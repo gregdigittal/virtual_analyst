@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/sentiment_v1.json",
+  "title": "sentiment_v1",
+  "description": "Assumption confidence and evidence overlay. Tracks provenance, quality, and conflicts for every material assumption in a model config.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "tenant_id",
+    "sentiment_id",
+    "baseline_id",
+    "baseline_version",
+    "created_at",
+    "entries",
+    "summary",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "sentiment_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tenant_id": { "type": "string" },
+    "sentiment_id": { "type": "string" },
+    "baseline_id": { "type": "string" },
+    "baseline_version": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "created_by": { "type": ["string", "null"] },
+
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sentiment_entry" },
+      "description": "One entry per tracked assumption"
+    },
+
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_tracked", "by_confidence", "evidence_coverage_pct", "conflicts"],
+      "properties": {
+        "total_tracked": { "type": "integer", "minimum": 0 },
+        "by_confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 },
+            "unvalidated": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "evidence_coverage_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "% of tracked assumptions with at least one evidence source"
+        },
+        "conflicts": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of assumptions with conflicting evidence"
+        }
+      }
+    },
+
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+
+  "$defs": {
+    "sentiment_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "assumption_path", "assumption_label", "confidence", "evidence"],
+      "properties": {
+        "entry_id": { "type": "string" },
+        "assumption_path": {
+          "type": "string",
+          "description": "JSON path in model_config (e.g., /assumptions/revenue_streams/0/drivers/pricing/0)"
+        },
+        "assumption_label": { "type": "string" },
+        "driver_ref": { "type": ["string", "null"], "description": "e.g., drv:price_per_unit" },
+        "current_value": { "description": "The value in the committed model_config" },
+        "confidence": {
+          "type": "string",
+          "enum": ["high", "medium", "low", "unvalidated"]
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_source" }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/conflict" },
+          "description": "Conflicting data points or opinions"
+        },
+        "sensitivity_rank": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Rank by impact on key output (1 = most sensitive). Set by tornado analysis."
+        },
+        "last_reviewed_at": { "type": ["string", "null"], "format": "date-time" },
+        "last_reviewed_by": { "type": ["string", "null"] }
+      }
+    },
+
+    "evidence_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "description"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "management_input",
+            "historical_data",
+            "industry_benchmark",
+            "contract_loi",
+            "regulatory",
+            "market_data",
+            "llm_research",
+            "analyst_estimate",
+            "assumption"
+          ]
+        },
+        "description": { "type": "string", "maxLength": 500 },
+        "date": { "type": ["string", "null"], "format": "date" },
+        "document_ref": { "type": ["string", "null"], "description": "Path or URL to source document" },
+        "page_ref": { "type": ["string", "null"], "description": "Page/cell reference within document" },
+        "quality": {
+          "type": "string",
+          "enum": ["verified", "plausible", "speculative"],
+          "default": "plausible"
+        }
+      }
+    },
+
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "alternative_value"],
+      "properties": {
+        "description": { "type": "string", "maxLength": 500 },
+        "alternative_value": { "description": "The conflicting data point" },
+        "source": { "$ref": "#/$defs/evidence_source" },
+        "resolution": {
+          "type": ["string", "null"],
+          "enum": ["accepted_current", "accepted_alternative", "unresolved", null]
+        },
+        "resolution_notes": { "type": ["string", "null"] }
+      }
+    },
+
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/integrity_check" }
+        }
+      }
+    },
+
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

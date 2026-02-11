@@ -1,0 +1,470 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/model_config_v1.json",
+  "title": "model_config_v1",
+  "description": "Compiled, immutable model configuration. The output of Draft→Commit and the input to the deterministic runtime engine.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "tenant_id",
+    "baseline_id",
+    "baseline_version",
+    "created_at",
+    "created_by",
+    "metadata",
+    "assumptions",
+    "driver_blueprint",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "model_config_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tenant_id": { "type": "string" },
+    "baseline_id": { "type": "string" },
+    "baseline_version": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "created_by": { "type": ["string", "null"] },
+    "parent_baseline_id": { "type": ["string", "null"] },
+    "parent_baseline_version": { "type": ["string", "null"] },
+    "template_id": { "type": ["string", "null"], "description": "Template used to initialize this config" },
+
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "assumptions": { "$ref": "#/$defs/assumptions" },
+    "driver_blueprint": { "$ref": "#/$defs/driver_blueprint" },
+    "distributions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/distribution_config" },
+      "description": "Stochastic distributions for Monte Carlo. Empty array = deterministic only."
+    },
+    "scenarios": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/scenario" },
+      "description": "Named scenario override sets."
+    },
+    "evidence_summary": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_entry" },
+      "description": "Provenance trail for assumptions."
+    },
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_name", "currency", "start_date", "horizon_months", "resolution"],
+      "properties": {
+        "entity_name": { "type": "string", "minLength": 1 },
+        "entity_description": { "type": ["string", "null"] },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217 currency code" },
+        "country_iso": { "type": ["string", "null"], "pattern": "^[A-Z]{2}$" },
+        "start_date": { "type": "string", "format": "date", "description": "First period start (YYYY-MM-DD)" },
+        "horizon_months": { "type": "integer", "minimum": 1, "maximum": 120 },
+        "resolution": { "type": "string", "enum": ["monthly", "annual"] },
+        "fiscal_year_end_month": { "type": "integer", "minimum": 1, "maximum": 12, "default": 12 },
+        "tax_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "initial_cash": { "type": "number", "minimum": 0, "description": "Opening cash balance" },
+        "initial_equity": { "type": "number", "minimum": 0, "description": "Opening equity" }
+      }
+    },
+
+    "assumptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revenue_streams", "cost_structure", "working_capital"],
+      "properties": {
+        "revenue_streams": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/revenue_stream" }
+        },
+        "cost_structure": { "$ref": "#/$defs/cost_structure" },
+        "working_capital": { "$ref": "#/$defs/working_capital" },
+        "capex": { "$ref": "#/$defs/capex" },
+        "funding": { "$ref": "#/$defs/funding" },
+        "staffing": {
+          "type": ["object", "null"],
+          "additionalProperties": true,
+          "description": "Optional headcount plan for services/SaaS templates"
+        },
+        "custom": {
+          "type": ["object", "null"],
+          "additionalProperties": true,
+          "description": "Template-specific assumptions not covered by standard categories"
+        }
+      }
+    },
+
+    "revenue_stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stream_id", "label", "stream_type", "drivers"],
+      "properties": {
+        "stream_id": { "type": "string" },
+        "label": { "type": "string" },
+        "stream_type": {
+          "type": "string",
+          "enum": ["unit_sale", "subscription", "transactional", "rental", "consumable_sale", "billable_hours", "fixed_fee"]
+        },
+        "drivers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "volume": { "type": "array", "items": { "$ref": "#/$defs/driver_value" } },
+            "pricing": { "type": "array", "items": { "$ref": "#/$defs/driver_value" } },
+            "direct_costs": { "type": "array", "items": { "$ref": "#/$defs/driver_value" } }
+          }
+        },
+        "working_capital_profile": {
+          "type": ["object", "null"],
+          "properties": {
+            "ar_days_ref": { "type": ["string", "null"] },
+            "ap_days_ref": { "type": ["string", "null"] },
+            "inv_days_ref": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+
+    "driver_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "value_type"],
+      "properties": {
+        "ref": { "type": "string", "description": "Driver reference (e.g., drv:price_per_unit)" },
+        "label": { "type": "string" },
+        "value_type": {
+          "type": "string",
+          "enum": ["constant", "ramp", "seasonal", "step"]
+        },
+        "value": { "description": "Scalar value for constant type" },
+        "schedule": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "required": ["month", "value"],
+            "properties": {
+              "month": { "type": "integer", "minimum": 0 },
+              "value": { "type": "number" }
+            }
+          },
+          "description": "Time-varying schedule for ramp/step types"
+        },
+        "seasonal_factors": {
+          "type": ["array", "null"],
+          "items": { "type": "number" },
+          "minItems": 12,
+          "maxItems": 12,
+          "description": "Monthly multipliers (Jan=index 0) for seasonal type"
+        },
+        "interpolation": {
+          "type": "string",
+          "enum": ["linear", "step"],
+          "default": "linear"
+        },
+        "units": { "type": ["string", "null"] },
+        "data_type": {
+          "type": "string",
+          "enum": ["number", "percent", "currency", "integer"],
+          "default": "number"
+        }
+      }
+    },
+
+    "cost_structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "variable_costs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cost_item" }
+        },
+        "fixed_costs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cost_item" }
+        },
+        "depreciation_method": {
+          "type": "string",
+          "enum": ["straight_line", "declining_balance"],
+          "default": "straight_line"
+        }
+      }
+    },
+
+    "cost_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cost_id", "label", "category", "driver"],
+      "properties": {
+        "cost_id": { "type": "string" },
+        "label": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": ["cogs", "sga", "rnd", "other_opex"]
+        },
+        "driver": { "$ref": "#/$defs/driver_value" }
+      }
+    },
+
+    "working_capital": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ar_days", "ap_days", "inv_days"],
+      "properties": {
+        "ar_days": { "$ref": "#/$defs/driver_value" },
+        "ap_days": { "$ref": "#/$defs/driver_value" },
+        "inv_days": { "$ref": "#/$defs/driver_value" },
+        "minimum_cash": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Floor for cash balance (triggers revolver draw if configured)"
+        }
+      }
+    },
+
+    "capex": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["capex_id", "label", "amount", "month", "useful_life_months"],
+            "properties": {
+              "capex_id": { "type": "string" },
+              "label": { "type": "string" },
+              "amount": { "type": "number", "minimum": 0 },
+              "month": { "type": "integer", "minimum": 0, "description": "Period in which capex occurs" },
+              "useful_life_months": { "type": "integer", "minimum": 1 },
+              "residual_value": { "type": "number", "minimum": 0, "default": 0 }
+            }
+          }
+        }
+      }
+    },
+
+    "funding": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "equity_raises": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["amount", "month"],
+            "properties": {
+              "label": { "type": "string" },
+              "amount": { "type": "number" },
+              "month": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "debt_facilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["facility_id", "label", "type", "limit", "interest_rate"],
+            "properties": {
+              "facility_id": { "type": "string" },
+              "label": { "type": "string" },
+              "type": { "type": "string", "enum": ["term_loan", "revolver", "overdraft"] },
+              "limit": { "type": "number", "minimum": 0 },
+              "interest_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+              "draw_schedule": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "object",
+                  "required": ["month", "amount"],
+                  "properties": {
+                    "month": { "type": "integer" },
+                    "amount": { "type": "number" }
+                  }
+                }
+              },
+              "repayment_schedule": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "object",
+                  "required": ["month", "amount"],
+                  "properties": {
+                    "month": { "type": "integer" },
+                    "amount": { "type": "number" }
+                  }
+                }
+              },
+              "is_cash_plug": {
+                "type": "boolean",
+                "default": false,
+                "description": "If true, this facility auto-draws to maintain minimum_cash"
+              }
+            }
+          }
+        },
+        "dividends": {
+          "type": ["object", "null"],
+          "properties": {
+            "policy": { "type": "string", "enum": ["none", "fixed_amount", "payout_ratio"] },
+            "value": { "type": "number" }
+          }
+        }
+      }
+    },
+
+    "driver_blueprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges", "formulas"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/blueprint_node" }
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/blueprint_edge" }
+        },
+        "formulas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/blueprint_formula" }
+        }
+      }
+    },
+
+    "blueprint_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "type", "label"],
+      "properties": {
+        "node_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["driver", "formula", "output"] },
+        "label": { "type": "string" },
+        "ref": { "type": ["string", "null"], "description": "Driver reference (e.g., drv:price_per_unit) for driver nodes" }
+      }
+    },
+
+    "blueprint_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" }
+      }
+    },
+
+    "blueprint_formula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["formula_id", "output_node_id", "expression", "inputs"],
+      "properties": {
+        "formula_id": { "type": "string" },
+        "output_node_id": { "type": "string" },
+        "expression": { "type": "string", "description": "Safe arithmetic expression" },
+        "inputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "References to input node_ids or driver refs"
+        },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+
+    "distribution_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "family", "params"],
+      "properties": {
+        "ref": { "type": "string", "description": "Driver reference to make stochastic" },
+        "family": {
+          "type": "string",
+          "enum": ["triangular", "normal", "lognormal", "uniform", "pert"]
+        },
+        "params": {
+          "type": "object",
+          "description": "Distribution-specific parameters",
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "mode": { "type": "number" },
+            "mean": { "type": "number" },
+            "std": { "type": "number" }
+          }
+        },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_id", "label", "overrides"],
+      "properties": {
+        "scenario_id": { "type": "string" },
+        "label": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "overrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scenario_override" }
+        }
+      }
+    },
+
+    "scenario_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "field", "value"],
+      "properties": {
+        "ref": { "type": "string", "description": "Driver reference to override" },
+        "field": { "type": "string", "enum": ["value", "multiplier"], "description": "Replace value or multiply base" },
+        "value": { "type": "number" },
+        "target_ref_version": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+
+    "evidence_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assumption_path", "source", "confidence"],
+      "properties": {
+        "assumption_path": { "type": "string", "description": "JSON path to the assumption" },
+        "source": { "type": "string", "maxLength": 500 },
+        "confidence": { "type": "string", "enum": ["high", "medium", "low", "unvalidated"] },
+        "proposed_by": { "type": ["string", "null"], "enum": ["user", "llm", null] },
+        "accepted_by": { "type": ["string", "null"] },
+        "accepted_at": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/integrity_check" }
+        }
+      }
+    },
+
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

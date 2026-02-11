@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/excel_connection_v1.json",
+  "title": "excel_connection_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "tenant_id",
+    "excel_connection_id",
+    "created_at",
+    "mode",
+    "target",
+    "workbook",
+    "bindings",
+    "sync",
+    "permissions",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "excel_connection_v1"
+    },
+    "artifact_version": {
+      "type": "string"
+    },
+    "tenant_id": {
+      "type": "string"
+    },
+    "excel_connection_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "read_only",
+        "bidirectional"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "draft_session",
+            "baseline",
+            "run"
+          ]
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "workbook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "template_version",
+        "sheet_map"
+      ],
+      "properties": {
+        "template_version": {
+          "type": "string"
+        },
+        "sheet_map": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assumptions",
+            "results",
+            "statements",
+            "kpis",
+            "metadata"
+          ],
+          "properties": {
+            "assumptions": {
+              "type": "string"
+            },
+            "results": {
+              "type": "string"
+            },
+            "statements": {
+              "type": "string"
+            },
+            "kpis": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/binding"
+      }
+    },
+    "sync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pull_enabled",
+        "push_enabled",
+        "push_behavior",
+        "refresh_interval_seconds"
+      ],
+      "properties": {
+        "pull_enabled": {
+          "type": "boolean"
+        },
+        "push_enabled": {
+          "type": "boolean"
+        },
+        "push_behavior": {
+          "type": "string",
+          "enum": [
+            "draft_override",
+            "changeset",
+            "blocked"
+          ]
+        },
+        "refresh_interval_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "can_push_roles"
+      ],
+      "properties": {
+        "can_push_roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "analyst",
+              "investor"
+            ]
+          }
+        }
+      }
+    },
+    "integrity": {
+      "$ref": "#/$defs/integrity_block"
+    }
+  },
+  "$defs": {
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "checks"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "warning",
+            "failed"
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/integrity_check"
+          }
+        }
+      }
+    },
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "severity",
+        "message"
+      ],
+      "properties": {
+        "check_id": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "details": {
+          "type": "object"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_id",
+        "kind",
+        "path",
+        "excel_ref",
+        "data_type"
+      ],
+      "properties": {
+        "binding_id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "assumption",
+            "result",
+            "statement_line",
+            "kpi"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "excel_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sheet",
+            "range",
+            "name"
+          ],
+          "properties": {
+            "sheet": {
+              "type": "string"
+            },
+            "range": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "data_type": {
+          "type": "string",
+          "enum": [
+            "number",
+            "string",
+            "date",
+            "percent",
+            "currency"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "max": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "allowed_values": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

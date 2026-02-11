@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/llm_routing_policy_v1.json",
+  "title": "llm_routing_policy_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "policy_id",
+    "created_at",
+    "rules",
+    "fallback",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "llm_routing_policy_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "policy_id": { "type": "string" },
+    "tenant_id": { "type": ["string", "null"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/routing_rule" }
+    },
+    "fallback": { "$ref": "#/$defs/provider_config" },
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+  "$defs": {
+    "routing_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_label", "priority", "provider", "model"],
+      "properties": {
+        "task_label": {
+          "type": "string",
+          "enum": ["draft_assumptions", "evidence_extraction", "memo_generation", "template_matching", "template_initialization"]
+        },
+        "priority": { "type": "integer", "minimum": 1 },
+        "provider": { "type": "string", "enum": ["anthropic", "openai"] },
+        "model": { "type": "string" },
+        "max_tokens": { "type": "integer", "minimum": 1, "default": 4096 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2, "default": 0.2 },
+        "cost_tier": { "type": "string", "enum": ["low", "standard", "high"], "default": "standard" }
+      }
+    },
+    "provider_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": { "type": "string", "enum": ["anthropic", "openai"] },
+        "model": { "type": "string" },
+        "max_tokens": { "type": "integer", "minimum": 1, "default": 4096 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2, "default": 0.2 },
+        "cost_tier": { "type": "string", "enum": ["low", "standard", "high"], "default": "low" }
+      }
+    },
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": { "type": "array", "items": { "$ref": "#/$defs/integrity_check" } }
+      }
+    },
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

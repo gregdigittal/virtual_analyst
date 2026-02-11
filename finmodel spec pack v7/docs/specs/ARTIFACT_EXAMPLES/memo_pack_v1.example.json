@@ -1,0 +1,38 @@
+{
+  "artifact_type": "memo_pack_v1",
+  "artifact_version": "1.0.0",
+  "tenant_id": "t_demo",
+  "memo_id": "memo_ic_001",
+  "created_at": "2026-02-07T00:00:00Z",
+  "created_by": "user_demo",
+  "memo_type": "investment_committee",
+  "source": {
+    "baseline_id": "b_001",
+    "run_id": "run_123",
+    "scenario_id": "base",
+    "changeset_id": null
+  },
+  "sections": [
+    {
+      "id": "executive_summary",
+      "title": "Executive Summary",
+      "content_blocks": [
+        {
+          "kind": "markdown",
+          "payload": {
+            "text": "Summary of opportunity, thesis, and key metrics."
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "html_path": "memos/memo_ic_001/index.html",
+    "pdf_path": "memos/memo_ic_001/memo.pdf",
+    "docx_path": "memos/memo_ic_001/memo.docx"
+  },
+  "integrity": {
+    "status": "passed",
+    "checks": []
+  }
+}

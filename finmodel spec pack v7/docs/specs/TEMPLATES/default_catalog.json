@@ -1,0 +1,283 @@
+{
+  "artifact_version": "1.0.0",
+  "artifact_type": "venture_template_catalog_v1",
+  "generated_at": "2026-02-07T00:00:00Z",
+  "catalog": {
+    "catalog_id": "vtc_default",
+    "version": "1.0.0",
+    "status": "active"
+  },
+  "templates": [
+    { "template_id": "manufacturing_discrete", "label": "Manufacturing (Discrete)", "business_model_family": "manufacturing",
+      "industry_context_tags": ["supply_chain_sensitive","capex_moderate","working_capital_intensive"],
+      "gtm_motion_tags": ["b2b","channel","direct_sales"],
+      "question_plan": [
+        { "section": "Revenue Streams", "questions": [
+          { "id": "rs_1", "q": "List your revenue streams (products/services). For each: unit, price range, expected monthly volumes." },
+          { "id": "rs_2", "q": "Are there any by-products or secondary revenue streams (maintenance, spares, warranties)?" }
+        ]},
+        { "section": "Capacity & Operations", "questions": [
+          { "id": "cap_1", "q": "What is the primary capacity constraint (machines, shifts, labor, raw materials, permits)?" },
+          { "id": "cap_2", "q": "What utilization ramp is expected over the first 24 months?" },
+          { "id": "cap_3", "q": "What yield/scrap/defect rates are expected?" }
+        ]},
+        { "section": "Costs", "questions": [
+          { "id": "c_1", "q": "Provide BOM/material costs per unit (or cost range), labor per unit, and energy/utilities per unit." },
+          { "id": "c_2", "q": "List fixed overheads (rent, admin, compliance, maintenance)." }
+        ]},
+        { "section": "Working Capital", "questions": [
+          { "id": "wc_1", "q": "Provide AR/AP days and inventory days (raw/WIP/finished) for each major product line if they differ." }
+        ]},
+        { "section": "Capex", "questions": [
+          { "id": "x_1", "q": "Provide capex milestones and commissioning dates. Any known quote ranges?" }
+        ]},
+        { "section": "USP / Competitive Edge", "questions": [
+          { "id": "usp_1", "q": "Select unfair advantages (distribution, licenses, tech/IP, cost advantage, local edge, partnerships) and explain why." },
+          { "id": "usp_2", "q": "What proof points exist (prior plants, contracts, LOIs, proprietary process, experienced team)?" }
+        ]}
+      ],
+      "required_inputs": [
+        { "id": "reporting_currency", "section": "Basics", "type": "string", "required": true },
+        { "id": "country_iso", "section": "Basics", "type": "string", "required": true },
+        { "id": "revenue_streams", "section": "Revenue Streams", "type": "array", "required": true },
+        { "id": "capacity_units_per_month", "section": "Capacity & Operations", "type": "number", "required": true },
+        { "id": "utilization_ramp", "section": "Capacity & Operations", "type": "array", "required": true },
+        { "id": "yield_rate", "section": "Capacity & Operations", "type": "number", "required": true },
+        { "id": "variable_cost_per_unit", "section": "Costs", "type": "number", "required": true },
+        { "id": "fixed_opex_per_month", "section": "Costs", "type": "number", "required": true },
+        { "id": "ar_days", "section": "Working Capital", "type": "number", "required": true },
+        { "id": "ap_days", "section": "Working Capital", "type": "number", "required": true },
+        { "id": "inv_days", "section": "Working Capital", "type": "number", "required": true }
+      ],
+      "default_distributions": [
+        { "ref": "drv:utilization", "family": "triangular", "params": { "min": 0.2, "mode": 0.5, "max": 0.85 } },
+        { "ref": "drv:yield_rate", "family": "triangular", "params": { "min": 0.85, "mode": 0.92, "max": 0.97 } },
+        { "ref": "drv:price_per_unit", "family": "triangular", "params": { "min": 0.9, "mode": 1.0, "max": 1.15 }, "notes": "Multiplier on input price baseline if only one number is given." },
+        { "ref": "drv:material_cost_per_unit", "family": "triangular", "params": { "min": 0.9, "mode": 1.0, "max": 1.2 } }
+      ],
+      "scenario_templates": [
+        { "scenario_id": "sc_base", "label": "Base Case", "overrides": [] },
+        { "scenario_id": "sc_downside_supply", "label": "Downside: Supply Disruption", "overrides": [
+          { "ref": "drv:material_cost_per_unit", "field": "multiplier", "value": 1.15, "target_ref_version": "v1", "notes": "+15% materials cost" },
+          { "ref": "drv:utilization", "field": "multiplier", "value": 0.85, "target_ref_version": "v1", "notes": "utilization reduced" }
+        ]},
+        { "scenario_id": "sc_upside_mix", "label": "Upside: Better Mix & Yield", "overrides": [
+          { "ref": "drv:yield_rate", "field": "multiplier", "value": 1.02, "target_ref_version": "v1" },
+          { "ref": "drv:price_per_unit", "field": "multiplier", "value": 1.05, "target_ref_version": "v1" }
+        ]}
+      ],
+      "usp_framework": {
+        "unfair_advantages": ["distribution_access","exclusive_partnerships","regulatory_licenses","proprietary_process_or_ip","cost_advantage_scale_or_inputs","local_execution_edge","switching_costs","brand_trust"],
+        "moat_mechanisms": ["higher_conversion","lower_churn","higher_price_power","lower_unit_cost","faster_rollout","supply_security","quality_advantage"],
+        "proof_points_prompts": ["Existing contracts/LOIs?","Prior operating history or experienced team?","Unique supplier access or proprietary process proof?"]
+      },
+      "driver_blueprint": {
+        "nodes": [
+          { "node_id": "n_price", "type": "driver", "label": "Avg Price / Unit", "ref": "drv:price_per_unit" },
+          { "node_id": "n_capacity", "type": "driver", "label": "Capacity Units/Month", "ref": "drv:capacity_units_per_month" },
+          { "node_id": "n_util", "type": "driver", "label": "Utilization", "ref": "drv:utilization" },
+          { "node_id": "n_yield", "type": "driver", "label": "Yield Rate", "ref": "drv:yield_rate" },
+          { "node_id": "n_units_sold", "type": "formula", "label": "Units Sold" },
+          { "node_id": "n_revenue", "type": "output", "label": "Revenue" },
+          { "node_id": "n_mat_cost", "type": "driver", "label": "Material Cost / Unit", "ref": "drv:material_cost_per_unit" },
+          { "node_id": "n_var_cost", "type": "formula", "label": "Variable Cost" },
+          { "node_id": "n_gross_profit", "type": "output", "label": "Gross Profit" }
+        ],
+        "edges": [
+          { "from": "n_capacity", "to": "n_units_sold" },
+          { "from": "n_util", "to": "n_units_sold" },
+          { "from": "n_yield", "to": "n_units_sold" },
+          { "from": "n_units_sold", "to": "n_revenue" },
+          { "from": "n_price", "to": "n_revenue" },
+          { "from": "n_units_sold", "to": "n_var_cost" },
+          { "from": "n_mat_cost", "to": "n_var_cost" },
+          { "from": "n_revenue", "to": "n_gross_profit" },
+          { "from": "n_var_cost", "to": "n_gross_profit" }
+        ],
+        "formulas": [
+          { "formula_id": "f_units", "output_node_id": "n_units_sold", "expression": "capacity_units_per_month * utilization * yield_rate", "inputs": ["drv:capacity_units_per_month","drv:utilization","drv:yield_rate"] },
+          { "formula_id": "f_rev", "output_node_id": "n_revenue", "expression": "units_sold * price_per_unit", "inputs": ["n_units_sold","drv:price_per_unit"] },
+          { "formula_id": "f_var", "output_node_id": "n_var_cost", "expression": "units_sold * material_cost_per_unit", "inputs": ["n_units_sold","drv:material_cost_per_unit"] }
+        ]
+      }
+    },
+    { "template_id": "wholesale_distribution", "label": "Wholesale Distribution", "business_model_family": "distribution",
+      "industry_context_tags": ["working_capital_intensive","supplier_concentration_risk","fx_sensitive_optional"],
+      "gtm_motion_tags": ["b2b","channel"],
+      "question_plan": [
+        { "section": "Revenue Streams", "questions": [{ "id": "rs_1", "q": "List revenue streams: product categories, service add-ons, rebates, delivery fees. Which have different credit terms?" }] },
+        { "section": "Volume & Pricing", "questions": [
+          { "id": "vp_1", "q": "How many customers, orders per customer per month, and average order value (by category)?" },
+          { "id": "vp_2", "q": "Gross margin targets by category; discounting policy; rebates?" }
+        ]},
+        { "section": "Working Capital", "questions": [{ "id": "wc_1", "q": "AR/AP and inventory days by category if materially different." }] },
+        { "section": "Supply Chain", "questions": [{ "id": "sc_1", "q": "Top suppliers and lead times; any import exposure; substitution options?" }] },
+        { "section": "USP / Competitive Edge", "questions": [{ "id": "usp_1", "q": "Why can you win: exclusive supply, distribution footprint, pricing power, credit advantage, service levels?" }] }
+      ],
+      "required_inputs": [
+        { "id": "revenue_streams", "section": "Revenue Streams", "type": "array", "required": true },
+        { "id": "customer_count", "section": "Volume & Pricing", "type": "number", "required": true },
+        { "id": "orders_per_customer_per_month", "section": "Volume & Pricing", "type": "number", "required": true },
+        { "id": "avg_order_value", "section": "Volume & Pricing", "type": "number", "required": true },
+        { "id": "gross_margin_pct", "section": "Volume & Pricing", "type": "number", "required": true },
+        { "id": "inv_days", "section": "Working Capital", "type": "number", "required": true }
+      ],
+      "default_distributions": [
+        { "ref": "drv:gross_margin_pct", "family": "triangular", "params": { "min": 0.12, "mode": 0.18, "max": 0.25 } },
+        { "ref": "wc:inv_days", "family": "triangular", "params": { "min": 30, "mode": 60, "max": 120 } }
+      ],
+      "scenario_templates": [
+        { "scenario_id": "sc_downside_inventory", "label": "Downside: Inventory Build / Slower Sell-through", "overrides": [{ "ref": "wc:inv_days", "field": "value", "value": 90, "target_ref_version": "v1" }] }
+      ],
+      "usp_framework": {
+        "unfair_advantages": ["exclusive_partnerships","distribution_access","cost_advantage_scale_or_inputs","local_execution_edge"],
+        "moat_mechanisms": ["supply_security","lower_unit_cost","faster_rollout","higher_conversion"],
+        "proof_points_prompts": ["Distribution footprint evidence?","Supplier contracts?","Service levels / OTIF metrics?"]
+      },
+      "driver_blueprint": {
+        "nodes": [
+          { "node_id": "n_cust", "type": "driver", "label": "Customers", "ref": "drv:customer_count" },
+          { "node_id": "n_freq", "type": "driver", "label": "Orders per Customer per Month", "ref": "drv:orders_per_customer_per_month" },
+          { "node_id": "n_aov", "type": "driver", "label": "Avg Order Value", "ref": "drv:avg_order_value" },
+          { "node_id": "n_rev", "type": "output", "label": "Revenue" },
+          { "node_id": "n_gm", "type": "driver", "label": "Gross Margin %", "ref": "drv:gross_margin_pct" }
+        ],
+        "edges": [
+          { "from": "n_cust", "to": "n_rev" },
+          { "from": "n_freq", "to": "n_rev" },
+          { "from": "n_aov", "to": "n_rev" }
+        ],
+        "formulas": [
+          { "formula_id": "f_rev", "output_node_id": "n_rev", "expression": "customer_count * orders_per_customer_per_month * avg_order_value", "inputs": ["drv:customer_count","drv:orders_per_customer_per_month","drv:avg_order_value"] }
+        ]
+      }
+    },
+    { "template_id": "services_billable", "label": "Services (Billable Hours)", "business_model_family": "services",
+      "industry_context_tags": ["talent_driven","low_capex","ar_sensitive"],
+      "gtm_motion_tags": ["b2b","direct_sales"],
+      "question_plan": [
+        { "section": "Revenue Streams", "questions": [{ "id": "rs_1", "q": "Revenue streams: time & materials, retainers, fixed-fee projects, success fees. Which have different billing terms?" }]},
+        { "section": "Delivery", "questions": [
+          { "id": "d_1", "q": "Team size plan, utilization target, average bill rate (by role if possible)." },
+          { "id": "d_2", "q": "Pipeline assumptions: lead-to-win rate and average project duration." }
+        ]},
+        { "section": "Working Capital", "questions": [{ "id": "wc_1", "q": "AR days, billing lag, and unbilled WIP policy." }]},
+        { "section": "USP", "questions": [{ "id": "usp_1", "q": "What gives you an edge: niche expertise, relationships, delivery capability, proprietary methods?" }]}
+      ],
+      "required_inputs": [
+        { "id": "revenue_streams", "section": "Revenue Streams", "type": "array", "required": true },
+        { "id": "headcount", "section": "Delivery", "type": "number", "required": true },
+        { "id": "utilization", "section": "Delivery", "type": "number", "required": true },
+        { "id": "bill_rate", "section": "Delivery", "type": "number", "required": true },
+        { "id": "ar_days", "section": "Working Capital", "type": "number", "required": true }
+      ],
+      "default_distributions": [
+        { "ref": "drv:utilization", "family": "triangular", "params": { "min": 0.55, "mode": 0.70, "max": 0.82 } },
+        { "ref": "wc:ar_days", "family": "triangular", "params": { "min": 30, "mode": 45, "max": 75 } }
+      ],
+      "scenario_templates": [
+        { "scenario_id": "sc_downside_util", "label": "Downside: Lower Utilization", "overrides": [{ "ref": "drv:utilization", "field": "multiplier", "value": 0.9, "target_ref_version": "v1" }] }
+      ],
+      "usp_framework": {
+        "unfair_advantages": ["local_execution_edge","brand_trust","proprietary_process_or_ip","distribution_access"],
+        "moat_mechanisms": ["higher_conversion","higher_price_power","lower_churn"],
+        "proof_points_prompts": ["Past delivery outcomes?","Client references?","Specialized certifications?"]
+      },
+      "driver_blueprint": {
+        "nodes": [
+          { "node_id": "n_hc", "type": "driver", "label": "Headcount", "ref": "drv:headcount" },
+          { "node_id": "n_util", "type": "driver", "label": "Utilization", "ref": "drv:utilization" },
+          { "node_id": "n_rate", "type": "driver", "label": "Bill Rate", "ref": "drv:bill_rate" },
+          { "node_id": "n_rev", "type": "output", "label": "Revenue" }
+        ],
+        "edges": [],
+        "formulas": [
+          { "formula_id": "f_rev", "output_node_id": "n_rev", "expression": "headcount * utilization * bill_rate", "inputs": ["drv:headcount","drv:utilization","drv:bill_rate"] }
+        ]
+      }
+    },
+    { "template_id": "saas_b2b", "label": "SaaS (B2B Subscription)", "business_model_family": "software",
+      "industry_context_tags": ["recurring_revenue","high_gross_margin","sales_cycle_risk"],
+      "gtm_motion_tags": ["enterprise_sales","smb_sales","land_and_expand"],
+      "question_plan": [
+        { "section": "Revenue Streams", "questions": [{ "id": "rs_1", "q": "Revenue streams: subscriptions (tiers), implementation fees, usage-based components. Which are recurring vs one-off?" }]},
+        { "section": "Go-to-Market", "questions": [
+          { "id": "gtm_1", "q": "Pipeline assumptions: leads, conversion rate, average sales cycle (months), average contract value." },
+          { "id": "gtm_2", "q": "Retention assumptions: churn %, expansion %, renewal uplift." }
+        ]},
+        { "section": "Unit Economics", "questions": [{ "id": "ue_1", "q": "CAC (sales+marketing per new customer), gross margin %, support cost per customer." }]},
+        { "section": "USP", "questions": [{ "id": "usp_1", "q": "Why do customers choose you: switching costs, integrations, data advantage, compliance, performance?" }]}
+      ],
+      "required_inputs": [
+        { "id": "revenue_streams", "section": "Revenue Streams", "type": "array", "required": true },
+        { "id": "starting_customers", "section": "Go-to-Market", "type": "number", "required": true },
+        { "id": "new_customers_per_month", "section": "Go-to-Market", "type": "number", "required": true },
+        { "id": "arpa_per_month", "section": "Go-to-Market", "type": "number", "required": true },
+        { "id": "monthly_churn_rate", "section": "Go-to-Market", "type": "number", "required": true }
+      ],
+      "default_distributions": [
+        { "ref": "drv:monthly_churn_rate", "family": "triangular", "params": { "min": 0.008, "mode": 0.015, "max": 0.03 } },
+        { "ref": "drv:expansion_rate", "family": "triangular", "params": { "min": 0.0, "mode": 0.01, "max": 0.03 } }
+      ],
+      "scenario_templates": [
+        { "scenario_id": "sc_downside_churn", "label": "Downside: Higher Churn", "overrides": [{ "ref": "drv:monthly_churn_rate", "field": "multiplier", "value": 1.35, "target_ref_version": "v1" }] }
+      ],
+      "usp_framework": {
+        "unfair_advantages": ["proprietary_process_or_ip","switching_costs","brand_trust","regulatory_licenses","data_advantage"],
+        "moat_mechanisms": ["lower_churn","higher_price_power","higher_conversion","faster_rollout"],
+        "proof_points_prompts": ["Retention cohort evidence?","Integration partners?","Compliance approvals?"]
+      },
+      "driver_blueprint": {
+        "nodes": [
+          { "node_id": "n_c0", "type": "driver", "label": "Starting Customers", "ref": "drv:starting_customers" },
+          { "node_id": "n_new", "type": "driver", "label": "New Customers / Month", "ref": "drv:new_customers_per_month" },
+          { "node_id": "n_churn", "type": "driver", "label": "Monthly Churn Rate", "ref": "drv:monthly_churn_rate" },
+          { "node_id": "n_arpa", "type": "driver", "label": "ARPA / Month", "ref": "drv:arpa_per_month" },
+          { "node_id": "n_rev", "type": "output", "label": "Subscription Revenue" }
+        ],
+        "edges": [],
+        "formulas": [
+          { "formula_id": "f_rev", "output_node_id": "n_rev", "expression": "(starting_customers + cumulative_new_customers - churned_customers) * arpa_per_month", "inputs": ["drv:starting_customers","drv:new_customers_per_month","drv:monthly_churn_rate","drv:arpa_per_month"], "notes": "Implementation will model customer stock and churn each month." }
+        ]
+      }
+    },
+    { "template_id": "fintech_payments_multi_stream", "label": "Fintech Payments (Multi-Stream: Fees + Rentals + Consumables)",
+      "business_model_family": "fintech_payments",
+      "industry_context_tags": ["regulated","network_effects","multi_currency_optional","fraud_risk","device_supply_chain"],
+      "gtm_motion_tags": ["merchant_acquisition","channel","embedded"],
+      "question_plan": [],
+      "required_inputs": [],
+      "default_distributions": [],
+      "scenario_templates": [],
+      "usp_framework": {
+        "unfair_advantages": ["local_execution_edge","distribution_access","regulatory_licenses","exclusive_partnerships","proprietary_process_or_ip","brand_trust","risk_control_advantage"],
+        "moat_mechanisms": ["faster_rollout","higher_conversion","lower_unit_cost","lower_losses","higher_retention","network_effects_liquidity"],
+        "proof_points_prompts": ["Multi-country operational track record?","Existing merchant network or partners?","Proven reliability in low-connectivity environments?","Compliance capability and prior regulatory interactions?"]
+      },
+      "stream_blueprints": [
+        { "stream_id": "rs_txn_fees", "label": "Transaction Fees", "stream_type": "transactional",
+          "drivers": {"volume": ["drv:active_merchants","drv:txns_per_merchant_per_day","drv:avg_ticket"], "pricing": ["drv:take_rate_pct"], "direct_costs": ["drv:processing_cost_pct","drv:agent_commission_pct","drv:fraud_loss_pct"]},
+          "working_capital_profile": {"settlement_lag_ref": "wc:settlement_lag_days_txn","ar_days_ref": "wc:ar_days_txn","ap_days_ref": "wc:ap_days_txn","inv_days_ref": null},
+          "supply_chain_profile": {"physical": false}
+        },
+        { "stream_id": "rs_device_rental", "label": "POS Device Rental", "stream_type": "rental",
+          "drivers": {"volume": ["drv:active_devices_rented"], "pricing": ["drv:device_rental_fee_per_month"], "direct_costs": ["drv:device_unit_cost","drv:device_lifespan_months","drv:device_maintenance_pct"]},
+          "working_capital_profile": {"settlement_lag_ref":"wc:settlement_lag_days_rental","ar_days_ref":"wc:ar_days_rental","ap_days_ref":"wc:ap_days_rental","inv_days_ref":"wc:inv_days_devices"},
+          "supply_chain_profile": {"physical": true, "inputs": [{"input_id":"in_pos_device","label":"POS Device","cogs_share_hint":0.0,"lead_time_days_ref":"sc:device_lead_time_days","fx_exposure":"import_optional"}]}
+        },
+        { "stream_id": "rs_token_sales", "label": "NFC Token / Media Sales", "stream_type": "consumable_sale",
+          "drivers": {"volume": ["drv:tokens_sold_per_month"], "pricing": ["drv:token_price"], "direct_costs": ["drv:token_unit_cost","drv:token_logistics_cost_per_unit"]},
+          "working_capital_profile": {"settlement_lag_ref":"wc:settlement_lag_days_tokens","ar_days_ref":"wc:ar_days_tokens","ap_days_ref":"wc:ap_days_tokens","inv_days_ref":"wc:inv_days_tokens"},
+          "supply_chain_profile": {"physical": true, "inputs": [{"input_id":"in_nfc_token","label":"NFC Token/Media","cogs_share_hint":0.0,"lead_time_days_ref":"sc:token_lead_time_days","fx_exposure":"import_optional"}]}
+        }
+      ],
+      "driver_blueprint": {"nodes": [], "edges": [], "formulas": []}
+    }
+  ],
+  "integrity": {
+    "status": "passed",
+    "checks": [
+      { "check_id": "I_CATALOG_STARTER_SET", "severity": "info", "message": "Starter templates included: manufacturing, distribution, services, SaaS, fintech multi-stream." }
+    ]
+  }
+}

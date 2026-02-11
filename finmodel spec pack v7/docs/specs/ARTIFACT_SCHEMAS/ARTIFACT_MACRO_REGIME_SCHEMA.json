@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/macro_regime_v1.json",
+  "title": "macro_regime_v1",
+  "description": "Macroeconomic overlay providing interest rates, inflation, FX rates, and country risk factors for a model.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "tenant_id",
+    "regime_id",
+    "created_at",
+    "base_currency",
+    "as_of_date",
+    "interest_rates",
+    "inflation",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "macro_regime_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tenant_id": { "type": "string" },
+    "regime_id": { "type": "string" },
+    "label": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "created_by": { "type": ["string", "null"] },
+    "base_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "as_of_date": { "type": "string", "format": "date" },
+    "source": {
+      "type": ["string", "null"],
+      "description": "Data source (e.g., 'SARB MPC Jan 2026', 'Bloomberg', 'Manual input')"
+    },
+
+    "interest_rates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_rate"],
+      "properties": {
+        "policy_rate": { "$ref": "#/$defs/rate_curve" },
+        "prime_rate": { "$ref": "#/$defs/rate_curve" },
+        "risk_free_rate": { "$ref": "#/$defs/rate_curve" },
+        "credit_spread_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Entity-specific credit spread in basis points"
+        }
+      }
+    },
+
+    "inflation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpi"],
+      "properties": {
+        "cpi": { "$ref": "#/$defs/rate_curve" },
+        "ppi": { "$ref": "#/$defs/rate_curve" }
+      }
+    },
+
+    "fx_rates": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["currency_pair", "spot_rate"],
+        "properties": {
+          "currency_pair": { "type": "string", "pattern": "^[A-Z]{3}/[A-Z]{3}$", "description": "e.g., USD/ZAR" },
+          "spot_rate": { "type": "number", "exclusiveMinimum": 0 },
+          "forward_curve": { "$ref": "#/$defs/rate_curve" }
+        }
+      }
+    },
+
+    "country_risk": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "equity_risk_premium": { "type": "number", "minimum": 0 },
+        "country_risk_premium": { "type": "number", "minimum": 0 },
+        "small_stock_premium": { "type": "number", "minimum": 0 },
+        "sovereign_rating": { "type": ["string", "null"] },
+        "sovereign_spread_bps": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "gdp_growth": { "$ref": "#/$defs/rate_curve" },
+
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+
+  "$defs": {
+    "rate_curve": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current"],
+      "properties": {
+        "current": { "type": "number", "description": "Current annualized rate (e.g., 0.075 for 7.5%)" },
+        "forecast": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "required": ["date", "value"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "value": { "type": "number" }
+            }
+          },
+          "description": "Forward curve: expected values at future dates"
+        },
+        "source": { "type": ["string", "null"] }
+      }
+    },
+
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/integrity_check" }
+        }
+      }
+    },
+
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

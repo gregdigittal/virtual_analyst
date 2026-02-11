@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/llm_call_log_v1.json",
+  "title": "llm_call_log_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "tenant_id",
+    "call_id",
+    "created_at",
+    "task_label",
+    "provider",
+    "model",
+    "tokens",
+    "latency_ms",
+    "cost_estimate_usd",
+    "correlation",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "llm_call_log_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tenant_id": { "type": "string" },
+    "call_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "task_label": {
+      "type": "string",
+      "enum": ["draft_assumptions", "evidence_extraction", "memo_generation", "template_matching", "template_initialization"]
+    },
+    "provider": { "type": "string", "enum": ["anthropic", "openai"] },
+    "model": { "type": "string" },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt_tokens", "completion_tokens", "total_tokens"],
+      "properties": {
+        "prompt_tokens": { "type": "integer", "minimum": 0 },
+        "completion_tokens": { "type": "integer", "minimum": 0 },
+        "total_tokens": { "type": "integer", "minimum": 0 },
+        "cache_read_tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "cache_write_tokens": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "latency_ms": { "type": "integer", "minimum": 0 },
+    "cost_estimate_usd": { "type": "number", "minimum": 0 },
+    "status": { "type": "string", "enum": ["success", "error", "timeout"], "default": "success" },
+    "error_message": { "type": ["string", "null"] },
+    "retry_count": { "type": "integer", "minimum": 0, "default": 0 },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "draft_session_id": { "type": ["string", "null"] },
+        "user_id": { "type": ["string", "null"] },
+        "request_id": { "type": ["string", "null"] },
+        "run_id": { "type": ["string", "null"] },
+        "memo_id": { "type": ["string", "null"] }
+      }
+    },
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+  "$defs": {
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": { "type": "array", "items": { "$ref": "#/$defs/integrity_check" } }
+      }
+    },
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

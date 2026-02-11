@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+import structlog
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from apps.api.app.core.settings import get_settings
+from apps.api.app.middleware.logging import logging_middleware
+from apps.api.app.middleware.metrics import metrics_middleware
+from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
+from apps.api.app.routers import health
+from shared.fm_shared.errors import FinModelError, get_http_status
+from shared.fm_shared.logging import configure_logging
+from shared.fm_shared.metrics import metrics_app
+
+
+settings = get_settings()
+configure_logging(environment=settings.environment, log_level=settings.log_level)
+logger = structlog.get_logger()
+
+
+app = FastAPI(
+    title="Virtual Analyst API",
+    version="0.1.0",
+    description="Deterministic financial modeling platform",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.middleware("http")(logging_middleware)
+app.middleware("http")(security_headers_middleware)
+app.middleware("http")(metrics_middleware)
+
+init_rate_limiting(app, settings.rate_limit)
+
+
+@app.exception_handler(FinModelError)
+async def finmodel_error_handler(request: Request, exc: FinModelError) -> JSONResponse:
+    logger.error(
+        "FinModel error",
+        error_code=exc.code,
+        error_message=exc.message,
+        category=exc.category.value,
+        severity=exc.severity.value,
+        context=exc.context,
+    )
+
+    return JSONResponse(
+        status_code=get_http_status(exc.code),
+        content={
+            "error": exc.to_dict(),
+            "meta": {
+                "request_id": getattr(request.state, "request_id", ""),
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            },
+        },
+    )
+
+
+app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.mount("/metrics", metrics_app)
+
+
+@app.get("/")
+async def root() -> dict:
+    return {"name": "Virtual Analyst API", "version": "0.1.0", "status": "ok"}

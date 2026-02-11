@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/memo_pack_v1.json",
+  "title": "memo_pack_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "tenant_id",
+    "memo_id",
+    "created_at",
+    "memo_type",
+    "source",
+    "sections",
+    "outputs",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "memo_pack_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tenant_id": { "type": "string" },
+    "memo_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "created_by": { "type": ["string", "null"] },
+    "memo_type": {
+      "type": "string",
+      "enum": ["investment_committee", "credit_memo", "valuation_note"]
+    },
+    "title": { "type": ["string", "null"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline_id", "run_id"],
+      "properties": {
+        "baseline_id": { "type": "string" },
+        "baseline_version": { "type": ["string", "null"] },
+        "run_id": { "type": "string" },
+        "scenario_id": { "type": ["string", "null"] },
+        "changeset_id": { "type": ["string", "null"] }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/section" }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["html_path"],
+      "properties": {
+        "html_path": { "type": "string" },
+        "pdf_path": { "type": ["string", "null"] },
+        "docx_path": { "type": ["string", "null"] }
+      }
+    },
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "content_blocks"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "order": { "type": "integer", "minimum": 0 },
+        "content_blocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/block" }
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "payload"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["markdown", "table_ref", "chart_ref", "assumption_refs", "risk_summary"]
+        },
+        "payload": {
+          "oneOf": [
+            { "$ref": "#/$defs/markdown_payload" },
+            { "$ref": "#/$defs/table_ref_payload" },
+            { "$ref": "#/$defs/chart_ref_payload" },
+            { "$ref": "#/$defs/assumption_refs_payload" },
+            { "$ref": "#/$defs/risk_summary_payload" }
+          ]
+        }
+      }
+    },
+    "markdown_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content"],
+      "properties": {
+        "content": { "type": "string", "description": "Markdown text content" }
+      }
+    },
+    "table_ref_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["table_type"],
+      "properties": {
+        "table_type": {
+          "type": "string",
+          "enum": ["income_statement", "balance_sheet", "cash_flow", "kpis", "custom"]
+        },
+        "periods": {
+          "type": ["array", "null"],
+          "items": { "type": "string" },
+          "description": "Which periods to include (null = all)"
+        },
+        "line_items": {
+          "type": ["array", "null"],
+          "items": { "type": "string" },
+          "description": "Which line items to include (null = all)"
+        },
+        "title": { "type": ["string", "null"] }
+      }
+    },
+    "chart_ref_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chart_type", "metric"],
+      "properties": {
+        "chart_type": { "type": "string", "enum": ["line", "bar", "area", "fan", "waterfall"] },
+        "metric": { "type": "string", "description": "e.g., revenue, ebitda, fcf" },
+        "include_mc_bands": { "type": "boolean", "default": false },
+        "title": { "type": ["string", "null"] },
+        "storage_path": { "type": ["string", "null"], "description": "Path to rendered chart image" }
+      }
+    },
+    "assumption_refs_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paths"],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "JSON paths to assumptions to display"
+        },
+        "include_evidence": { "type": "boolean", "default": true },
+        "include_confidence": { "type": "boolean", "default": true }
+      }
+    },
+    "risk_summary_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_risks": { "type": "integer", "minimum": 1, "default": 5 },
+        "source": {
+          "type": "string",
+          "enum": ["sentiment", "mc_sensitivity", "manual"],
+          "default": "sentiment"
+        }
+      }
+    },
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": { "type": "array", "items": { "$ref": "#/$defs/integrity_check" } }
+      }
+    },
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

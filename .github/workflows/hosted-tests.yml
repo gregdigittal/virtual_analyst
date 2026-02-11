@@ -1,0 +1,30 @@
+name: Hosted Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  hosted-e2e:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.HOSTED_API_URL != '' }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+
+      - name: Run hosted tests
+        env:
+          HOSTED_API_URL: ${{ secrets.HOSTED_API_URL }}
+          HOSTED_WEB_URL: ${{ secrets.HOSTED_WEB_URL }}
+        run: |
+          pytest tests/e2e/ -v

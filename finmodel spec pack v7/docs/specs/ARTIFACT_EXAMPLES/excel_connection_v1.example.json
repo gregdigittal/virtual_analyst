@@ -1,0 +1,76 @@
+{
+  "artifact_type": "excel_connection_v1",
+  "artifact_version": "1.0.0",
+  "tenant_id": "t_demo",
+  "excel_connection_id": "xc_001",
+  "created_at": "2026-02-07T00:00:00Z",
+  "created_by": "user_demo",
+  "mode": "bidirectional",
+  "target": {
+    "kind": "baseline",
+    "id": "b_001"
+  },
+  "workbook": {
+    "template_version": "1.0",
+    "sheet_map": {
+      "assumptions": "Assumptions",
+      "results": "Results",
+      "statements": "Statements",
+      "kpis": "KPIs",
+      "metadata": "Meta"
+    }
+  },
+  "bindings": [
+    {
+      "binding_id": "a_price",
+      "kind": "assumption",
+      "path": "/assumptions/revenue/streams/0/price",
+      "excel_ref": {
+        "sheet": "Assumptions",
+        "range": "B5",
+        "name": "assump_price"
+      },
+      "data_type": "currency",
+      "units": "USD",
+      "validation": {
+        "min": 0,
+        "max": null,
+        "allowed_values": null
+      }
+    },
+    {
+      "binding_id": "k_fcf_p50",
+      "kind": "kpi",
+      "path": "/kpis/fcf/p50",
+      "excel_ref": {
+        "sheet": "KPIs",
+        "range": "B12",
+        "name": "kpi_fcf_p50"
+      },
+      "data_type": "number",
+      "units": "USD",
+      "validation": {
+        "min": null,
+        "max": null,
+        "allowed_values": null
+      }
+    }
+  ],
+  "sync": {
+    "pull_enabled": true,
+    "push_enabled": true,
+    "push_behavior": "changeset",
+    "refresh_interval_seconds": 0
+  },
+  "permissions": {
+    "can_push_roles": [
+      "owner",
+      "admin",
+      "analyst"
+    ]
+  },
+  "integrity": {
+    "status": "passed",
+    "checks": []
+  }
+}

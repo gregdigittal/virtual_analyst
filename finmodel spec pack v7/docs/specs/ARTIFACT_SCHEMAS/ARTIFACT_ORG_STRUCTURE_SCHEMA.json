@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/org_structure_v1.json",
+  "title": "org_structure_v1",
+  "description": "Multi-entity group structure defining subsidiaries, ownership, intercompany relationships, and consolidation rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "tenant_id",
+    "org_id",
+    "created_at",
+    "group_name",
+    "reporting_currency",
+    "entities",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "org_structure_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tenant_id": { "type": "string" },
+    "org_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "created_by": { "type": ["string", "null"] },
+    "group_name": { "type": "string", "minLength": 1 },
+    "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+
+    "entities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entity" }
+    },
+
+    "ownership_links": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ownership_link" },
+      "description": "Parent-child ownership relationships"
+    },
+
+    "intercompany_links": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/$defs/intercompany_link" },
+      "description": "Intercompany transactions to eliminate on consolidation"
+    },
+
+    "consolidation": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["full", "proportional", "equity_method"],
+          "default": "full"
+        },
+        "eliminate_intercompany": { "type": "boolean", "default": true },
+        "minority_interest_treatment": {
+          "type": "string",
+          "enum": ["proportional", "full_goodwill"],
+          "default": "proportional"
+        }
+      }
+    },
+
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "name", "entity_type", "currency", "country_iso"],
+      "properties": {
+        "entity_id": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 },
+        "entity_type": {
+          "type": "string",
+          "enum": ["holding", "operating", "spv", "jv", "associate", "branch"]
+        },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "country_iso": { "type": "string", "pattern": "^[A-Z]{2}$" },
+        "tax_jurisdiction": { "type": ["string", "null"] },
+        "tax_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "is_root": {
+          "type": "boolean",
+          "default": false,
+          "description": "True for the top-level holding/parent entity"
+        },
+        "baseline_id": {
+          "type": ["string", "null"],
+          "description": "Link to this entity's model_config baseline (if modelled)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "dormant", "disposed"],
+          "default": "active"
+        }
+      }
+    },
+
+    "ownership_link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parent_entity_id", "child_entity_id", "ownership_pct"],
+      "properties": {
+        "parent_entity_id": { "type": "string" },
+        "child_entity_id": { "type": "string" },
+        "ownership_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Ownership percentage (e.g., 75 for 75%)"
+        },
+        "voting_pct": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Voting percentage if different from ownership"
+        },
+        "consolidation_method": {
+          "type": "string",
+          "enum": ["full", "proportional", "equity_method", "not_consolidated"],
+          "description": "Override: >50% defaults to full, 20-50% to equity, <20% to not_consolidated"
+        },
+        "effective_date": { "type": ["string", "null"], "format": "date" }
+      }
+    },
+
+    "intercompany_link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_entity_id", "to_entity_id", "link_type"],
+      "properties": {
+        "from_entity_id": { "type": "string" },
+        "to_entity_id": { "type": "string" },
+        "link_type": {
+          "type": "string",
+          "enum": ["management_fee", "royalty", "loan", "trade", "dividend"]
+        },
+        "description": { "type": ["string", "null"] },
+        "driver_ref": {
+          "type": ["string", "null"],
+          "description": "Reference to a driver in the from-entity's model_config"
+        }
+      }
+    },
+
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/integrity_check" }
+        }
+      }
+    },
+
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

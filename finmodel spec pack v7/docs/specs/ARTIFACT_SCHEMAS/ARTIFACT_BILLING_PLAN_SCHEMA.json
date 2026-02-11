@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finmodel.app/schemas/billing_plan_v1.json",
+  "title": "billing_plan_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "artifact_version",
+    "plan_id",
+    "created_at",
+    "label",
+    "limits",
+    "pricing",
+    "integrity"
+  ],
+  "properties": {
+    "artifact_type": { "const": "billing_plan_v1" },
+    "artifact_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "plan_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "label": { "type": "string" },
+    "tier": { "type": "string", "enum": ["starter", "professional", "enterprise"] },
+    "status": { "type": "string", "enum": ["active", "deprecated"], "default": "active" },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seats", "entities", "llm_tokens_monthly", "mc_simulations_per_run", "connectors"],
+      "properties": {
+        "seats": { "type": "integer", "minimum": 1, "description": "Max users per tenant" },
+        "entities": { "type": "integer", "minimum": 1, "description": "Max modelled entities" },
+        "llm_tokens_monthly": { "type": "integer", "minimum": 0, "description": "Max LLM tokens per month (0 = unlimited)" },
+        "mc_simulations_per_run": { "type": "integer", "minimum": 0, "description": "Max MC simulations per run" },
+        "mc_runs_monthly": { "type": "integer", "minimum": 0, "description": "Max MC runs per month" },
+        "connectors": { "type": "integer", "minimum": 0, "description": "Max ERP connections" },
+        "excel_connections": { "type": "integer", "minimum": 0, "description": "Max Excel live link connections" },
+        "memo_pages_monthly": { "type": "integer", "minimum": 0, "description": "Max memo pages per month" },
+        "storage_gb": { "type": "number", "minimum": 0, "description": "Max artifact storage in GB" }
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "base_monthly"],
+      "properties": {
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "base_monthly": { "type": "integer", "minimum": 0, "description": "Base monthly price in cents" },
+        "base_annual": { "type": ["integer", "null"], "minimum": 0, "description": "Annual price in cents (discount)" },
+        "per_seat_monthly": { "type": ["integer", "null"], "minimum": 0, "description": "Additional seat price in cents" },
+        "per_entity_monthly": { "type": ["integer", "null"], "minimum": 0 },
+        "overage_llm_per_1k_tokens": { "type": ["integer", "null"], "minimum": 0, "description": "Overage cost per 1000 tokens in cents" },
+        "overage_mc_per_run": { "type": ["integer", "null"], "minimum": 0 },
+        "overage_connector_monthly": { "type": ["integer", "null"], "minimum": 0 },
+        "custom_pricing": { "type": "boolean", "default": false, "description": "True for enterprise (negotiated)" }
+      }
+    },
+    "features": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "draft_llm": { "type": "boolean", "default": true },
+        "monte_carlo": { "type": "boolean", "default": false },
+        "valuation": { "type": "boolean", "default": false },
+        "erp_sync": { "type": "boolean", "default": false },
+        "excel_live_links": { "type": "boolean", "default": false },
+        "memo_packs": { "type": "boolean", "default": false },
+        "byo_api_key": { "type": "boolean", "default": false },
+        "sso": { "type": "boolean", "default": false },
+        "audit_log": { "type": "boolean", "default": false },
+        "priority_support": { "type": "boolean", "default": false }
+      }
+    },
+    "integrity": { "$ref": "#/$defs/integrity_block" }
+  },
+  "$defs": {
+    "integrity_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "checks": { "type": "array", "items": { "$ref": "#/$defs/integrity_check" } }
+      }
+    },
+    "integrity_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "severity", "message"],
+      "properties": {
+        "check_id": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}
