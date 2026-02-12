@@ -188,9 +188,10 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: Jobs execute with retry and status tracking
 - Note: `apps/worker/celery_app.py` (Redis broker/backend), `apps/worker/tasks.py` (add, fail_then_dlq; DLQ on final failure). `POST /api/v1/jobs/enqueue`, `GET /api/v1/jobs/{task_id}`. Run worker: `celery -A apps.worker.celery_app worker -l info`.
 
-### VA-P2-02: Draft session CRUD (M)
+### VA-P2-02: Draft session CRUD (M) — DONE
 - State machine and autosave
 - AC: Draft lifecycle transitions enforced
+- Note: POST/GET/PATCH/DELETE /api/v1/drafts; state machine active↔ready_to_commit, any→abandoned; workspace in ArtifactStore (draft_workspace); audit draft.created/accessed/abandoned; PATCH supports status and/or workspace (autosave).
 
 ### VA-P2-03: LLM provider abstraction (L)
 - Anthropic + OpenAI with structured outputs
