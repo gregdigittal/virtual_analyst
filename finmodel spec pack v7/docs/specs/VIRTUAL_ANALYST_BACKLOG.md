@@ -183,9 +183,10 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 
 ## Phase 2 — Draft Layer + LLM Integration
 
-### VA-P2-01: Background job queue (M)
+### VA-P2-01: Background job queue (M) — DONE
 - Celery + Redis, retries, DLQ
 - AC: Jobs execute with retry and status tracking
+- Note: `apps/worker/celery_app.py` (Redis broker/backend), `apps/worker/tasks.py` (add, fail_then_dlq; DLQ on final failure). `POST /api/v1/jobs/enqueue`, `GET /api/v1/jobs/{task_id}`. Run worker: `celery -A apps.worker.celery_app worker -l info`.
 
 ### VA-P2-02: Draft session CRUD (M)
 - State machine and autosave

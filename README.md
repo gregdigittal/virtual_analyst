@@ -24,6 +24,16 @@ Hosted tests require GitHub secrets:
 - `HOSTED_API_URL`
 - `HOSTED_WEB_URL` (optional)
 
+## Running the worker (Celery)
+
+With Redis running (`docker-compose up -d` or `REDIS_URL` set):
+
+```bash
+celery -A apps.worker.celery_app worker -l info
+```
+
+Jobs API: `POST /api/v1/jobs/enqueue` (body: `{"task": "add", "args": [1, 2]}`) returns `task_id`; poll `GET /api/v1/jobs/{task_id}` for status. Failed jobs after retries are appended to a Redis DLQ list (`celery:dlq`).
+
 ## Repository Layout
 
 - `apps/` — API, web, and worker services

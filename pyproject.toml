@@ -75,6 +75,7 @@ packages = [
     "apps.api.app.core",
     "apps.api.app.middleware",
     "apps.api.app.routers",
+    "apps.worker",
     "shared",
     "shared.fm_shared",
 ]
