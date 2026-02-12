@@ -1,0 +1,99 @@
+{
+  "artifact_type": "model_config_v1",
+  "artifact_version": "1.0.0",
+  "tenant_id": "t_golden",
+  "baseline_id": "bl_mfg",
+  "baseline_version": "v1",
+  "created_at": "2026-01-01T00:00:00Z",
+  "template_id": "manufacturing_discrete",
+  "metadata": {
+    "entity_name": "Manufacturing Golden",
+    "currency": "ZAR",
+    "start_date": "2026-01-01",
+    "horizon_months": 12,
+    "tax_rate": 0.27,
+    "initial_cash": 500000,
+    "initial_equity": 2000000
+  },
+  "assumptions": {
+    "revenue_streams": [
+      {
+        "stream_id": "rs1",
+        "label": "Product",
+        "stream_type": "unit_sale",
+        "drivers": {
+          "volume": [
+            {"ref": "drv:monthly_capacity", "value_type": "constant", "value": 1000},
+            {"ref": "drv:utilization", "value_type": "constant", "value": 0.7},
+            {"ref": "drv:yield_rate", "value_type": "constant", "value": 0.92}
+          ],
+          "pricing": [
+            {"ref": "drv:price_per_unit", "value_type": "constant", "value": 4500}
+          ],
+          "direct_costs": [
+            {"ref": "drv:material_cost", "value_type": "constant", "value": 1800}
+          ]
+        }
+      }
+    ],
+    "cost_structure": {
+      "variable_costs": [],
+      "fixed_costs": [
+        {
+          "cost_id": "fc_plant",
+          "label": "Plant Overhead",
+          "category": "cogs",
+          "driver": {"ref": "drv:plant_overhead", "value_type": "constant", "value": 250000}
+        }
+      ]
+    },
+    "working_capital": {
+      "ar_days": {"ref": "drv:ar_days", "value_type": "constant", "value": 45},
+      "ap_days": {"ref": "drv:ap_days", "value_type": "constant", "value": 30},
+      "inv_days": {"ref": "drv:inv_days", "value_type": "constant", "value": 60}
+    }
+  },
+  "driver_blueprint": {
+    "nodes": [
+      {"node_id": "n_capacity", "type": "driver", "label": "Capacity", "ref": "drv:monthly_capacity"},
+      {"node_id": "n_utilization", "type": "driver", "label": "Utilization", "ref": "drv:utilization"},
+      {"node_id": "n_yield", "type": "driver", "label": "Yield", "ref": "drv:yield_rate"},
+      {"node_id": "n_price", "type": "driver", "label": "Price", "ref": "drv:price_per_unit"},
+      {"node_id": "n_material", "type": "driver", "label": "Material", "ref": "drv:material_cost"},
+      {"node_id": "n_units_produced", "type": "formula", "label": "Units Produced"},
+      {"node_id": "n_revenue", "type": "output", "label": "Revenue"},
+      {"node_id": "n_material_cogs", "type": "output", "label": "Material COGS"}
+    ],
+    "edges": [
+      {"from": "n_capacity", "to": "n_units_produced"},
+      {"from": "n_utilization", "to": "n_units_produced"},
+      {"from": "n_yield", "to": "n_units_produced"},
+      {"from": "n_units_produced", "to": "n_revenue"},
+      {"from": "n_price", "to": "n_revenue"},
+      {"from": "n_units_produced", "to": "n_material_cogs"},
+      {"from": "n_material", "to": "n_material_cogs"}
+    ],
+    "formulas": [
+      {
+        "formula_id": "f_units",
+        "output_node_id": "n_units_produced",
+        "expression": "monthly_capacity * utilization * yield_rate",
+        "inputs": ["drv:monthly_capacity", "drv:utilization", "drv:yield_rate"]
+      },
+      {
+        "formula_id": "f_revenue",
+        "output_node_id": "n_revenue",
+        "expression": "units_produced * price_per_unit",
+        "inputs": ["n_units_produced", "drv:price_per_unit"]
+      },
+      {
+        "formula_id": "f_material_cogs",
+        "output_node_id": "n_material_cogs",
+        "expression": "units_produced * material_cost",
+        "inputs": ["n_units_produced", "drv:material_cost"]
+      }
+    ]
+  },
+  "scenarios": [],
+  "integrity": {"status": "passed", "checks": []}
+}

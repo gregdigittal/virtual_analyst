@@ -5,8 +5,8 @@ Version: 1.0
 This backlog is the execution overlay for Virtual Analyst v1, derived from the FinModel v7 spec pack. For detailed schemas and acceptance criteria, reference `docs/specs/BACKLOG.md` and the phase prompts in `docs/specs/PROMPTS/`.
 
 ## Status (2026-02-11)
-- **Phase 1 core shipped:** Model layer (schemas, graph, evaluator, engine, statements, KPIs), baseline/run APIs with transactions and audit, artifact store (Supabase/in-memory), migration 0006_audit_log, web UI (login, baselines list/detail, runs list, run results IS/BS/CF + KPIs). Unit tests for graph, evaluator, engine, statements, KPIs (24 passing). Statements generator: CF closing cash aligned to BS via financing plug.
-- **Next:** VA-P1-21 (integration tests), VA-P1-22 (performance tests), VA-P1-23 (golden file tests). Then Phase 1 optional: VA-P1-12–15 (indexing, pooling, query optimization, dashboard).
+- **Phase 1 core shipped:** Model layer, baseline/run APIs, artifact store, audit, web UI. Unit tests (24), integration tests (4, gated by INTEGRATION_TESTS=1 + DB), performance tests (engine 12mo P95 &lt;500ms, full pipeline &lt;1s), golden file tests (manufacturing statements/KPIs). Integration suite: baseline/run lifecycle, tenant isolation (RLS). Golden: manufacturing_base_statements.json, manufacturing_base_kpis.json.
+- **Next:** VA-P1-14 (query optimization), VA-P1-15 (performance monitoring dashboard). CI: set INTEGRATION_TESTS=1 and DATABASE_URL to run integration tests.
 - **Context save:** `docs/specs/CONTEXT_SAVE_2026-02-11.md`
 
 ## Complexity Scale
@@ -123,13 +123,15 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - Run lifecycle with status transitions and artifacts
 - AC: Runs complete and results retrievable
 
-### VA-P1-12: Database indexing (S)
+### VA-P1-12: Database indexing (S) — DONE
 - Indexes per performance spec
 - AC: Query performance meets <50ms P95 target
+- Note: 0007_indexes_performance.sql — idx_model_baselines_tenant_created, idx_runs_tenant_created.
 
-### VA-P1-13: Connection pooling (S)
-- SQLAlchemy pool sizing and metrics
+### VA-P1-13: Connection pooling (S) — DONE
+- Pool sizing and metrics
 - AC: Pool configured to 20 connections
+- Note: asyncpg pool in apps/api/app/db/connection.py (init_pool/close_pool, lifespan); DB_POOL_MIN_SIZE, DB_POOL_MAX_SIZE=20.
 
 ### VA-P1-14: Query optimization (M)
 - Eliminate N+1s, add pagination
@@ -160,17 +162,20 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: Unit tests pass; coverage >70 percent
 - Note: 24 unit tests (graph, evaluator, engine, statements, KPIs); model layer coverage improved.
 
-### VA-P1-21: Integration tests (L)
+### VA-P1-21: Integration tests (L) — DONE
 - Baseline/run lifecycle and RLS isolation
 - AC: Integration suite passes; RLS enforced
+- Note: tests/integration (baseline create/list/get, run lifecycle, tenant isolation). Run with INTEGRATION_TESTS=1 and DATABASE_URL set.
 
-### VA-P1-22: Performance tests (M)
+### VA-P1-22: Performance tests (M) — DONE
 - Engine and API latency thresholds
 - AC: Performance tests meet SLAs
+- Note: tests/load/test_engine_performance.py — engine 12mo &lt;500ms P95, full pipeline &lt;1s.
 
-### VA-P1-23: Golden file tests (M)
+### VA-P1-23: Golden file tests (M) — DONE
 - Manufacturing template outputs
 - AC: Outputs match golden files within tolerance
+- Note: tests/golden/ — manufacturing_config.json, manufacturing_base_statements.json, manufacturing_base_kpis.json.
 
 ---
 

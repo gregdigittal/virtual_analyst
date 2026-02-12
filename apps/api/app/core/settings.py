@@ -19,6 +19,8 @@ class Settings(BaseSettings):
         default="postgresql://postgres:postgres@localhost:5432/finmodel_dev",
         alias="DATABASE_URL",
     )
+    pool_min_size: int = Field(default=2, ge=0, alias="DB_POOL_MIN_SIZE")
+    pool_max_size: int = Field(default=20, ge=1, le=100, alias="DB_POOL_MAX_SIZE")
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
 
     supabase_url: str = Field(default="http://localhost:54321", alias="SUPABASE_URL")

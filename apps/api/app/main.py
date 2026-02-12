@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import structlog
@@ -8,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from apps.api.app.core.settings import get_settings
+from apps.api.app.db.connection import close_pool, init_pool
 from apps.api.app.middleware.logging import logging_middleware
 from apps.api.app.middleware.metrics import metrics_middleware
 from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
@@ -21,10 +23,18 @@ configure_logging(environment=settings.environment, log_level=settings.log_level
 logger = structlog.get_logger()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_pool()
+    yield
+    await close_pool()
+
+
 app = FastAPI(
     title="Virtual Analyst API",
     version="0.1.0",
     description="Deterministic financial modeling platform",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

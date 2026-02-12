@@ -1,4 +1,4 @@
-"""Database connection helper."""
+"""Database connection helper with connection pooling."""
 
 from __future__ import annotations
 
@@ -6,8 +6,35 @@ import asyncpg
 
 from apps.api.app.core.settings import get_settings
 
+_pool: asyncpg.Pool | None = None
+
+
+async def init_pool() -> None:
+    """Create the connection pool (call at app startup)."""
+    global _pool
+    if _pool is not None:
+        return
+    settings = get_settings()
+    _pool = await asyncpg.create_pool(
+        settings.database_url,
+        min_size=settings.pool_min_size,
+        max_size=settings.pool_max_size,
+        command_timeout=60,
+    )
+
+
+async def close_pool() -> None:
+    """Close the connection pool (call at app shutdown)."""
+    global _pool
+    if _pool is not None:
+        await _pool.close()
+        _pool = None
+
 
 async def get_conn() -> asyncpg.Connection:
+    """Return a connection from the pool, or a new connection if pool not initialized."""
+    if _pool is not None:
+        return await _pool.acquire()
     settings = get_settings()
     return await asyncpg.connect(settings.database_url)
 
