@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import List, Any
+from typing import List
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        env_parse_delimiter=",",
     )
 
     environment: str = Field(default="development", alias="ENVIRONMENT")
@@ -29,21 +28,15 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
 
-    cors_allowed_origins: List[str] = Field(
-        default=["http://localhost:3000"],
+    cors_allowed_origins: str = Field(
+        default="http://localhost:3000",
         alias="CORS_ALLOWED_ORIGINS",
     )
 
     rate_limit: str = Field(default="100/minute", alias="RATE_LIMIT")
 
-    @field_validator("cors_allowed_origins", mode="before")
-    @classmethod
-    def split_origins(cls, value: Any) -> List[str]:
-        if value is None:
-            return []
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return [item for item in list(value) if item]
+    def cors_allowed_origins_list(self) -> List[str]:
+        return [item.strip() for item in self.cors_allowed_origins.split(",") if item.strip()]
 
 
 def get_settings() -> Settings:
