@@ -2,8 +2,12 @@
 
 ## Repo state
 - **Branch:** main
-- **Last push:** 9bea640 — Phase 1: Core engine, baselines/runs API, audit log, web UI
+- **Last push:** 694f16d — Metrics: exclude /api/v1/metrics from latency; require X-Tenant-ID on summary; dashboard auth headers
 - **Remote:** https://github.com/gregdigittal/virtual_analyst.git
+
+### Incremental (2026-02-11)
+- **Metrics middleware:** Requests to `/api/v1/metrics` are excluded from latency recording to avoid self-pollution of the ring buffer.
+- **Metrics summary auth:** `GET /api/v1/metrics/summary` now requires `X-Tenant-ID` header; returns 400 if missing. Dashboard `fetchSummary` sends `X-Tenant-ID` (from `user_metadata.tenant_id` or `user.id`) and `Authorization: Bearer <access_token>`.
 
 ## Completed (Phase 1 core)
 
@@ -32,11 +36,9 @@
 - **DB:** Supabase Postgres; run migrations 0001, 0002, 0006 in SQL Editor. RLS uses `current_setting('app.tenant_id', true)` where applicable.
 
 ## Next build tasks (from backlog)
-1. **VA-P1-20 Unit tests (L):** Extend to engine, statements, KPIs; aim >70% coverage on model layer.
-2. **VA-P1-21 Integration tests (L):** Baseline/run lifecycle and RLS isolation.
-3. **VA-P1-22 Performance tests (M):** Engine and API latency (e.g. P95 <500ms for 12-month run).
-4. **VA-P1-23 Golden file tests (M):** Manufacturing template outputs match golden files.
-5. **VA-P1-12/13/14/15 (optional):** DB indexing, connection pooling, query optimization, performance dashboard — can follow after tests.
+- **Phase 1:** Complete (VA-P1-01 through VA-P1-23, including unit/integration/perf/golden tests, indexing, pooling, query optimization, performance dashboard).
+- **Phase 2 (next):** VA-P2-01 Background job queue (M) — Celery + Redis, retries, DLQ. Then VA-P2-02 Draft session CRUD, VA-P2-03 LLM provider abstraction, etc.
+- **CI:** Run integration tests with `INTEGRATION_TESTS=1` and `DATABASE_URL` set.
 
 ## Notes
 - Frontend uses session `user.id` as tenant; no multi-tenant UI yet.
