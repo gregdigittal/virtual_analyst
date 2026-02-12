@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # --- Metadata ---
@@ -161,11 +161,10 @@ class BlueprintNode(BaseModel):
 
 
 class BlueprintEdge(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     from_: str = Field(..., alias="from")
     to: str = Field(...)
-
-    class Config:
-        populate_by_name = True
 
 
 class BlueprintFormula(BaseModel):

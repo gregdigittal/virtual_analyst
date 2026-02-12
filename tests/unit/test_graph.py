@@ -11,7 +11,9 @@ from shared.fm_shared.model.schemas import (
 )
 
 
-def _blueprint(nodes: list[dict], edges: list[dict], formulas: list[dict] | None = None) -> DriverBlueprint:
+def _blueprint(
+    nodes: list[dict], edges: list[dict], formulas: list[dict] | None = None
+) -> DriverBlueprint:
     return DriverBlueprint(
         nodes=[BlueprintNode.model_validate(n) for n in nodes],
         edges=[BlueprintEdge.model_validate(e) for e in edges],

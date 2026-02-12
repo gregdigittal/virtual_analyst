@@ -185,7 +185,7 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
             }
         )
 
-    # Cash flow
+    # Cash flow: closing cash must match BS cash (financing used as plug if needed)
     opening_cash = [initial_cash] + [bs_list[t]["cash"] for t in range(horizon - 1)]
     cf_list: list[dict[str, Any]] = []
     for t in range(horizon):
@@ -196,9 +196,9 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
         delta_ap = ap[t] - (ap[t - 1] if t > 0 else 0)
         operating = ni_t + da_t - delta_ar - delta_inv + delta_ap
         investing = -(ppe_gross[t] - (ppe_gross[t - 1] if t > 0 else 0))
-        financing = 0.0
+        closing = bs_list[t]["cash"]
+        financing = closing - opening_cash[t] - operating - investing
         net_cf = operating + investing + financing
-        closing = opening_cash[t] + net_cf
         cf_list.append(
             {
                 "period_index": t,
@@ -210,7 +210,7 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 "closing_cash": closing,
             }
         )
-        if abs(closing - bs_list[t]["cash"]) > 0.01:
+        if abs(closing - (opening_cash[t] + net_cf)) > 0.01:
             raise StatementImbalanceError(
                 f"CF closing cash {closing} != BS cash {bs_list[t]['cash']} at period {t}",
                 details={"period": t, "cf_closing": closing, "bs_cash": bs_list[t]["cash"]},

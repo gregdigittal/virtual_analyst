@@ -17,7 +17,9 @@ def test_evaluate_arithmetic() -> None:
 def test_evaluate_with_variables() -> None:
     """Expressions with variables resolve correctly."""
     assert evaluate("a + b", {"a": 10, "b": 5}) == 15.0
-    assert evaluate("units_sold * price_per_unit", {"units_sold": 100, "price_per_unit": 2.5}) == 250.0
+    assert (
+        evaluate("units_sold * price_per_unit", {"units_sold": 100, "price_per_unit": 2.5}) == 250.0
+    )
 
 
 def test_evaluate_min_max() -> None:
