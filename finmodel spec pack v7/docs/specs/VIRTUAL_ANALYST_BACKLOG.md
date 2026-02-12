@@ -6,7 +6,7 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 
 ## Status (2026-02-11)
 - **Phase 1 core shipped:** Model layer, baseline/run APIs, artifact store, audit, web UI. Unit tests (24), integration tests (4, gated by INTEGRATION_TESTS=1 + DB), performance tests (engine 12mo P95 &lt;500ms, full pipeline &lt;1s), golden file tests (manufacturing statements/KPIs). Integration suite: baseline/run lifecycle, tenant isolation (RLS). Golden: manufacturing_base_statements.json, manufacturing_base_kpis.json.
-- **Next:** VA-P1-14 (query optimization), VA-P1-15 (performance monitoring dashboard). CI: set INTEGRATION_TESTS=1 and DATABASE_URL to run integration tests.
+- **Next:** Phase 2 (VA-P2-01 etc.) or CI: set INTEGRATION_TESTS=1 and DATABASE_URL to run integration tests.
 - **Context save:** `docs/specs/CONTEXT_SAVE_2026-02-11.md`
 
 ## Complexity Scale
@@ -133,13 +133,15 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: Pool configured to 20 connections
 - Note: asyncpg pool in apps/api/app/db/connection.py (init_pool/close_pool, lifespan); DB_POOL_MIN_SIZE, DB_POOL_MAX_SIZE=20.
 
-### VA-P1-14: Query optimization (M)
+### VA-P1-14: Query optimization (M) — DONE
 - Eliminate N+1s, add pagination
 - AC: No N+1 in common queries
+- Note: List baselines/runs cap limit at 100 (Query le=100); single-query list (no N+1).
 
-### VA-P1-15: Performance monitoring (M)
+### VA-P1-15: Performance monitoring (M) — DONE
 - Engine and DB metrics dashboard
 - AC: Dashboard shows latency and execution time
+- Note: In-memory latency ring (get_latency_summary), GET /api/v1/metrics/summary, web /dashboard (request count, P50/P95, by endpoint).
 
 ### VA-P1-16: Audit logging (initial) (M) — DONE
 - Baseline/run event logging

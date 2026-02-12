@@ -30,6 +30,12 @@ export function Nav() {
           >
             Runs
           </Link>
+          <Link
+            href="/dashboard"
+            className="text-sm font-medium text-foreground hover:text-muted-foreground"
+          >
+            Dashboard
+          </Link>
         </div>
         <button
           type="button"

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPaths = ["/baselines", "/runs"];
+const protectedPaths = ["/baselines", "/runs", "/dashboard"];
 
 function isProtected(pathname: string): boolean {
   return protectedPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -44,5 +44,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/baselines/:path*", "/runs/:path*"],
+  matcher: ["/", "/login", "/baselines/:path*", "/runs/:path*", "/dashboard/:path*"],
 };

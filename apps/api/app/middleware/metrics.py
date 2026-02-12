@@ -8,6 +8,7 @@ from shared.fm_shared.metrics import (
     api_request_duration_seconds,
     api_requests_active,
     api_requests_total,
+    record_request_latency,
 )
 
 
@@ -33,5 +34,7 @@ async def metrics_middleware(request: Request, call_next):
             method=request.method,
             endpoint=request.url.path,
         ).observe(duration)
+        if not request.url.path.startswith("/api/v1/metrics"):
+            record_request_latency(request.url.path, duration)
 
     return response

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from apps.api.app.db import ensure_tenant, get_conn
@@ -89,8 +89,8 @@ async def create_baseline(
 @router.get("")
 async def list_baselines(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=100, description="Max 100 to avoid N+1 and large responses"),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from apps.api.app.db import ensure_tenant, get_conn
 from apps.api.app.db.audit import EVENT_RUN_ACCESSED, EVENT_RUN_CREATED, create_audit_event
@@ -161,8 +161,8 @@ async def create_run(
 @router.get("")
 async def list_runs(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=100, description="Max 100 to avoid N+1 and large responses"),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
