@@ -7,7 +7,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_parse_delimiter=",",
+    )
 
     environment: str = Field(default="development", alias="ENVIRONMENT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
@@ -35,9 +39,11 @@ class Settings(BaseSettings):
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def split_origins(cls, value: Any) -> List[str]:
+        if value is None:
+            return []
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
-        return list(value)
+        return [item for item in list(value) if item]
 
 
 def get_settings() -> Settings:
