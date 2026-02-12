@@ -4,6 +4,11 @@ Version: 1.0
 
 This backlog is the execution overlay for Virtual Analyst v1, derived from the FinModel v7 spec pack. For detailed schemas and acceptance criteria, reference `docs/specs/BACKLOG.md` and the phase prompts in `docs/specs/PROMPTS/`.
 
+## Status (2026-02-11)
+- **Phase 1 core shipped:** Model layer (schemas, graph, evaluator, engine, statements, KPIs), baseline/run APIs with transactions and audit, artifact store (Supabase/in-memory), migration 0006_audit_log, web UI (login, baselines list/detail, runs list, run results IS/BS/CF + KPIs). Unit tests added for graph and evaluator (11 passing).
+- **Next:** VA-P1-20 (extend unit tests to engine/statements/KPIs, coverage >70%), VA-P1-21 (integration tests), VA-P1-22 (performance tests), VA-P1-23 (golden file tests). Then Phase 1 optional: VA-P1-12–15 (indexing, pooling, query optimization, dashboard).
+- **Context save:** `docs/specs/CONTEXT_SAVE_2026-02-11.md`
+
 ## Complexity Scale
 - S: <1 day
 - M: 1-3 days
@@ -78,43 +83,43 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - Apply 0001/0002 migrations and enable Auth/Storage/RLS
 - AC: Tables present; RLS policies enabled; env configured
 
-### VA-P1-02: Pydantic models for model_config_v1 (L)
+### VA-P1-02: Pydantic models for model_config_v1 (L) — DONE
 - Full schema validation with cross-field checks
 - AC: Example JSON round-trips; invalid JSON rejected
 
-### VA-P1-03: Artifact storage service (M)
+### VA-P1-03: Artifact storage service (M) — DONE
 - Supabase Storage with schema validation and compression
 - AC: Save/load artifacts round-trip; invalid rejected
 
-### VA-P1-04: Calculation graph builder (L)
+### VA-P1-04: Calculation graph builder (L) — DONE
 - DAG build, topo sort, cycle detection
 - AC: Manufacturing blueprint builds; cycles error with path
 
-### VA-P1-05: Expression evaluator (M)
+### VA-P1-05: Expression evaluator (M) — DONE
 - Safe AST evaluation with limited functions
 - AC: Test expressions evaluate correctly; unsafe ops rejected
 
-### VA-P1-06: Time-series engine (XL)
+### VA-P1-06: Time-series engine (XL) — DONE
 - Execute formulas over horizon with limits and metrics
 - AC: 12-month run <500ms; deterministic outputs
 
-### VA-P1-07: Three-statement generator (XL)
+### VA-P1-07: Three-statement generator (XL) — DONE
 - IS/BS/CF with reconciliation and balancing
 - AC: BS balances monthly; CF reconciles to cash
 
-### VA-P1-08: KPI calculator (M)
+### VA-P1-08: KPI calculator (M) — DONE
 - Margins, ratios, working capital metrics
 - AC: KPIs match expected values in tests
 
-### VA-P1-09: FastAPI application scaffold (M)
+### VA-P1-09: FastAPI application scaffold (M) — DONE
 - Routers, DB/Redis connections, DI
 - AC: App boots and routes mounted correctly
 
-### VA-P1-10: Baseline API routes (M)
+### VA-P1-10: Baseline API routes (M) — DONE
 - CRUD with pagination and versioning rules
 - AC: CRUD works; one active baseline enforced
 
-### VA-P1-11: Run API routes (L)
+### VA-P1-11: Run API routes (L) — DONE
 - Run lifecycle with status transitions and artifacts
 - AC: Runs complete and results retrievable
 
@@ -134,25 +139,26 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - Engine and DB metrics dashboard
 - AC: Dashboard shows latency and execution time
 
-### VA-P1-16: Audit logging (initial) (M)
+### VA-P1-16: Audit logging (initial) (M) — DONE
 - Baseline/run event logging
 - AC: Events persisted in append-only audit table
 
-### VA-P1-17: Next.js web app scaffold (M)
+### VA-P1-17: Next.js web app scaffold (M) — DONE
 - Auth, layout, Tailwind, shadcn/ui
 - AC: Login and redirect to dashboard works
 
-### VA-P1-18: Baseline list + detail UI (M)
+### VA-P1-18: Baseline list + detail UI (M) — DONE
 - Pagination, search, error states
 - AC: List and detail pages render correctly
 
-### VA-P1-19: Run results UI (M)
+### VA-P1-19: Run results UI (M) — DONE
 - IS/BS/CF tables, KPIs, charts
 - AC: Tables render with correct formatting
 
-### VA-P1-20: Unit tests (L)
+### VA-P1-20: Unit tests (L) — IN PROGRESS
 - Engine, graph, evaluator, statements, KPIs
 - AC: Unit tests pass; coverage >70 percent
+- Note: Graph and evaluator tests added; extend to engine, statements, KPIs.
 
 ### VA-P1-21: Integration tests (L)
 - Baseline/run lifecycle and RLS isolation
