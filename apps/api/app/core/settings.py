@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,9 +35,10 @@ class Settings(BaseSettings):
 
     rate_limit: str = Field(default="100/minute", alias="RATE_LIMIT")
 
-    def cors_allowed_origins_list(self) -> List[str]:
+    def cors_allowed_origins_list(self) -> list[str]:
         return [item.strip() for item in self.cors_allowed_origins.split(",") if item.strip()]
 
 
+@lru_cache
 def get_settings() -> Settings:
     return Settings()

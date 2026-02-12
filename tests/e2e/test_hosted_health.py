@@ -3,7 +3,6 @@ import os
 import httpx
 import pytest
 
-
 HOSTED_API_URL = os.getenv("HOSTED_API_URL", "").rstrip("/")
 HOSTED_WEB_URL = os.getenv("HOSTED_WEB_URL", "").rstrip("/")
 

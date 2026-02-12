@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 
-class ErrorCategory(str, Enum):
+class ErrorCategory(StrEnum):
     VALIDATION = "validation"
     ENGINE = "engine"
     STORAGE = "storage"
@@ -15,7 +15,7 @@ class ErrorCategory(str, Enum):
     SYSTEM = "system"
 
 
-class ErrorSeverity(str, Enum):
+class ErrorSeverity(StrEnum):
     CRITICAL = "CRITICAL"
     ERROR = "ERROR"
     WARNING = "WARNING"
@@ -29,12 +29,12 @@ class FinModelError(Exception):
         self,
         code: str,
         message: str,
-        details: Optional[str] = None,
-        user_message: Optional[str] = None,
+        details: str | None = None,
+        user_message: str | None = None,
         category: ErrorCategory = ErrorCategory.SYSTEM,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
-        context: Optional[Dict[str, Any]] = None,
-        retry_after: Optional[int] = None,
+        context: dict[str, Any] | None = None,
+        retry_after: int | None = None,
     ) -> None:
         self.code = code
         self.message = message
@@ -44,17 +44,17 @@ class FinModelError(Exception):
         self.severity = severity
         self.context = context or {}
         self.retry_after = retry_after
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now(UTC)
         super().__init__(self.message)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "code": self.code,
             "message": self.message,
             "details": self.details,
             "severity": self.severity.value,
             "user_message": self.user_message,
-            "timestamp": self.timestamp.isoformat() + "Z",
+            "timestamp": self.timestamp.isoformat(),
             "retry_after": self.retry_after,
         }
 

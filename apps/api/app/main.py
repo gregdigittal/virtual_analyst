@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import structlog
 from fastapi import FastAPI, Request
@@ -11,11 +11,10 @@ from apps.api.app.core.settings import get_settings
 from apps.api.app.middleware.logging import logging_middleware
 from apps.api.app.middleware.metrics import metrics_middleware
 from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
-from apps.api.app.routers import health
+from apps.api.app.routers import baselines, health, runs
 from shared.fm_shared.errors import FinModelError, get_http_status
 from shared.fm_shared.logging import configure_logging
 from shared.fm_shared.metrics import metrics_app
-
 
 settings = get_settings()
 configure_logging(environment=settings.environment, log_level=settings.log_level)
@@ -60,13 +59,15 @@ async def finmodel_error_handler(request: Request, exc: FinModelError) -> JSONRe
             "error": exc.to_dict(),
             "meta": {
                 "request_id": getattr(request.state, "request_id", ""),
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         },
     )
 
 
-app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(health.router, prefix="/api/v1")
+app.include_router(baselines.router, prefix="/api/v1")
+app.include_router(runs.router, prefix="/api/v1")
 app.mount("/metrics", metrics_app)
 
 

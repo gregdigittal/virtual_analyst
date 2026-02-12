@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import asyncpg
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-import asyncpg
 from redis.asyncio import Redis
 
 from apps.api.app.core.settings import get_settings
-
 
 router = APIRouter()
 

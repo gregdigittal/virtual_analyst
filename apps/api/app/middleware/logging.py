@@ -7,7 +7,6 @@ from fastapi import Request
 
 from shared.fm_shared.logging import correlation_id_var, tenant_id_var, user_id_var
 
-
 logger = structlog.get_logger()
 
 
