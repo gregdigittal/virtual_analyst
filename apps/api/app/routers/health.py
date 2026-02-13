@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import asyncpg
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 
 from apps.api.app.core.settings import get_settings
+from apps.api.app.db.connection import get_conn
 
 router = APIRouter()
 
@@ -21,9 +21,11 @@ async def readiness() -> JSONResponse:
     checks = {"database": "ok", "redis": "ok"}
 
     try:
-        conn = await asyncpg.connect(settings.database_url)
-        await conn.execute("SELECT 1")
-        await conn.close()
+        conn = await get_conn()
+        try:
+            await conn.execute("SELECT 1")
+        finally:
+            await conn.release() if hasattr(conn, "release") else await conn.close()
     except Exception as exc:
         checks["database"] = f"error: {exc}"
 

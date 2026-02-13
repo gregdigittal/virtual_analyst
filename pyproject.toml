@@ -29,6 +29,9 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.43b0",
     "tenacity>=8.2.3",
     "slowapi>=0.1.9",
+    "anthropic>=0.39.0",
+    "openai>=1.55.0",
+    "jsonschema>=4.20.0",
 ]
 
 [project.optional-dependencies]
@@ -75,6 +78,8 @@ packages = [
     "apps.api.app.core",
     "apps.api.app.middleware",
     "apps.api.app.routers",
+    "apps.api.app.services",
+    "apps.api.app.services.llm",
     "apps.worker",
     "shared",
     "shared.fm_shared",

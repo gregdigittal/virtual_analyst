@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from apps.api.app.db import ensure_tenant, get_conn
+from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import EVENT_RUN_ACCESSED, EVENT_RUN_CREATED, create_audit_event
 from apps.api.app.deps import get_artifact_store
 from shared.fm_shared.errors import EngineError, StorageError
@@ -36,8 +36,7 @@ async def create_run(
         raise HTTPException(400, "baseline_id required")
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             await ensure_tenant(conn, x_tenant_id)
             row = await conn.fetchrow(
@@ -49,8 +48,6 @@ async def create_run(
             if not row:
                 raise HTTPException(404, "Baseline not found")
             baseline_version = row["baseline_version"]
-    finally:
-        await conn.close()
 
     artifact_id = f"{baseline_id}_{baseline_version}"
     try:
@@ -71,8 +68,7 @@ async def create_run(
 
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     status = "running"
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             await conn.execute(
                 """INSERT INTO runs (tenant_id, run_id, baseline_id, baseline_version, scenario_id, status)
@@ -84,46 +80,41 @@ async def create_run(
                 scenario_id,
                 status,
             )
-    finally:
-        await conn.close()
 
     try:
         time_series = run_engine(config, scenario_overrides)
         statements = generate_statements(config, time_series)
         kpis = calculate_kpis(statements)
     except (EngineError, StatementImbalanceError) as e:
-        conn = await get_conn()
-        try:
+        async with tenant_conn(x_tenant_id) as conn:
             async with conn.transaction():
                 await conn.execute(
                     "UPDATE runs SET status = 'failed' WHERE tenant_id = $1 AND run_id = $2",
                     x_tenant_id,
                     run_id,
                 )
-        finally:
-            await conn.close()
         raise HTTPException(422, str(e)) from e
 
     run_artifact_id = f"{run_id}_statements"
-    storage_path = store.save(
-        x_tenant_id,
-        "run_results",
-        run_artifact_id,
-        {
-            "statements": {
-                "income_statement": statements.income_statement,
-                "balance_sheet": statements.balance_sheet,
-                "cash_flow": statements.cash_flow,
-                "periods": statements.periods,
-            },
-            "kpis": kpis,
-            "time_series": time_series,
+    run_results_payload = {
+        "statements": {
+            "income_statement": statements.income_statement,
+            "balance_sheet": statements.balance_sheet,
+            "cash_flow": statements.cash_flow,
+            "periods": statements.periods,
         },
-    )
+        "kpis": kpis,
+        "time_series": time_series,
+    }
 
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
+            storage_path = store.save(
+                x_tenant_id,
+                "run_results",
+                run_artifact_id,
+                run_results_payload,
+            )
             await conn.execute(
                 "UPDATE runs SET status = 'succeeded' WHERE tenant_id = $1 AND run_id = $2",
                 x_tenant_id,
@@ -146,8 +137,6 @@ async def create_run(
                 user_id=x_user_id or None,
                 event_data={"baseline_id": baseline_id, "status": "succeeded"},
             )
-    finally:
-        await conn.close()
 
     return {
         "run_id": run_id,
@@ -166,8 +155,7 @@ async def list_runs(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         rows = await conn.fetch(
             """SELECT run_id, baseline_id, baseline_version, scenario_id, status, created_at
                FROM runs WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
@@ -187,8 +175,6 @@ async def list_runs(
             for r in rows
         ]
         return {"items": items, "limit": limit, "offset": offset}
-    finally:
-        await conn.close()
 
 
 @router.get("/{run_id}")
@@ -199,8 +185,7 @@ async def get_run(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         row = await conn.fetchrow(
             """SELECT run_id, baseline_id, baseline_version, scenario_id, status, created_at
                FROM runs WHERE tenant_id = $1 AND run_id = $2""",
@@ -227,8 +212,6 @@ async def get_run(
             "status": row["status"],
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
         }
-    finally:
-        await conn.close()
 
 
 @router.get("/{run_id}/statements")

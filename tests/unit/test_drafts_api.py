@@ -37,16 +37,15 @@ def test_create_draft_requires_x_tenant_id() -> None:
     assert r.status_code == 400
 
 
-@patch("apps.api.app.routers.drafts.get_conn")
-def test_get_draft_returns_404_when_not_found(mock_get_conn: MagicMock) -> None:
+@patch("apps.api.app.routers.drafts.tenant_conn")
+def test_get_draft_returns_404_when_not_found(mock_tenant_conn: MagicMock) -> None:
     """GET draft returns 404 when draft_sessions has no row."""
     mock_conn = MagicMock()
     mock_conn.fetchrow = AsyncMock(return_value=None)
-    mock_conn.close = AsyncMock()
-    mock_conn.transaction = MagicMock()
-    mock_conn.transaction.return_value.__aenter__ = AsyncMock(return_value=None)
-    mock_conn.transaction.return_value.__aexit__ = AsyncMock(return_value=None)
-    mock_get_conn.return_value = AsyncMock(return_value=mock_conn)
+    mock_cm = MagicMock()
+    mock_cm.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_cm.__aexit__ = AsyncMock(return_value=None)
+    mock_tenant_conn.return_value = mock_cm
 
     r = client.get(
         "/api/v1/drafts/ds_nonexistent",

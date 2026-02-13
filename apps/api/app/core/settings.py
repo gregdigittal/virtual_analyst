@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     rate_limit: str = Field(default="100/minute", alias="RATE_LIMIT")
 
+    anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+
     def cors_allowed_origins_list(self) -> list[str]:
         return [item.strip() for item in self.cors_allowed_origins.split(",") if item.strip()]
 

@@ -193,9 +193,10 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: Draft lifecycle transitions enforced
 - Note: POST/GET/PATCH/DELETE /api/v1/drafts; state machine active↔ready_to_commit, any→abandoned; workspace in ArtifactStore (draft_workspace); audit draft.created/accessed/abandoned; PATCH supports status and/or workspace (autosave).
 
-### VA-P2-03: LLM provider abstraction (L)
+### VA-P2-03: LLM provider abstraction (L) — DONE
 - Anthropic + OpenAI with structured outputs
 - AC: Both providers return valid JSON outputs
+- Note: `apps/api/app/services/llm/provider.py` — LLMProvider ABC, complete(messages, response_schema, task_label) → LLMResponse; AnthropicProvider (output_config json_schema), OpenAIProvider (response_format json_schema); retry 3× exponential backoff; TokenUsage, LLMResponse; settings ANTHROPIC_API_KEY, OPENAI_API_KEY.
 
 ### VA-P2-04: LLM governance (M)
 - Circuit breaker, routing, metering

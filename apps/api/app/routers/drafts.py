@@ -5,14 +5,15 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
-from apps.api.app.db import ensure_tenant, get_conn
+from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import (
     EVENT_DRAFT_ABANDONED,
     EVENT_DRAFT_ACCESSED,
     EVENT_DRAFT_CREATED,
+    EVENT_DRAFT_UPDATED,
     create_audit_event,
 )
 from apps.api.app.deps import get_artifact_store
@@ -81,9 +82,7 @@ async def create_draft(
     workspace = _empty_workspace(
         draft_session_id, b.template_id, b.parent_baseline_id, b.parent_baseline_version
     )
-    store.save(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id, workspace)
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             await ensure_tenant(conn, x_tenant_id)
             await conn.execute(
@@ -97,6 +96,7 @@ async def create_draft(
                 storage_path,
                 x_user_id or None,
             )
+            store.save(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id, workspace)
             await create_audit_event(
                 conn,
                 x_tenant_id,
@@ -112,32 +112,34 @@ async def create_draft(
             "status": STATUS_ACTIVE,
             "storage_path": storage_path,
         }
-    finally:
-        await conn.close()
 
 
 @router.get("")
 async def list_drafts(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     status: Literal["active", "ready_to_commit", "committed", "abandoned"] | None = None,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
-    """List draft sessions for tenant, optionally filtered by status."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         if status:
             rows = await conn.fetch(
                 """SELECT draft_session_id, parent_baseline_id, parent_baseline_version, status, created_at
-                   FROM draft_sessions WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC""",
+                   FROM draft_sessions WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4""",
                 x_tenant_id,
                 status,
+                limit,
+                offset,
             )
         else:
             rows = await conn.fetch(
                 """SELECT draft_session_id, parent_baseline_id, parent_baseline_version, status, created_at
-                   FROM draft_sessions WHERE tenant_id = $1 ORDER BY created_at DESC""",
+                   FROM draft_sessions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
                 x_tenant_id,
+                limit,
+                offset,
             )
         items = [
             {
@@ -149,9 +151,7 @@ async def list_drafts(
             }
             for r in rows
         ]
-        return {"items": items}
-    finally:
-        await conn.close()
+        return {"items": items, "limit": limit, "offset": offset}
 
 
 @router.get("/{draft_session_id}")
@@ -164,43 +164,41 @@ async def get_draft(
     """Return draft workspace and meta. Rejects abandoned/committed unless we allow read."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
-        row = await conn.fetchrow(
-            """SELECT draft_session_id, parent_baseline_id, parent_baseline_version, status, storage_path, created_at
-               FROM draft_sessions WHERE tenant_id = $1 AND draft_session_id = $2""",
-            x_tenant_id,
-            draft_session_id,
-        )
-        if not row:
-            raise HTTPException(404, "Draft not found")
-        if row["status"] == STATUS_ABANDONED:
-            raise HTTPException(410, "Draft abandoned")
-        workspace = store.load(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id)
-        await create_audit_event(
-            conn,
-            x_tenant_id,
-            EVENT_DRAFT_ACCESSED,
-            "draft",
-            "draft_session",
-            draft_session_id,
-            user_id=x_user_id or None,
-            event_data={"status": row["status"]},
-        )
-        return {
-            "draft_session_id": row["draft_session_id"],
-            "parent_baseline_id": row["parent_baseline_id"],
-            "parent_baseline_version": row["parent_baseline_version"],
-            "status": row["status"],
-            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-            "workspace": workspace,
-        }
-    except StorageError as e:
-        if e.code == "ERR_STOR_NOT_FOUND":
-            raise HTTPException(404, "Draft workspace not found") from e
-        raise
-    finally:
-        await conn.close()
+    async with tenant_conn(x_tenant_id) as conn:
+        try:
+            row = await conn.fetchrow(
+                """SELECT draft_session_id, parent_baseline_id, parent_baseline_version, status, storage_path, created_at
+                   FROM draft_sessions WHERE tenant_id = $1 AND draft_session_id = $2""",
+                x_tenant_id,
+                draft_session_id,
+            )
+            if not row:
+                raise HTTPException(404, "Draft not found")
+            if row["status"] == STATUS_ABANDONED:
+                raise HTTPException(410, "Draft abandoned")
+            workspace = store.load(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id)
+            await create_audit_event(
+                conn,
+                x_tenant_id,
+                EVENT_DRAFT_ACCESSED,
+                "draft",
+                "draft_session",
+                draft_session_id,
+                user_id=x_user_id or None,
+                event_data={"status": row["status"]},
+            )
+            return {
+                "draft_session_id": row["draft_session_id"],
+                "parent_baseline_id": row["parent_baseline_id"],
+                "parent_baseline_version": row["parent_baseline_version"],
+                "status": row["status"],
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                "workspace": workspace,
+            }
+        except StorageError as e:
+            if e.code == "ERR_STOR_NOT_FOUND":
+                raise HTTPException(404, "Draft workspace not found") from e
+            raise
 
 
 @router.patch("/{draft_session_id}")
@@ -211,59 +209,78 @@ async def patch_draft(
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
-    """Update status (state machine) and/or workspace (autosave). Invalid transitions return 409."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     new_status: str | None = body.get("status")
     workspace_update: dict[str, Any] | None = body.get("workspace")
-    conn = await get_conn()
-    try:
-        row = await conn.fetchrow(
-            """SELECT draft_session_id, status, storage_path FROM draft_sessions
-               WHERE tenant_id = $1 AND draft_session_id = $2""",
-            x_tenant_id,
-            draft_session_id,
-        )
-        if not row:
-            raise HTTPException(404, "Draft not found")
-        if row["status"] in (STATUS_ABANDONED, STATUS_COMMITTED):
-            raise HTTPException(410, f"Draft is {row['status']}")
-
-        if new_status is not None:
-            allowed = VALID_TRANSITIONS.get(row["status"], set())
-            if new_status not in allowed:
-                raise HTTPException(
-                    409,
-                    f"Invalid transition from {row['status']} to {new_status}",
+    async with tenant_conn(x_tenant_id) as conn:
+        try:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """SELECT draft_session_id, status, storage_path FROM draft_sessions
+                       WHERE tenant_id = $1 AND draft_session_id = $2 FOR UPDATE""",
+                    x_tenant_id,
+                    draft_session_id,
                 )
-            await conn.execute(
-                "UPDATE draft_sessions SET status = $1 WHERE tenant_id = $2 AND draft_session_id = $3",
-                new_status,
+                if not row:
+                    raise HTTPException(404, "Draft not found")
+                if row["status"] in (STATUS_ABANDONED, STATUS_COMMITTED):
+                    raise HTTPException(410, f"Draft is {row['status']}")
+
+                if new_status is not None:
+                    allowed = VALID_TRANSITIONS.get(row["status"], set())
+                    if new_status not in allowed:
+                        raise HTTPException(
+                            409,
+                            f"Invalid transition from {row['status']} to {new_status}",
+                        )
+                    await conn.execute(
+                        "UPDATE draft_sessions SET status = $1 WHERE tenant_id = $2 AND draft_session_id = $3",
+                        new_status,
+                        x_tenant_id,
+                        draft_session_id,
+                    )
+                    if new_status == STATUS_ABANDONED:
+                        await create_audit_event(
+                            conn,
+                            x_tenant_id,
+                            EVENT_DRAFT_ABANDONED,
+                            "draft",
+                            "draft_session",
+                            draft_session_id,
+                            user_id=x_user_id or None,
+                        )
+                    else:
+                        await create_audit_event(
+                            conn,
+                            x_tenant_id,
+                            EVENT_DRAFT_UPDATED,
+                            "draft",
+                            "draft_session",
+                            draft_session_id,
+                            user_id=x_user_id or None,
+                            event_data={"status": new_status},
+                        )
+
+                if workspace_update is not None:
+                    current = store.load(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id)
+                    merged = {**current, **workspace_update}
+                    store.save(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id, merged)
+
+            row2 = await conn.fetchrow(
+                """SELECT draft_session_id, status FROM draft_sessions
+                   WHERE tenant_id = $1 AND draft_session_id = $2""",
                 x_tenant_id,
                 draft_session_id,
             )
-
-        if workspace_update is not None:
-            current = store.load(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id)
-            merged = {**current, **workspace_update}
-            store.save(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id, merged)
-
-        row2 = await conn.fetchrow(
-            """SELECT draft_session_id, status FROM draft_sessions
-               WHERE tenant_id = $1 AND draft_session_id = $2""",
-            x_tenant_id,
-            draft_session_id,
-        )
-        return {
-            "draft_session_id": draft_session_id,
-            "status": row2["status"] if row2 else new_status or row["status"],
-        }
-    except StorageError as e:
-        if e.code == "ERR_STOR_NOT_FOUND":
-            raise HTTPException(404, "Draft workspace not found") from e
-        raise
-    finally:
-        await conn.close()
+            return {
+                "draft_session_id": draft_session_id,
+                "status": row2["status"] if row2 else new_status or row["status"],
+            }
+        except StorageError as e:
+            if e.code == "ERR_STOR_NOT_FOUND":
+                raise HTTPException(404, "Draft workspace not found") from e
+            raise
 
 
 @router.delete("/{draft_session_id}", status_code=200)
@@ -275,8 +292,7 @@ async def delete_draft(
     """Abandon draft (soft delete: set status=abandoned)."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             res = await conn.execute(
                 """UPDATE draft_sessions SET status = $1
@@ -307,5 +323,3 @@ async def delete_draft(
                 user_id=x_user_id or None,
             )
         return {"draft_session_id": draft_session_id, "status": STATUS_ABANDONED}
-    finally:
-        await conn.close()

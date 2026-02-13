@@ -55,7 +55,8 @@ async def enqueue_job(
     if not task_cls:
         raise HTTPException(400, f"Unknown task: {body.task}")
     try:
-        result = task_cls.apply_async(args=body.args, kwargs=body.kwargs)
+        merged_kwargs = {**(body.kwargs or {}), "_tenant_id": x_tenant_id}
+        result = task_cls.apply_async(args=body.args, kwargs=merged_kwargs)
         return {"task_id": result.id}
     except Exception as e:
         raise HTTPException(500, str(e)) from e

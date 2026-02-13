@@ -78,7 +78,10 @@ def _eval_node(node: ast.AST, variables: dict[str, float]) -> float:
         op = BINARY_OPS.get(type(node.op))
         if op is None:
             raise EvalError(f"Unsupported binary op: {type(node.op)}")
-        return op(left, right)
+        try:
+            return op(left, right)
+        except ZeroDivisionError:
+            raise EvalError("Division by zero")
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name):
             raise EvalError("Only simple function calls allowed")
@@ -86,5 +89,8 @@ def _eval_node(node: ast.AST, variables: dict[str, float]) -> float:
         if name not in SAFE_BUILTINS:
             raise EvalError(f"Disallowed function: {name!r}")
         args = [_eval_node(a, variables) for a in node.args]
-        return SAFE_BUILTINS[name](*args)
+        try:
+            return SAFE_BUILTINS[name](*args)
+        except TypeError as e:
+            raise EvalError(f"Function call error: {name}({len(args)} args): {e}")
     raise EvalError(f"Unsupported AST node: {type(node)}")

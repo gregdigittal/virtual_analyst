@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import copy
 
+import structlog
+
+from shared.fm_shared.errors import EngineError
 from shared.fm_shared.model.evaluator import EvalError, evaluate
 from shared.fm_shared.model.graph import CalcGraph
 from shared.fm_shared.model.schemas import (
@@ -15,6 +18,8 @@ from shared.fm_shared.model.schemas import (
     ModelConfig,
     ScenarioOverride,
 )
+
+logger = structlog.get_logger()
 
 
 def _ref_to_var(s: str) -> str:
@@ -151,12 +156,24 @@ def run_engine(
                     time_series[nid][t] = 0.0
                     continue
                 variables: dict[str, float] = {}
-                for inp in formula.inputs:
-                    var_name, key = input_to_var_and_key(inp)
-                    variables[var_name] = time_series[key][t]
+                try:
+                    for inp in formula.inputs:
+                        var_name, key = input_to_var_and_key(inp)
+                        variables[var_name] = time_series[key][t]
+                except KeyError as e:
+                    raise EngineError(
+                        f"Formula input '{e.args[0] if e.args else '?'}' not found in time_series for node '{nid}' at period {t}"
+                    ) from e
                 try:
                     time_series[nid][t] = evaluate(formula.expression, variables)
-                except EvalError:
+                except EvalError as e:
+                    logger.warning(
+                        "formula_eval_fallback",
+                        node_id=nid,
+                        period=t,
+                        expression=formula.expression,
+                        error=str(e),
+                    )
                     time_series[nid][t] = 0.0
 
     return time_series

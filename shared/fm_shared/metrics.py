@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections import deque
 from threading import Lock
 
@@ -30,8 +31,8 @@ def get_latency_summary() -> dict:
         items = list(_latency_buffer)
     n = len(items)
     sorted_durations = sorted(d[1] for d in items)
-    p50 = sorted_durations[int(n * 0.5)] * 1000 if n else 0
-    p95 = sorted_durations[int(n * 0.95)] * 1000 if n else 0
+    p50 = sorted_durations[min(int(math.ceil(n * 0.5)) - 1, n - 1)] * 1000 if n else 0
+    p95 = sorted_durations[min(int(math.ceil(n * 0.95)) - 1, n - 1)] * 1000 if n else 0
     by_endpoint: dict[str, list[float]] = {}
     for path, dur in items:
         by_endpoint.setdefault(path, []).append(dur * 1000)

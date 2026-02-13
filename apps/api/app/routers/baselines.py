@@ -8,7 +8,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
-from apps.api.app.db import ensure_tenant, get_conn
+from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import (
     EVENT_BASELINE_ACCESSED,
     EVENT_BASELINE_CREATED,
@@ -43,14 +43,7 @@ async def create_baseline(
     baseline_id = f"bl_{uuid.uuid4().hex[:12]}"
     baseline_version = "v1"
     storage_path = f"{x_tenant_id}/model_config_v1/{baseline_id}_{baseline_version}.json"
-    store.save(
-        x_tenant_id,
-        "model_config_v1",
-        f"{baseline_id}_{baseline_version}",
-        body.model_config_payload,
-    )
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             await ensure_tenant(conn, x_tenant_id)
             await conn.execute(
@@ -65,6 +58,12 @@ async def create_baseline(
                 baseline_version,
                 storage_path,
             )
+            store.save(
+                x_tenant_id,
+                "model_config_v1",
+                f"{baseline_id}_{baseline_version}",
+                body.model_config_payload,
+            )
             await create_audit_event(
                 conn,
                 x_tenant_id,
@@ -75,8 +74,6 @@ async def create_baseline(
                 user_id=x_user_id or None,
                 event_data={"baseline_version": baseline_version, "storage_path": storage_path},
             )
-    finally:
-        await conn.close()
     return {
         "tenant_id": x_tenant_id,
         "baseline_id": baseline_id,
@@ -94,8 +91,7 @@ async def list_baselines(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         rows = await conn.fetch(
             """SELECT baseline_id, baseline_version, status, storage_path, is_active, created_at
                FROM model_baselines WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
@@ -114,8 +110,6 @@ async def list_baselines(
             for r in rows
         ]
         return {"items": items, "limit": limit, "offset": offset}
-    finally:
-        await conn.close()
 
 
 @router.get("/{baseline_id}")
@@ -127,42 +121,40 @@ async def get_baseline(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
-        row = await conn.fetchrow(
-            """SELECT baseline_id, baseline_version, status, storage_path, is_active, created_at
-               FROM model_baselines WHERE tenant_id = $1 AND baseline_id = $2 AND is_active = true""",
-            x_tenant_id,
-            baseline_id,
-        )
-        if not row:
-            raise HTTPException(404, "Baseline not found")
-        artifact_id = f"{row['baseline_id']}_{row['baseline_version']}"
-        config = store.load(x_tenant_id, "model_config_v1", artifact_id)
-        await create_audit_event(
-            conn,
-            x_tenant_id,
-            EVENT_BASELINE_ACCESSED,
-            "baseline",
-            "baseline",
-            baseline_id,
-            user_id=x_user_id or None,
-            event_data={"baseline_version": row["baseline_version"]},
-        )
-        return {
-            "baseline_id": row["baseline_id"],
-            "baseline_version": row["baseline_version"],
-            "status": row["status"],
-            "is_active": row["is_active"],
-            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-            "model_config": config,
-        }
-    except StorageError as e:
-        if e.code == "ERR_STOR_NOT_FOUND":
-            raise HTTPException(404, "Baseline artifact not found") from e
-        raise
-    finally:
-        await conn.close()
+    async with tenant_conn(x_tenant_id) as conn:
+        try:
+            row = await conn.fetchrow(
+                """SELECT baseline_id, baseline_version, status, storage_path, is_active, created_at
+                   FROM model_baselines WHERE tenant_id = $1 AND baseline_id = $2 AND is_active = true""",
+                x_tenant_id,
+                baseline_id,
+            )
+            if not row:
+                raise HTTPException(404, "Baseline not found")
+            artifact_id = f"{row['baseline_id']}_{row['baseline_version']}"
+            config = store.load(x_tenant_id, "model_config_v1", artifact_id)
+            await create_audit_event(
+                conn,
+                x_tenant_id,
+                EVENT_BASELINE_ACCESSED,
+                "baseline",
+                "baseline",
+                baseline_id,
+                user_id=x_user_id or None,
+                event_data={"baseline_version": row["baseline_version"]},
+            )
+            return {
+                "baseline_id": row["baseline_id"],
+                "baseline_version": row["baseline_version"],
+                "status": row["status"],
+                "is_active": row["is_active"],
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                "model_config": config,
+            }
+        except StorageError as e:
+            if e.code == "ERR_STOR_NOT_FOUND":
+                raise HTTPException(404, "Baseline artifact not found") from e
+            raise
 
 
 class PatchBaselineBody(BaseModel):
@@ -177,8 +169,7 @@ async def patch_baseline(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    conn = await get_conn()
-    try:
+    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             if body.status == "active":
                 await conn.execute(
@@ -192,5 +183,3 @@ async def patch_baseline(
                 baseline_id,
             )
         return {"baseline_id": baseline_id, "status": body.status}
-    finally:
-        await conn.close()

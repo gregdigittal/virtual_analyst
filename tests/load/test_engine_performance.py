@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 
 from shared.fm_shared.model import generate_statements, run_engine
@@ -15,17 +16,18 @@ ENGINE_12MO_P95_MS = 500
 def test_engine_12mo_under_p95() -> None:
     """Deterministic 12-month run completes within P95 SLA (500ms)."""
     config = minimal_model_config(tenant_id="t_perf")
-    runs = 5
+    runs = 20
     timings = []
     for _ in range(runs):
         t0 = time.perf_counter()
         run_engine(config)
         timings.append((time.perf_counter() - t0) * 1000)
-    avg_ms = sum(timings) / len(timings)
-    max_ms = max(timings)
-    assert (
-        max_ms < ENGINE_12MO_P95_MS
-    ), f"Engine 12mo run exceeded P95 {ENGINE_12MO_P95_MS}ms: max={max_ms:.1f}ms avg={avg_ms:.1f}ms"
+    sorted_timings = sorted(timings)
+    p95_idx = int(math.ceil(len(sorted_timings) * 0.95)) - 1
+    p95 = sorted_timings[p95_idx]
+    assert p95 < ENGINE_12MO_P95_MS, (
+        f"Engine 12mo run exceeded P95 {ENGINE_12MO_P95_MS}ms: p95={p95:.1f}ms"
+    )
 
 
 def test_engine_plus_statements_plus_kpis_12mo_under_1s() -> None:

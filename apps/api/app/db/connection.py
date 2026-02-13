@@ -2,11 +2,31 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 import asyncpg
 
 from apps.api.app.core.settings import get_settings
 
 _pool: asyncpg.Pool | None = None
+
+
+@asynccontextmanager
+async def tenant_conn(tenant_id: str):
+    if _pool is not None:
+        conn = await _pool.acquire()
+    else:
+        settings = get_settings()
+        conn = await asyncpg.connect(settings.database_url)
+    try:
+        await conn.execute("SET app.tenant_id = $1", tenant_id)
+        yield conn
+    finally:
+        await conn.execute("RESET app.tenant_id")
+        if _pool is not None:
+            await _pool.release(conn)
+        else:
+            await conn.close()
 
 
 async def init_pool() -> None:

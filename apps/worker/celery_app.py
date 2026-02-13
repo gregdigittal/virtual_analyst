@@ -6,7 +6,10 @@ import json
 import os
 from datetime import UTC, datetime
 
+import structlog
 from celery import Celery
+
+logger = structlog.get_logger()
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
@@ -60,4 +63,4 @@ def push_to_dlq(
         finally:
             r.close()
     except Exception:
-        pass
+        logger.error("Failed to push task %s to DLQ", task_id, exc_info=True)

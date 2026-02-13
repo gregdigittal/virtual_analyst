@@ -56,3 +56,13 @@ def test_missing_variable_raises() -> None:
     """Missing variable raises EvalError."""
     with pytest.raises(EvalError):
         evaluate("a + b", {"a": 1})
+
+
+def test_division_by_zero_raises_eval_error() -> None:
+    with pytest.raises(EvalError):
+        evaluate("1 / 0", {})
+
+
+def test_wrong_function_arity_raises_eval_error() -> None:
+    with pytest.raises(EvalError):
+        evaluate("clamp(x)", {"x": 5})

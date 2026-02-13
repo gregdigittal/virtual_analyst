@@ -81,4 +81,5 @@ def test_no_cycle_returns_none() -> None:
     )
     g = CalcGraph.from_blueprint(bp)
     assert g.detect_cycles() is None
-    assert g.topo_sort() == ["a", "b"] or g.topo_sort() == ["b", "a"]
+    result = g.topo_sort()
+    assert set(result) == {"a", "b"}
