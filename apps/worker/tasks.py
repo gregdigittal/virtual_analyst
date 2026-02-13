@@ -11,7 +11,7 @@ class DLQTask(celery_app.Task):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         retries = getattr(self.request, "retries", None) or 0
         max_retries = getattr(self, "max_retries", 3)
-        if retries >= max_retries - 1:
+        if retries >= max_retries:
             push_to_dlq(task_id, self.name, exc, args, kwargs)
         super().on_failure(exc, task_id, args, kwargs, einfo)
 

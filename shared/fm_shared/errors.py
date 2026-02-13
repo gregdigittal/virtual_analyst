@@ -89,6 +89,16 @@ class StorageError(FinModelError):
         )
 
 
+class LLMError(FinModelError):
+    def __init__(self, message: str, **kwargs: Any) -> None:
+        super().__init__(
+            code=kwargs.pop("code", "ERR_LLM_PROVIDER_ERROR"),
+            message=message,
+            category=ErrorCategory.LLM,
+            **kwargs,
+        )
+
+
 def get_http_status(error_code: str) -> int:
     if error_code.startswith("ERR_VAL_"):
         return 422
@@ -102,6 +112,6 @@ def get_http_status(error_code: str) -> int:
         return 429
     if error_code.endswith("TIMEOUT"):
         return 504
-    if error_code.endswith("UNAVAILABLE"):
+    if "ERR_LLM_ALL_PROVIDERS" in error_code or error_code.endswith("UNAVAILABLE"):
         return 503
     return 500

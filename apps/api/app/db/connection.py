@@ -22,7 +22,7 @@ async def tenant_conn(tenant_id: str):
         await conn.execute("SET app.tenant_id = $1", tenant_id)
         yield conn
     finally:
-        await conn.execute("RESET app.tenant_id")
+        await conn.execute("SET app.tenant_id = ''")
         if _pool is not None:
             await _pool.release(conn)
         else:

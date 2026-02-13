@@ -48,28 +48,7 @@ async def create_run(
             if not row:
                 raise HTTPException(404, "Baseline not found")
             baseline_version = row["baseline_version"]
-
-    artifact_id = f"{baseline_id}_{baseline_version}"
-    try:
-        config_dict = store.load(x_tenant_id, "model_config_v1", artifact_id)
-    except StorageError as e:
-        if e.code == "ERR_STOR_NOT_FOUND":
-            raise HTTPException(404, "Baseline artifact not found") from e
-        raise
-    config = ModelConfig.model_validate(config_dict)
-
-    scenario_overrides: list[ScenarioOverride] | None = None
-    scenario_id = body.get("scenario_id")
-    if scenario_id and config.scenarios:
-        for sc in config.scenarios:
-            if sc.scenario_id == scenario_id:
-                scenario_overrides = sc.overrides
-                break
-
-    run_id = f"run_{uuid.uuid4().hex[:12]}"
-    status = "running"
-    async with tenant_conn(x_tenant_id) as conn:
-        async with conn.transaction():
+            run_id = f"run_{uuid.uuid4().hex[:12]}"
             await conn.execute(
                 """INSERT INTO runs (tenant_id, run_id, baseline_id, baseline_version, scenario_id, status)
                    VALUES ($1, $2, $3, $4, $5, $6)""",
@@ -77,37 +56,52 @@ async def create_run(
                 run_id,
                 baseline_id,
                 baseline_version,
-                scenario_id,
-                status,
+                body.get("scenario_id"),
+                "running",
             )
 
-    try:
-        time_series = run_engine(config, scenario_overrides)
-        statements = generate_statements(config, time_series)
-        kpis = calculate_kpis(statements)
-    except (EngineError, StatementImbalanceError) as e:
-        async with tenant_conn(x_tenant_id) as conn:
+        artifact_id = f"{baseline_id}_{baseline_version}"
+        try:
+            config_dict = store.load(x_tenant_id, "model_config_v1", artifact_id)
+        except StorageError as e:
+            if e.code == "ERR_STOR_NOT_FOUND":
+                raise HTTPException(404, "Baseline artifact not found") from e
+            raise
+        config = ModelConfig.model_validate(config_dict)
+
+        scenario_overrides: list[ScenarioOverride] | None = None
+        scenario_id = body.get("scenario_id")
+        if scenario_id and config.scenarios:
+            for sc in config.scenarios:
+                if sc.scenario_id == scenario_id:
+                    scenario_overrides = sc.overrides
+                    break
+
+        try:
+            time_series = run_engine(config, scenario_overrides)
+            statements = generate_statements(config, time_series)
+            kpis = calculate_kpis(statements)
+        except (EngineError, StatementImbalanceError) as e:
             async with conn.transaction():
                 await conn.execute(
                     "UPDATE runs SET status = 'failed' WHERE tenant_id = $1 AND run_id = $2",
                     x_tenant_id,
                     run_id,
                 )
-        raise HTTPException(422, str(e)) from e
+            raise HTTPException(422, str(e)) from e
 
-    run_artifact_id = f"{run_id}_statements"
-    run_results_payload = {
-        "statements": {
-            "income_statement": statements.income_statement,
-            "balance_sheet": statements.balance_sheet,
-            "cash_flow": statements.cash_flow,
-            "periods": statements.periods,
-        },
-        "kpis": kpis,
-        "time_series": time_series,
-    }
+        run_artifact_id = f"{run_id}_statements"
+        run_results_payload = {
+            "statements": {
+                "income_statement": statements.income_statement,
+                "balance_sheet": statements.balance_sheet,
+                "cash_flow": statements.cash_flow,
+                "periods": statements.periods,
+            },
+            "kpis": kpis,
+            "time_series": time_series,
+        }
 
-    async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             storage_path = store.save(
                 x_tenant_id,

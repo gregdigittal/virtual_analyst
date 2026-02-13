@@ -1,4 +1,4 @@
-"""LLM provider abstraction: Anthropic, OpenAI, structured outputs."""
+"""LLM provider abstraction: Anthropic, OpenAI, structured outputs, routing, circuit breaker, metering."""
 
 from apps.api.app.services.llm.provider import (
     LLMProvider,
@@ -8,6 +8,7 @@ from apps.api.app.services.llm.provider import (
     AnthropicProvider,
     OpenAIProvider,
 )
+from apps.api.app.services.llm.router import LLMRouter
 
 __all__ = [
     "LLMProvider",
@@ -16,4 +17,5 @@ __all__ = [
     "TokenUsage",
     "AnthropicProvider",
     "OpenAIProvider",
+    "LLMRouter",
 ]

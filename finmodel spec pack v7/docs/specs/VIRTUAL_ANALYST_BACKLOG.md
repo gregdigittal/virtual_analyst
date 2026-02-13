@@ -198,9 +198,10 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: Both providers return valid JSON outputs
 - Note: `apps/api/app/services/llm/provider.py` — LLMProvider ABC, complete(messages, response_schema, task_label) → LLMResponse; AnthropicProvider (output_config json_schema), OpenAIProvider (response_format json_schema); retry 3× exponential backoff; TokenUsage, LLMResponse; settings ANTHROPIC_API_KEY, OPENAI_API_KEY.
 
-### VA-P2-04: LLM governance (M)
+### VA-P2-04: LLM governance (M) — DONE
 - Circuit breaker, routing, metering
 - AC: Routing, fallback, and limits enforced
+- Note: `apps/api/app/services/llm/router.py` (LLMRouter, default policy, complete_with_routing); `circuit_breaker.py` (per-provider open/half_open/closed); `metering.py` (in-memory usage + check_limit). Settings: LLM_TOKENS_MONTHLY_LIMIT, CIRCUIT_BREAKER_FAILURE_THRESHOLD, CIRCUIT_BREAKER_RECOVERY_SECONDS. ERR_LLM_QUOTA_EXCEEDED (429), ERR_LLM_ALL_PROVIDERS_FAILED (503). Unit tests: tests/unit/test_llm_router.py.
 
 ### VA-P2-05: Draft chat endpoint (L)
 - Structured proposals stored as draft deltas
