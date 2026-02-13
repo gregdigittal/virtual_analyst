@@ -228,17 +228,19 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: LLM prompts include hallucination prevention; confidence badges shown on proposals and assumptions; content safety validation on LLM output
 - Note: System prompts updated with CRITICAL RULES (no fabrication, evidence-backed, confidence guide). TEMPLATE_INITIALIZATION_SCHEMA updated with confidence/evidence description. Proposal UI shows confidence badges (green/amber/red). AssumptionTree displays _confidence and _evidence sibling fields inline. Post-LLM content safety validation (_validate_proposal_content) drops unsafe proposals.
 
-### VA-P2-09: Notifications (M)
+### VA-P2-09: Notifications (M) — DONE
 - Email and in-app notifications
 - AC: Key events generate notifications
+- Note: Migration 0008_notifications; notifications table; list/mark-read API; created on run complete and draft commit; web bell icon and /notifications page.
 
 ---
 
 ## Phase 3 — Monte Carlo + Scenarios + Valuation
 
-### VA-P3-01: Distribution engine + MC runner (L)
+### VA-P3-01: Distribution engine + MC runner (L) — DONE
 - Supported distributions and seeded RNG
 - AC: MC results deterministic with seed
+- Note: shared/fm_shared/analysis/distributions.py (sample: triangular, normal, lognormal, uniform, pert); monte_carlo.py (run_monte_carlo → MCResult with percentiles P5–P95 for revenue, ebitda, net_income, fcf). Unit tests: test_distributions.py, test_monte_carlo.py.
 
 ### VA-P3-02: Async MC execution (M)
 - Background jobs with progress reporting
