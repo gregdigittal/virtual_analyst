@@ -7,8 +7,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export interface ApiOptions {
   tenantId: string;
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public body: unknown
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
 async function request<T>(
@@ -24,13 +35,15 @@ async function request<T>(
     headers,
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
+  const data = await res.json().catch(() => ({ detail: res.statusText }));
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(
-      typeof err.detail === "string" ? err.detail : JSON.stringify(err)
+    throw new ApiError(
+      typeof data.detail === "string" ? data.detail : JSON.stringify(data),
+      res.status,
+      data
     );
   }
-  return res.json() as Promise<T>;
+  return data as T;
 }
 
 export interface BaselineSummary {
@@ -83,6 +96,65 @@ export interface KpiItem {
   [key: string]: unknown;
 }
 
+export interface DraftSummary {
+  draft_session_id: string;
+  parent_baseline_id: string | null;
+  parent_baseline_version: string | null;
+  status: string;
+  created_at: string | null;
+}
+
+export interface DraftsResponse {
+  items: DraftSummary[];
+  limit: number;
+  offset: number;
+}
+
+export interface DraftWorkspace {
+  draft_session_id?: string;
+  template_id?: string | null;
+  parent_baseline_id?: string | null;
+  parent_baseline_version?: string | null;
+  assumptions?: Record<string, unknown>;
+  driver_blueprint?: Record<string, unknown>;
+  distributions?: unknown[];
+  scenarios?: unknown[];
+  evidence?: unknown[];
+  chat_history?: { role: string; content: string }[];
+  pending_proposals?: PendingProposal[];
+  [key: string]: unknown;
+}
+
+export interface PendingProposal {
+  id: string;
+  path: string;
+  value: unknown;
+  evidence?: string;
+  confidence?: string;
+  reasoning?: string;
+}
+
+export interface DraftDetail {
+  draft_session_id: string;
+  parent_baseline_id: string | null;
+  parent_baseline_version: string | null;
+  status: string;
+  created_at: string | null;
+  workspace: DraftWorkspace;
+}
+
+export interface ChatResponse {
+  proposals?: PendingProposal[];
+  clarification?: string | null;
+  commentary?: string | null;
+}
+
+export interface CommitResult {
+  baseline_id: string;
+  baseline_version: string;
+  integrity?: { status: string; checks: unknown[] };
+}
+
 export const api = {
   baselines: {
     list: (tenantId: string) =>
@@ -120,6 +192,53 @@ export const api = {
       request<KpiItem[]>(
         `/api/v1/runs/${encodeURIComponent(runId)}/kpis`,
         { tenantId }
+      ),
+  },
+  drafts: {
+    list: (tenantId: string, status?: string) =>
+      request<DraftsResponse>(
+        `/api/v1/drafts${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+        { tenantId }
+      ),
+    get: (tenantId: string, draftSessionId: string) =>
+      request<DraftDetail>(
+        `/api/v1/drafts/${encodeURIComponent(draftSessionId)}`,
+        { tenantId }
+      ),
+    create: (tenantId: string, body?: { template_id?: string; parent_baseline_id?: string; parent_baseline_version?: string }) =>
+      request<{ draft_session_id: string; status: string; storage_path: string }>(
+        "/api/v1/drafts",
+        { tenantId, method: "POST", body: body ?? {} }
+      ),
+    patch: (tenantId: string, draftSessionId: string, body: { status?: string; workspace?: Record<string, unknown> }) =>
+      request<{ draft_session_id: string; status?: string }>(
+        `/api/v1/drafts/${encodeURIComponent(draftSessionId)}`,
+        { tenantId, method: "PATCH", body }
+      ),
+    chat: (tenantId: string, draftSessionId: string, message: string) =>
+      request<ChatResponse>(
+        `/api/v1/drafts/${encodeURIComponent(draftSessionId)}/chat`,
+        { tenantId, method: "POST", body: { message } }
+      ),
+    acceptProposal: (tenantId: string, draftSessionId: string, proposalId: string) =>
+      request<{ proposal_id: string; status: string }>(
+        `/api/v1/drafts/${encodeURIComponent(draftSessionId)}/proposals/${encodeURIComponent(proposalId)}/accept`,
+        { tenantId, method: "POST" }
+      ),
+    rejectProposal: (tenantId: string, draftSessionId: string, proposalId: string) =>
+      request<{ proposal_id: string; status: string }>(
+        `/api/v1/drafts/${encodeURIComponent(draftSessionId)}/proposals/${encodeURIComponent(proposalId)}/reject`,
+        { tenantId, method: "POST" }
+      ),
+    commit: (tenantId: string, draftSessionId: string, acknowledgeWarnings?: boolean) =>
+      request<CommitResult>(
+        `/api/v1/drafts/${encodeURIComponent(draftSessionId)}/commit`,
+        { tenantId, method: "POST", body: { acknowledge_warnings: !!acknowledgeWarnings } }
+      ),
+    delete: (tenantId: string, draftSessionId: string) =>
+      request<{ draft_session_id: string; status: string }>(
+        `/api/v1/drafts/${encodeURIComponent(draftSessionId)}`,
+        { tenantId, method: "DELETE" }
       ),
   },
 };

@@ -25,6 +25,12 @@ export function Nav() {
             Baselines
           </Link>
           <Link
+            href="/drafts"
+            className="text-sm font-medium text-foreground hover:text-muted-foreground"
+          >
+            Drafts
+          </Link>
+          <Link
             href="/runs"
             className="text-sm font-medium text-foreground hover:text-muted-foreground"
           >
