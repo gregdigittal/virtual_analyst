@@ -84,7 +84,7 @@ export default function DraftWorkspacePage() {
   const [markingReady, setMarkingReady] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [integrityDialog, setIntegrityDialog] = useState<{
-    checks: unknown[];
+    checks: { check_id?: string; severity?: string; message?: string }[];
     status: string;
   } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -208,7 +208,7 @@ export default function DraftWorkspacePage() {
       router.refresh();
     } catch (e) {
       if (e instanceof ApiError && e.statusCode === 409) {
-        const integrity = (e.body as { detail?: { integrity?: { checks: unknown[]; status: string } } })?.detail?.integrity;
+        const integrity = (e.body as { detail?: { integrity?: { checks: { check_id?: string; severity?: string; message?: string }[]; status: string } } })?.detail?.integrity;
         if (integrity?.checks) {
           setIntegrityDialog({ checks: integrity.checks, status: integrity.status });
           return;
