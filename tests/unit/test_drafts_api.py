@@ -72,3 +72,12 @@ def test_reject_proposal_requires_x_tenant_id() -> None:
 def test_commit_draft_requires_x_tenant_id() -> None:
     r = client.post("/api/v1/drafts/ds_123/commit", json={})
     assert r.status_code == 400
+
+
+def test_validate_proposal_content_rejects_unsafe() -> None:
+    from apps.api.app.routers.drafts import _validate_proposal_content
+
+    assert _validate_proposal_content({"evidence": "See https://evil.com", "value": 100}) is not None
+    assert _validate_proposal_content({"evidence": "User stated 10%", "value": 100}) is None
+    assert _validate_proposal_content({"evidence": "Clean", "value": 1e16}) is not None
+    assert _validate_proposal_content({"evidence": "Clean", "value": 500}) is None

@@ -27,7 +27,11 @@ TEMPLATE_INITIALIZATION_SCHEMA = {
     "properties": {
         "assumptions": {
             "type": "object",
-            "description": "Model assumptions: revenue_streams, cost_structure, working_capital, etc.",
+            "description": (
+                "Model assumptions: revenue_streams, cost_structure, working_capital, etc. "
+                "Every numeric value SHOULD have sibling '_confidence' (high/medium/low) "
+                "and '_evidence' (source citation) fields."
+            ),
             "properties": {
                 "revenue_streams": {"type": "array"},
                 "cost_structure": {"type": "object"},
@@ -58,19 +62,31 @@ def _build_template_initialization_prompt(
     parts = [
         f"You are a financial analyst. Generate initial model assumptions for a {template_label} business.",
         f"Entity name: {entity_name or 'Unnamed'}.",
+        "",
+        "## CRITICAL RULES",
+        "- Do NOT invent, fabricate, or hallucinate any data, facts, statistics, or financial figures.",
+        "- Base all numeric values on: (a) the user's questionnaire answers below, (b) named industry benchmarks you can cite, or (c) reasonable defaults clearly marked as placeholders.",
+        "- For EVERY numeric value, include a '_confidence' sibling field set to 'high', 'medium', or 'low'.",
+        "- For EVERY numeric value, include an '_evidence' sibling field citing the source.",
+        "- 'high' = directly from user input or named benchmark; 'medium' = reasonable inference; 'low' = placeholder needing verification.",
+        "- Do NOT present placeholders as established facts.",
+        "",
         "Questionnaire answers (question_id -> answer):",
         str(answers),
     ]
     if question_plan:
+        parts.append("")
         parts.append("Question plan (for context):")
         for section in question_plan:
             parts.append(f"  {section.get('section', '')}:")
             for q in section.get("questions", []):
                 parts.append(f"    - {q.get('id', '')}: {q.get('q', '')}")
+    parts.append("")
     parts.append(
         "Respond ONLY with a JSON object: { \"assumptions\": { ... } }. "
         "Populate assumptions.revenue_streams (array of stream objects with drivers), "
-        "assumptions.cost_structure (variable_costs, fixed_costs), assumptions.working_capital, as needed for the template."
+        "assumptions.cost_structure (variable_costs, fixed_costs), assumptions.working_capital, as needed for the template. "
+        "Remember: every numeric value needs a sibling '_confidence' and '_evidence' field."
     )
     return "\n".join(parts)
 

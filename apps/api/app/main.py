@@ -13,7 +13,7 @@ from apps.api.app.db.connection import close_pool, init_pool
 from apps.api.app.middleware.logging import logging_middleware
 from apps.api.app.middleware.metrics import metrics_middleware
 from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
-from apps.api.app.routers import baselines, changesets, drafts, health, jobs, metrics_summary, runs, ventures
+from apps.api.app.routers import baselines, changesets, drafts, health, jobs, metrics_summary, notifications, runs, ventures
 from shared.fm_shared.errors import FinModelError, get_http_status
 from shared.fm_shared.logging import configure_logging
 from shared.fm_shared.metrics import metrics_app
@@ -89,6 +89,7 @@ app.include_router(drafts.router, prefix="/api/v1")
 app.include_router(baselines.router, prefix="/api/v1")
 app.include_router(changesets.router, prefix="/api/v1")
 app.include_router(runs.router, prefix="/api/v1")
+app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(ventures.router, prefix="/api/v1")
 app.mount("/metrics", metrics_app)
 

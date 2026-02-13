@@ -27,18 +27,44 @@ function AssumptionTree({ data }: { data: unknown }) {
   }
   if (typeof data === "object") {
     const entries = Object.entries(data as Record<string, unknown>);
+    const displayEntries = entries.filter(([key]) => !key.endsWith("_confidence") && !key.endsWith("_evidence"));
+    const record = data as Record<string, unknown>;
     return (
       <ul className="space-y-1 pl-2 text-sm">
-        {entries.map(([key, value]) => (
-          <li key={key} className="border-l border-border pl-2">
-            <span className="font-medium text-foreground">{key}:</span>{" "}
-            {typeof value === "object" && value !== null && !Array.isArray(value) ? (
-              <AssumptionTree data={value} />
-            ) : (
-              <span className="text-muted-foreground">{String(value)}</span>
-            )}
-          </li>
-        ))}
+        {displayEntries.map(([key, value]) => {
+          const confidence = record[`${key}_confidence`] as string | undefined;
+          const evidence = record[`${key}_evidence`] as string | undefined;
+          return (
+            <li key={key} className="border-l border-border pl-2">
+              <span className="font-medium text-foreground">{key}:</span>{" "}
+              {typeof value === "object" && value !== null && !Array.isArray(value) ? (
+                <AssumptionTree data={value} />
+              ) : (
+                <>
+                  <span className="text-muted-foreground">{String(value)}</span>
+                  {confidence && (
+                    <span
+                      className={`ml-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                        confidence === "high"
+                          ? "bg-green-100 text-green-800"
+                          : confidence === "medium"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {confidence}
+                    </span>
+                  )}
+                  {evidence && (
+                    <span className="ml-1 text-[10px] text-muted-foreground italic">
+                      ({evidence})
+                    </span>
+                  )}
+                </>
+              )}
+            </li>
+          );
+        })}
       </ul>
     );
   }
@@ -289,10 +315,28 @@ export default function DraftWorkspacePage() {
                     key={p.id}
                     className="rounded border border-amber-200 bg-white p-2 text-sm"
                   >
-                    <div className="font-mono text-xs text-muted-foreground">{p.path}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">{p.path}</span>
+                      {p.confidence && (
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                            p.confidence === "high"
+                              ? "bg-green-100 text-green-800"
+                              : p.confidence === "medium"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {p.confidence}
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-1">{String(p.value)}</div>
                     {p.evidence && (
                       <div className="mt-1 text-xs text-muted-foreground">{p.evidence}</div>
+                    )}
+                    {p.reasoning && (
+                      <div className="mt-1 text-xs italic text-muted-foreground">{p.reasoning}</div>
                     )}
                     <div className="mt-2 flex gap-2">
                       <button

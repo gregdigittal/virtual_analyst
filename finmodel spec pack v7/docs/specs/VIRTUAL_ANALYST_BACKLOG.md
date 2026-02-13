@@ -218,9 +218,15 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: Draft generated from questionnaire
 - Note: POST /api/v1/ventures (create venture from template), POST .../answers (submit questionnaire), POST .../generate-draft (LLM generates assumptions → draft session). Template catalog: apps/api/app/data/default_catalog.json (manufacturing, wholesale, services, SaaS, fintech). LLM task_label: template_initialization. Unit tests: tests/unit/test_ventures_api.py.
 
-### VA-P2-08: Draft workspace UI (L)
+### VA-P2-08: Draft workspace UI (L) — DONE
 - Chat, assumption editor, integrity status
 - AC: End-to-end draft -> commit flow in UI
+- Note: /drafts list and /drafts/[id] workspace (assumption tree, chat, pending proposals, Mark ready, Commit, Abandon). API client: drafts list/get/create/patch/chat/acceptProposal/rejectProposal/commit/delete. Integrity dialog on 409; terminal banners for committed/abandoned.
+
+### VA-P2-08b: LLM guardrails & confidence visibility (M) — DONE
+- Facts-only constraints in all LLM prompts, confidence display in UI
+- AC: LLM prompts include hallucination prevention; confidence badges shown on proposals and assumptions; content safety validation on LLM output
+- Note: System prompts updated with CRITICAL RULES (no fabrication, evidence-backed, confidence guide). TEMPLATE_INITIALIZATION_SCHEMA updated with confidence/evidence description. Proposal UI shows confidence badges (green/amber/red). AssumptionTree displays _confidence and _evidence sibling fields inline. Post-LLM content safety validation (_validate_proposal_content) drops unsafe proposals.
 
 ### VA-P2-09: Notifications (M)
 - Email and in-app notifications

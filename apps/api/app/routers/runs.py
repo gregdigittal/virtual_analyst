@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from apps.api.app.db import ensure_tenant, tenant_conn
+from apps.api.app.db.notifications import create_notification
 from apps.api.app.db.audit import EVENT_RUN_ACCESSED, EVENT_RUN_CREATED, create_audit_event
 from apps.api.app.deps import get_artifact_store
 from shared.fm_shared.errors import EngineError, StorageError
@@ -113,6 +114,16 @@ async def create_run(
                 "UPDATE runs SET status = 'succeeded' WHERE tenant_id = $1 AND run_id = $2",
                 x_tenant_id,
                 run_id,
+            )
+            await create_notification(
+                conn,
+                x_tenant_id,
+                "run_complete",
+                "Run completed",
+                body=f"Run {run_id} completed successfully.",
+                entity_type="run",
+                entity_id=run_id,
+                user_id=x_user_id or None,
             )
             await conn.execute(
                 """INSERT INTO run_artifacts (tenant_id, run_id, artifact_type, storage_path)

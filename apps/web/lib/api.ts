@@ -155,6 +155,26 @@ export interface CommitResult {
   integrity?: { status: string; checks: unknown[] };
 }
 
+export interface NotificationItem {
+  id: string;
+  tenant_id: string;
+  user_id: string | null;
+  type: string;
+  title: string;
+  body: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  read_at: string | null;
+  created_at: string | null;
+}
+
+export interface NotificationsResponse {
+  items: NotificationItem[];
+  unread_count: number;
+  limit: number;
+  offset: number;
+}
+
 export const api = {
   baselines: {
     list: (tenantId: string) =>
@@ -239,6 +259,22 @@ export const api = {
       request<{ draft_session_id: string; status: string }>(
         `/api/v1/drafts/${encodeURIComponent(draftSessionId)}`,
         { tenantId, method: "DELETE" }
+      ),
+  },
+  notifications: {
+    list: (tenantId: string, unreadOnly?: boolean, limit?: number, offset?: number) =>
+      request<NotificationsResponse>(
+        `/api/v1/notifications?${new URLSearchParams({
+          ...(unreadOnly && { unread_only: "true" }),
+          ...(limit != null && { limit: String(limit) }),
+          ...(offset != null && { offset: String(offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    markRead: (tenantId: string, notificationId: string) =>
+      request<{ id: string; read_at: string | null }>(
+        `/api/v1/notifications/${encodeURIComponent(notificationId)}`,
+        { tenantId, method: "PATCH" }
       ),
   },
 };

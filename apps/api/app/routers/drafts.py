@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any, Literal
 
@@ -9,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from apps.api.app.db import ensure_tenant, tenant_conn
+from apps.api.app.db.notifications import create_notification
 from apps.api.app.db.audit import (
     EVENT_DRAFT_ABANDONED,
     EVENT_DRAFT_ACCESSED,
@@ -78,15 +80,50 @@ def _build_draft_assumptions_prompt(workspace: dict[str, Any]) -> str:
     evidence = workspace.get("evidence") or []
     parts = [
         "You are a financial analyst assistant helping build a financial model.",
+        "",
+        "## CRITICAL RULES",
+        "- Do NOT invent, fabricate, or hallucinate any data, facts, statistics, or financial figures.",
+        "- Every proposed value MUST be grounded in one of: (a) the user's explicit input, (b) evidence provided below, (c) standard industry benchmarks you can cite by name.",
+        "- If you lack sufficient information to propose a value, set confidence to 'low' and clearly state in the evidence field that this is a placeholder requiring user verification.",
+        "- Do NOT present assumptions as facts. Always qualify uncertain values.",
+        "- Do NOT propose values outside physically reasonable bounds for the business type.",
+        "",
+        "## Confidence Rating Guide",
+        "- high: Direct evidence from user input, uploaded documents, or named industry benchmark",
+        "- medium: Reasonable inference from available context, clearly stated as such",
+        "- low: Placeholder or educated guess — MUST be flagged for user review",
+        "",
         "Driver blueprint (nodes/edges/formulas):",
         str(blueprint),
+        "",
         "Current assumptions (already set):",
         str(assumptions),
+        "",
         "Evidence collected so far:",
         str(evidence[:20]),
-        "Respond ONLY with a JSON object: proposals (array of {path, value, evidence, confidence}), optional clarification, optional commentary.",
+        "",
+        "Respond ONLY with a JSON object: proposals (array of {path, value, evidence, confidence, reasoning}), optional clarification, optional commentary.",
+        "For each proposal, the 'evidence' field MUST cite the source (e.g. 'User stated...', 'Industry benchmark: XYZ report', 'Derived from...'). Never leave evidence empty.",
     ]
     return "\n".join(parts)
+
+
+_UNSAFE_CONTENT_PATTERN = re.compile(
+    r"(https?://|<script|javascript:|eval\(|exec\()", re.IGNORECASE
+)
+
+
+def _validate_proposal_content(proposal: dict[str, Any]) -> str | None:
+    """Return error message if proposal content is unsafe, else None."""
+    for field in ("evidence", "reasoning"):
+        text = proposal.get(field, "")
+        if isinstance(text, str) and _UNSAFE_CONTENT_PATTERN.search(text):
+            return f"Unsafe content in {field}"
+    value = proposal.get("value")
+    if isinstance(value, (int, float)):
+        if not (-1e15 < value < 1e15):
+            return f"Value {value} outside reasonable bounds"
+    return None
 
 
 def _path_under_assumptions(path: str) -> bool:
@@ -414,6 +451,17 @@ async def patch_draft(
                             user_id=x_user_id or None,
                             event_data={"status": new_status},
                         )
+                        if new_status == STATUS_READY_TO_COMMIT:
+                            await create_notification(
+                                conn,
+                                x_tenant_id,
+                                "draft_ready",
+                                "Draft ready to commit",
+                                body=f"Draft {draft_session_id} is ready to commit.",
+                                entity_type="draft_session",
+                                entity_id=draft_session_id,
+                                user_id=x_user_id or None,
+                            )
 
                 if workspace_update is not None:
                     current = store.load(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id)
@@ -536,6 +584,9 @@ async def draft_chat(
             for p in proposals_in:
                 path = p.get("path") or ""
                 if not _path_under_assumptions(path):
+                    continue
+                safety_err = _validate_proposal_content(p)
+                if safety_err:
                     continue
                 valid.append({
                     "id": f"prop_{uuid.uuid4().hex[:12]}",
