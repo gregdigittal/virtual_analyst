@@ -33,3 +33,8 @@ def add_usage(tenant_id: str, tokens: int, cost_estimate_usd: float, period: str
 def check_limit(tenant_id: str, limit: int, period: str | None = None) -> bool:
     usage = get_usage(tenant_id, period)
     return int(usage["llm_tokens_total"]) < limit
+
+
+def reset_usage() -> None:
+    with _usage_lock:
+        _usage.clear()

@@ -19,6 +19,7 @@ DEFAULT_POLICY = {
         {"task_label": "draft_assumptions", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.2},
         {"task_label": "evidence_extraction", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 2048, "temperature": 0.1},
         {"task_label": "memo_generation", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 8192, "temperature": 0.3},
+        {"task_label": "template_initialization", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.2},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }

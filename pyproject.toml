@@ -76,6 +76,7 @@ packages = [
     "apps.api",
     "apps.api.app",
     "apps.api.app.core",
+    "apps.api.app.data",
     "apps.api.app.middleware",
     "apps.api.app.routers",
     "apps.api.app.services",

@@ -52,3 +52,23 @@ def test_get_draft_returns_404_when_not_found(mock_tenant_conn: MagicMock) -> No
         headers={"X-Tenant-ID": TENANT},
     )
     assert r.status_code == 404
+
+
+def test_draft_chat_requires_x_tenant_id() -> None:
+    r = client.post("/api/v1/drafts/ds_123/chat", json={"message": "hello"})
+    assert r.status_code == 400
+
+
+def test_accept_proposal_requires_x_tenant_id() -> None:
+    r = client.post("/api/v1/drafts/ds_123/proposals/prop_abc/accept")
+    assert r.status_code == 400
+
+
+def test_reject_proposal_requires_x_tenant_id() -> None:
+    r = client.post("/api/v1/drafts/ds_123/proposals/prop_abc/reject")
+    assert r.status_code == 400
+
+
+def test_commit_draft_requires_x_tenant_id() -> None:
+    r = client.post("/api/v1/drafts/ds_123/commit", json={})
+    assert r.status_code == 400

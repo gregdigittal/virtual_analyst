@@ -203,17 +203,20 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: Routing, fallback, and limits enforced
 - Note: `apps/api/app/services/llm/router.py` (LLMRouter, default policy, complete_with_routing); `circuit_breaker.py` (per-provider open/half_open/closed); `metering.py` (in-memory usage + check_limit). Settings: LLM_TOKENS_MONTHLY_LIMIT, CIRCUIT_BREAKER_FAILURE_THRESHOLD, CIRCUIT_BREAKER_RECOVERY_SECONDS. ERR_LLM_QUOTA_EXCEEDED (429), ERR_LLM_ALL_PROVIDERS_FAILED (503). Unit tests: tests/unit/test_llm_router.py.
 
-### VA-P2-05: Draft chat endpoint (L)
+### VA-P2-05: Draft chat endpoint (L) — DONE
 - Structured proposals stored as draft deltas
 - AC: Proposal validation and persistence works
+- Note: POST /api/v1/drafts/{id}/chat (body: message, context); builds system prompt from workspace, calls LLMRouter.complete_with_routing("draft_assumptions"), validates paths under assumptions, appends to pending_proposals and chat_history. POST .../proposals/{id}/accept and .../reject to apply or remove proposals. PROPOSAL_RESPONSE_SCHEMA, _build_draft_assumptions_prompt, _path_under_assumptions, _set_by_path. get_llm_router in deps.
 
-### VA-P2-06: Commit pipeline + changesets (L)
+### VA-P2-06: Commit pipeline + changesets (L) — DONE
 - Compile to frozen model_config; diff and merge
 - AC: Commit creates baseline; changeset merge works
+- Note: POST /api/v1/drafts/{id}/commit (body: acknowledge_warnings); integrity checks (IC_GRAPH_ACYCLIC), compile workspace to model_config, create baseline, set draft status=committed. POST/GET /api/v1/changesets, POST .../test (dry-run engine), POST .../merge (new baseline version). model_changesets table and changeset_overrides artifact type. tests/unit/test_drafts_api.py, test_changesets_api.py.
 
-### VA-P2-07: Venture template wizard (M)
+### VA-P2-07: Venture template wizard (M) — DONE
 - Template selection and LLM-generated draft
 - AC: Draft generated from questionnaire
+- Note: POST /api/v1/ventures (create venture from template), POST .../answers (submit questionnaire), POST .../generate-draft (LLM generates assumptions → draft session). Template catalog: apps/api/app/data/default_catalog.json (manufacturing, wholesale, services, SaaS, fintech). LLM task_label: template_initialization. Unit tests: tests/unit/test_ventures_api.py.
 
 ### VA-P2-08: Draft workspace UI (L)
 - Chat, assumption editor, integrity status

@@ -1,11 +1,26 @@
-"""Application dependencies: artifact store, etc."""
+"""Application dependencies: artifact store, LLM router, etc."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from apps.api.app.core.settings import get_settings
+from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.storage import ArtifactStore
+
+_llm_router: LLMRouter | None = None
+
+
+def get_llm_router() -> LLMRouter:
+    global _llm_router
+    if _llm_router is None:
+        _llm_router = LLMRouter()
+    return _llm_router
+
+
+def reset_llm_router() -> None:
+    global _llm_router
+    _llm_router = None
 
 
 def get_artifact_store() -> ArtifactStore:
