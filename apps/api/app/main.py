@@ -13,7 +13,7 @@ from apps.api.app.db.connection import close_pool, init_pool
 from apps.api.app.middleware.logging import logging_middleware
 from apps.api.app.middleware.metrics import metrics_middleware
 from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
-from apps.api.app.routers import baselines, changesets, drafts, health, jobs, metrics_summary, notifications, runs, ventures
+from apps.api.app.routers import audit, baselines, billing, changesets, compliance, covenants, drafts, excel, health, import_csv, integrations, jobs, memos, metrics_summary, notifications, runs, scenarios, ventures
 from shared.fm_shared.errors import FinModelError, get_http_status
 from shared.fm_shared.logging import configure_logging
 from shared.fm_shared.metrics import metrics_app
@@ -89,8 +89,17 @@ app.include_router(drafts.router, prefix="/api/v1")
 app.include_router(baselines.router, prefix="/api/v1")
 app.include_router(changesets.router, prefix="/api/v1")
 app.include_router(runs.router, prefix="/api/v1")
+app.include_router(scenarios.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(ventures.router, prefix="/api/v1")
+app.include_router(integrations.router, prefix="/api/v1")
+app.include_router(billing.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
+app.include_router(compliance.router, prefix="/api/v1")
+app.include_router(import_csv.router, prefix="/api/v1")
+app.include_router(covenants.router, prefix="/api/v1")
+app.include_router(excel.router, prefix="/api/v1")
+app.include_router(memos.router, prefix="/api/v1")
 app.mount("/metrics", metrics_app)
 
 

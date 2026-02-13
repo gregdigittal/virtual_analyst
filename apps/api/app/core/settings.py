@@ -44,6 +44,34 @@ class Settings(BaseSettings):
     circuit_breaker_failure_threshold: int = Field(default=5, ge=1, alias="CIRCUIT_BREAKER_FAILURE_THRESHOLD")
     circuit_breaker_recovery_seconds: int = Field(default=60, ge=1, alias="CIRCUIT_BREAKER_RECOVERY_SECONDS")
 
+    xero_client_id: str | None = Field(default=None, alias="XERO_CLIENT_ID")
+    xero_client_secret: str | None = Field(default=None, alias="XERO_CLIENT_SECRET")
+    integration_callback_base_url: str = Field(
+        default="http://localhost:3000",
+        alias="INTEGRATION_CALLBACK_BASE_URL",
+    )
+    """Frontend URL to redirect user after OAuth success (e.g. ?connection_id=)."""
+    integration_oauth_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/integrations/connections/callback",
+        alias="INTEGRATION_OAUTH_REDIRECT_URI",
+    )
+    """OAuth redirect_uri registered with provider; must point at this API callback."""
+    oauth_state_secret: str = Field(
+        default="change-me-in-production",
+        alias="OAUTH_STATE_SECRET",
+    )
+    """Secret key for signing OAuth state tokens (HMAC-SHA256)."""
+    oauth_encryption_key: str = Field(
+        default="",
+        alias="OAUTH_ENCRYPTION_KEY",
+    )
+    """Fernet key for encrypting OAuth tokens at rest. Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"""
+
+    stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
+    stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
+    stripe_price_id_professional: str | None = Field(default=None, alias="STRIPE_PRICE_ID_PROFESSIONAL")
+    stripe_price_id_starter: str | None = Field(default=None, alias="STRIPE_PRICE_ID_STARTER")
+
     def cors_allowed_origins_list(self) -> list[str]:
         return [item.strip() for item in self.cors_allowed_origins.split(",") if item.strip()]
 

@@ -1,0 +1,2 @@
+-- 0011: Reserved (no schema changes)
+-- This file exists to maintain sequential migration numbering.

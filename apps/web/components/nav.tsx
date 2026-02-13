@@ -60,6 +60,12 @@ export function Nav() {
             Runs
           </Link>
           <Link
+            href="/scenarios"
+            className="text-sm font-medium text-foreground hover:text-muted-foreground"
+          >
+            Scenarios
+          </Link>
+          <Link
             href="/dashboard"
             className="text-sm font-medium text-foreground hover:text-muted-foreground"
           >

@@ -5,6 +5,7 @@ Monte Carlo runner: sample distributions, run engine per sim, aggregate percenti
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Callable
 
 import numpy as np
 
@@ -33,11 +34,13 @@ def run_monte_carlo(
     num_simulations: int,
     seed: int,
     scenario_id: str | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> MCResult:
     """
     Run num_simulations with seeded RNG. For each sim: sample distributions into
     scenario overrides, run engine + statements + KPIs, collect revenue/ebitda/net_income/fcf.
     Returns percentiles (P5..P95) per metric per period and optional summary.
+    progress_callback(sims_done, total) is called periodically for async progress reporting.
     """
     rng = np.random.default_rng(seed)
     horizon = config.metadata.horizon_months
@@ -55,7 +58,11 @@ def run_monte_carlo(
     net_income_sims: list[list[float]] = []
     fcf_sims: list[list[float]] = []
 
+    report_every = max(1, num_simulations // 20) if progress_callback else 0
+
     for sim_i in range(num_simulations):
+        if progress_callback and (sim_i + 1) % report_every == 0:
+            progress_callback(sim_i + 1, num_simulations)
         overrides: list[ScenarioOverride] = []
         for dist in config.distributions:
             val = sample(dist, 1, rng)[0]
@@ -77,6 +84,9 @@ def run_monte_carlo(
         ebitda_sims.append(ebitda)
         net_income_sims.append(ni)
         fcf_sims.append(fcf)
+
+    if progress_callback:
+        progress_callback(num_simulations, num_simulations)
 
     def percentile_series(sims: list[list[float]]) -> dict[str, list[float]]:
         arr = np.array(sims)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from apps.api.app.core.settings import get_settings
+from apps.api.app.services.billing import BillingService
 from apps.api.app.services.llm.circuit_breaker import CircuitBreaker
 from apps.api.app.services.llm.metering import add_usage, check_limit
 from apps.api.app.services.llm.provider import (
@@ -68,9 +69,13 @@ class LLMRouter:
             recovery_timeout_sec=settings.circuit_breaker_recovery_seconds,
         )
         self._policy: dict[str, Any] | None = None
+        self._billing: BillingService | None = None
 
     def set_policy(self, policy: dict[str, Any]) -> None:
         self._policy = policy
+
+    def set_billing_service(self, billing: BillingService) -> None:
+        self._billing = billing
 
     def resolve(self, task_label: str) -> list[tuple[str, str, int, float]]:
         return _resolve_candidates(task_label, self._policy)
@@ -85,12 +90,21 @@ class LLMRouter:
         temperature: float = 0.2,
     ) -> LLMResponse:
         settings = get_settings()
-        if not check_limit(tenant_id, settings.llm_tokens_monthly_limit):
-            raise LLMError(
-                "Token quota exceeded",
-                code="ERR_LLM_QUOTA_EXCEEDED",
-                context={"limit": settings.llm_tokens_monthly_limit, "tenant_id": tenant_id},
-            )
+        if self._billing:
+            allowed, current, limit = await self._billing.check_llm_limit(tenant_id, estimated_tokens=max_tokens)
+            if not allowed:
+                raise LLMError(
+                    "Token quota exceeded",
+                    code="ERR_LLM_QUOTA_EXCEEDED",
+                    context={"limit": limit, "current": current, "tenant_id": tenant_id},
+                )
+        else:
+            if not check_limit(tenant_id, settings.llm_tokens_monthly_limit):
+                raise LLMError(
+                    "Token quota exceeded",
+                    code="ERR_LLM_QUOTA_EXCEEDED",
+                    context={"limit": settings.llm_tokens_monthly_limit, "tenant_id": tenant_id},
+                )
         candidates = self.resolve(task_label)
         last_error: Exception | None = None
         for provider_key, model, rule_max_tokens, rule_temp in candidates:
@@ -108,7 +122,23 @@ class LLMRouter:
                     temperature=rule_temp,
                 )
                 self._circuit.record_success(provider_key)
-                add_usage(tenant_id, resp.tokens.total_tokens, resp.cost_estimate_usd)
+                if self._billing:
+                    await self._billing.record_llm_usage(
+                        tenant_id,
+                        resp.tokens.total_tokens,
+                        resp.cost_estimate_usd,
+                        task_label,
+                        resp.provider,
+                        resp.model,
+                        {
+                            "prompt_tokens": resp.tokens.prompt_tokens,
+                            "completion_tokens": resp.tokens.completion_tokens,
+                            "total_tokens": resp.tokens.total_tokens,
+                        },
+                        resp.latency_ms,
+                    )
+                else:
+                    add_usage(tenant_id, resp.tokens.total_tokens, resp.cost_estimate_usd)
                 return resp
             except Exception as e:
                 last_error = e

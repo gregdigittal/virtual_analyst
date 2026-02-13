@@ -242,21 +242,25 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 - AC: MC results deterministic with seed
 - Note: shared/fm_shared/analysis/distributions.py (sample: triangular, normal, lognormal, uniform, pert); monte_carlo.py (run_monte_carlo → MCResult with percentiles P5–P95 for revenue, ebitda, net_income, fcf). Unit tests: test_distributions.py, test_monte_carlo.py.
 
-### VA-P3-02: Async MC execution (M)
+r### VA-P3-02: Async MC execution (M) — DONE
 - Background jobs with progress reporting
 - AC: 1k sim run completes and reports progress
+- Note: POST /runs with mc_enabled, num_simulations, seed enqueues Celery run_mc_execute; progress in Redis; GET /runs/{id} returns mc_progress when queued/running; GET /runs/{id}/mc returns percentiles. Migration 0009_runs_async_mc.
 
-### VA-P3-03: Scenario management (M)
+### VA-P3-03: Scenario management (M) — DONE
 - CRUD with overrides and comparison
 - AC: Scenario comparison produces expected variance
+- Note: scenarios table (0010_scenarios); POST/GET/DELETE /api/v1/scenarios; POST .../compare returns side-by-side KPIs. Web /scenarios list + compare form.
 
-### VA-P3-04: Valuation module (M)
+### VA-P3-04: Valuation module (M) — DONE
 - DCF and multiples outputs
 - AC: Valuation outputs appear in run results
+- Note: shared/fm_shared/analysis/valuation.py (dcf_valuation, multiples_valuation). Sync run accepts valuation_config; GET /runs/{id}/valuation. Web /runs/[id]/valuation page.
 
-### VA-P3-05: Sensitivity + charts (M)
+### VA-P3-05: Sensitivity + charts (M) — DONE
 - Tornado, fan, waterfall charts
 - AC: Charts render with correct inputs
+- Note: GET /runs/{id}/sensitivity (one-at-a-time ±pct, terminal FCF impact). MC page: percentile table + revenue fan (P10/P50/P90). Valuation page: DCF + multiples cards.
 
 ---
 
@@ -304,9 +308,186 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 
 ---
 
+## Phase 6 — Team Collaboration & Workflow Engine
+
+### VA-P6-01: Team & hierarchy data model (M)
+- Migration 0011: teams, team_members, job_functions tables with RLS
+- Seed default job functions on tenant creation
+- AC: Teams CRUD works; hierarchy (reports_to) validates within team; RLS enforced
+
+### VA-P6-02: Team management API (M)
+- CRUD for teams, members, job functions
+- AC: POST/GET/PATCH/DELETE teams; add/remove/update members; list job functions
+
+### VA-P6-03: Workflow template engine (L)
+- Migration 0011: workflow_templates, workflow_instances tables
+- Stage definitions with assignee rules (explicit, reports_to, reports_to_chain, team_pool)
+- Seed default templates (Self-Service, Standard Review, Full Approval)
+- Workflow state machine: pending → in_progress → submitted → approved/returned → completed
+- AC: Create workflow from template; stages advance correctly; routing resolves correct reviewer via hierarchy
+
+### VA-P6-04: Task assignment system (L)
+- Migration 0011: task_assignments table
+- Create assignment (top-down: senior assigns to junior/pool)
+- Submit for review (bottom-up: junior submits, system routes to reviewer)
+- Claim pool assignments
+- Deadline tracking with approaching/overdue detection
+- AC: Assignments created and visible in inbox; pool claim works; deadlines tracked; status transitions enforced
+
+### VA-P6-05: Review & correction pipeline (L)
+- Migration 0011: reviews, change_summaries tables
+- Review decisions: approve, request_changes, reject
+- Inline corrections tracked as structured diff {path, old_value, new_value, reason}
+- Change summary auto-generated on review with corrections
+- AC: Reviewer can approve/return/reject; corrections recorded as diff; change summary created
+
+### VA-P6-06: Learning feedback system (M)
+- LLM task_label: review_summary (generates learning_points from corrections)
+- Acknowledgment tracking (author marks feedback as read)
+- AC: Corrections generate change summary with LLM learning points; author can acknowledge; unacknowledged feedback highlighted
+
+### VA-P6-07: Workflow notifications (M)
+- Notification events: task_assigned, task_submitted, review decision, deadline_approaching, deadline_overdue, workflow_completed
+- Email templates for workflow events
+- AC: All workflow events generate in-app + email notifications; deadline reminders fire at 24h and 4h
+
+### VA-P6-08: Team management UI (M)
+- /settings/teams — list, create, edit teams
+- Team detail — member list, hierarchy tree visualization, add/remove/edit members
+- Job function management
+- AC: Teams CRUD in UI; hierarchy displayed as tree; member permissions editable
+
+### VA-P6-09: Task inbox UI (L)
+- /inbox — personal task inbox with tabs (My Tasks, Team Pool, Awaiting Review, Review Requests)
+- Assignment cards with priority badges, deadlines, status
+- /inbox/{id} — assignment detail with instructions panel and workspace link
+- /assignments/new — create assignment wizard (type, entity, assignee, instructions, deadline, workflow)
+- AC: Inbox shows all relevant tasks; pool claim works; create assignment wizard produces correct assignments
+
+### VA-P6-10: Review workspace UI (L)
+- /inbox/{id}/review — split layout (methodology + assumptions + review form)
+- Methodology panel: chat history (read-only), approach summary (LLM task: methodology_context)
+- Inline editing with change tracking (every edit recorded)
+- Review decision form: approve/request_changes/reject with notes
+- AC: Reviewer sees methodology context; inline edits tracked as diffs; decision persists and advances workflow
+
+### VA-P6-11: Learning feedback UI (M)
+- /inbox/feedback — list of change summaries with diff display
+- Unacknowledged items highlighted
+- Change diff visualization: old/new values with reasons
+- LLM-generated learning points with "AI-generated" label
+- Acknowledge button
+- AC: Feedback displayed with structured diffs; learning points shown; acknowledge updates timestamp
+
+### VA-P6-12: Test suite — Phase 6 (L)
+- test_teams_api.py — CRUD, hierarchy validation, RLS
+- test_workflow_engine.py — template creation, stage advancement, routing logic
+- test_assignments_api.py — create, claim, submit, status transitions
+- test_reviews_api.py — approve/return/reject, change tracking, summary generation
+- test_workflow_integration.py — full flow: assign → build → submit → review → approve/return
+- AC: All Phase 6 tests pass; workflow integration test covers complete lifecycle
+
+---
+
+## Phase 7 — Budgeting & Board Pack
+
+### VA-P7-01: Budget data model & migrations (M)
+- Migration: budgets, budget_line_items, budget_periods, budget_versions, budget_department_allocations tables with RLS
+- Budget lifecycle state machine: draft → submitted → under_review → approved → active → closed
+- Versioning: each budget has immutable snapshots (budget_version_id) so the CFO can see revision history
+- AC: Budget CRUD works; state transitions enforced; versions are append-only; RLS tenant-scoped
+
+### VA-P7-02: Budget CRUD & department allocation API (L)
+- POST/GET/PATCH /api/v1/budgets — create, list, get, update budget metadata (fiscal year, label, status)
+- POST /api/v1/budgets/{id}/line-items — add/update/remove line items (account ref, monthly amounts, notes)
+- POST /api/v1/budgets/{id}/departments — allocate budget by department/cost centre with limits
+- Budget cloning: POST /api/v1/budgets/{id}/clone (copy structure for next period or what-if)
+- AC: Line items persist with monthly granularity; department allocations sum-checked against total; clone preserves structure
+
+### VA-P7-03: Budget templates & LLM-assisted seeding (M)
+- Pre-built budget templates per industry (manufacturing, SaaS, services, wholesale — reuse existing catalog)
+- LLM task_label: budget_initialization — given prior-year actuals + strategic priorities, propose initial line-item amounts with confidence scores
+- Template wizard: select template → answer questionnaire (headcount plan, capex outlook, growth targets) → LLM seeds budget
+- AC: Budget created from template with LLM-proposed amounts; confidence badges displayed; user can accept/reject each line
+
+### VA-P7-04: Actuals import & variance analysis engine (L)
+- Import actuals from ERP sync snapshots (Phase 4 canonical_sync_snapshot) or CSV upload
+- Variance calculation: budget vs actual (absolute, percentage, YTD cumulative) per line item per period
+- Variance classification: favourable/unfavourable with materiality threshold (configurable per tenant)
+- Drill-down: variance by department, by account, by period
+- Endpoint: GET /api/v1/budgets/{id}/variance?period=YYYY-MM&department=x
+- AC: Variance computed correctly; favourable/unfavourable classification correct; drill-down works by department and period
+
+### VA-P7-05: Rolling forecast engine (M)
+- Replace remaining budget periods with latest actuals + re-forecast
+- POST /api/v1/budgets/{id}/reforecast — creates new budget version with actuals locked and remaining periods re-projected
+- LLM task_label: budget_reforecast — given YTD actuals and original assumptions, propose revised forecast with variance explanations
+- AC: Reforecast creates new version; actuals periods locked; revised forecast periods show LLM-assisted projections with confidence
+
+### VA-P7-06: Budget approval workflow integration (M)
+- Integrates with Phase 6 workflow engine
+- Seed workflow template: Budget Approval (stages: department_head_review → finance_review → cfo_approval → board_presentation)
+- Budget submission triggers workflow; each stage reviewer sees budget summary + variance highlights
+- CFO approval transitions budget to active status
+- AC: Budget submission creates workflow instance; stage progression works; CFO approval activates budget
+
+### VA-P7-07: Board pack composer (L)
+- Board pack template engine: configurable sections (executive summary, P&L, BS, CF, budget variance, KPI dashboard, scenario comparison, strategic commentary)
+- Section ordering and inclusion controlled per pack
+- Auto-populated from run results, budget variance, KPI data, scenario compare
+- LLM task_label: board_pack_narrative — generates executive summary and commentary sections from financial data with facts-only constraints
+- Branding: applies tenant logo, colour palette, and T&C footer (Phase 10 org settings)
+- AC: Board pack assembles all sections; LLM narrative is factual and sourced; branding applied
+
+### VA-P7-08: Board pack export (PDF/PPTX/HTML) (L)
+- PDF generation with professional layout (cover page, ToC, numbered sections, charts, tables, page numbers)
+- PPTX generation for board presentation (one section per slide, chart-heavy layout)
+- HTML generation for web preview and email distribution
+- Chart rendering: IS/BS/CF waterfall, budget variance bar, KPI trend lines, scenario tornado, MC fan
+- Configurable: which sections to include, period range, comparison periods
+- AC: PDF/PPTX/HTML exports render correctly; charts embedded; branding applied; file size reasonable (<10MB for standard pack)
+
+### VA-P7-09: Board pack scheduling & distribution (M)
+- Schedule recurring pack generation (e.g. monthly on 5th business day)
+- Distribution list: email board pack to specified recipients with optional cover note
+- Pack history: list of generated packs with download links and generation metadata
+- AC: Scheduled generation runs on time; email delivery works; pack history accessible
+
+### VA-P7-10: Budget & board pack UI (L)
+- /budgets — list budgets with status badges, fiscal year filter
+- /budgets/new — create budget wizard (template selection, period configuration, department setup)
+- /budgets/[id] — budget workspace (line-item editor with monthly columns, department tabs, totals row, variance column when actuals available)
+- /budgets/[id]/variance — variance dashboard (heatmap by department x period, drill-down tables, charts)
+- /budgets/[id]/reforecast — rolling forecast view (locked actuals greyed out, editable forecast periods)
+- /board-packs — list generated packs, create new pack
+- /board-packs/new — pack composer (select sections, configure, preview, generate)
+- /board-packs/[id] — pack preview with download buttons (PDF/PPTX/HTML)
+- AC: All budget pages render correctly; line-item editor supports inline editing; variance heatmap displays; board pack preview matches export output
+
+### VA-P7-11: Budget KPI dashboard (M)
+- Dedicated budget-focused dashboard widgets: burn rate, runway, budget utilisation %, variance trend, department spend ranking
+- Alerting: configurable thresholds (e.g. department >90% utilised, unfavourable variance >10%) trigger notifications
+- CFO view: consolidated across all departments with drill-down
+- AC: Dashboard widgets render correct data; alerts fire on threshold breach; drill-down navigates to variance detail
+
+### VA-P7-12: Test suite — Phase 7 (L)
+- test_budgets_api.py — CRUD, line items, department allocation, cloning, state transitions
+- test_variance_engine.py — actuals import, variance calculation, classification, drill-down
+- test_rolling_forecast.py — reforecast version creation, actuals locking, LLM projection
+- test_board_pack.py — section assembly, LLM narrative, branding, export format validation
+- test_budget_workflow_integration.py — full flow: create budget → submit → review stages → CFO approve → active
+- AC: All Phase 7 tests pass; variance calculations verified against manual examples; board pack exports validated
+
+---
+
 ## Post-Launch Backlog (v1.1+)
 - Multi-currency and FX overlays
 - SSO/SAML
 - Template marketplace
-- Advanced approval workflows
 - Connector marketplace and QuickBooks adapter
+- Cross-team workflow routing (multi-team approval chains)
+- Workflow analytics dashboard (cycle times, review rates, bottleneck detection)
+- AI-assisted review suggestions (flag unusual assumptions for reviewer attention)
+- Peer comparison (anonymous benchmarking of model accuracy across team)
+- Board pack benchmarking (compare pack KPIs against industry median)
+- Natural language budget queries (CFO asks "which department is over budget?" via chat)

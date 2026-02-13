@@ -197,12 +197,35 @@ export const api = {
       request<RunDetail>(`/api/v1/runs/${encodeURIComponent(runId)}`, {
         tenantId,
       }),
-    create: (tenantId: string, baselineId: string, scenarioId?: string) =>
-      request<{ run_id: string; status: string }>("/api/v1/runs", {
+    create: (
+      tenantId: string,
+      baselineId: string,
+      opts?: { scenarioId?: string; mcEnabled?: boolean; numSimulations?: number; seed?: number }
+    ) =>
+      request<{ run_id: string; status: string; task_id?: string }>("/api/v1/runs", {
         tenantId,
         method: "POST",
-        body: { baseline_id: baselineId, ...(scenarioId && { scenario_id: scenarioId }) },
+        body: {
+          baseline_id: baselineId,
+          ...(opts?.scenarioId && { scenario_id: opts.scenarioId }),
+          ...(opts?.mcEnabled && { mc_enabled: true, num_simulations: opts.numSimulations ?? 1000, seed: opts.seed ?? 42 }),
+        },
       }),
+    getMc: (tenantId: string, runId: string) =>
+      request<{ num_simulations: number; seed: number; percentiles: Record<string, Record<string, number[]>>; summary: Record<string, unknown> }>(
+        `/api/v1/runs/${encodeURIComponent(runId)}/mc`,
+        { tenantId }
+      ),
+    getValuation: (tenantId: string, runId: string) =>
+      request<{ dcf?: Record<string, unknown>; multiples?: Record<string, unknown> }>(
+        `/api/v1/runs/${encodeURIComponent(runId)}/valuation`,
+        { tenantId }
+      ),
+    getSensitivity: (tenantId: string, runId: string, pct?: number) =>
+      request<{ base_fcf: number; pct: number; drivers: { ref: string; impact_low: number; impact_high: number }[] }>(
+        `/api/v1/runs/${encodeURIComponent(runId)}/sensitivity?pct=${pct ?? 0.1}`,
+        { tenantId }
+      ),
     getStatements: (tenantId: string, runId: string) =>
       request<StatementsData>(
         `/api/v1/runs/${encodeURIComponent(runId)}/statements`,
@@ -277,4 +300,32 @@ export const api = {
         { tenantId, method: "PATCH" }
       ),
   },
+  scenarios: {
+    list: (tenantId: string, baselineId?: string) =>
+      request<{ items: ScenarioItem[]; limit: number; offset: number }>(
+        `/api/v1/scenarios${baselineId ? `?baseline_id=${encodeURIComponent(baselineId)}` : ""}`,
+        { tenantId }
+      ),
+    get: (tenantId: string, scenarioId: string) =>
+      request<ScenarioItem>(`/api/v1/scenarios/${encodeURIComponent(scenarioId)}`, { tenantId }),
+    create: (tenantId: string, body: { baseline_id: string; label: string; overrides?: { ref: string; field: string; value: number }[]; description?: string }) =>
+      request<ScenarioItem>("/api/v1/scenarios", { tenantId, method: "POST", body }),
+    delete: (tenantId: string, scenarioId: string) =>
+      request<unknown>(`/api/v1/scenarios/${encodeURIComponent(scenarioId)}`, { tenantId, method: "DELETE" }),
+    compare: (tenantId: string, body: { baseline_id: string; scenario_ids: string[] }) =>
+      request<{ baseline_id: string; baseline_version: string; scenarios: Record<string, unknown>[] }>(
+        "/api/v1/scenarios/compare",
+        { tenantId, method: "POST", body }
+      ),
+  },
 };
+
+export interface ScenarioItem {
+  scenario_id: string;
+  baseline_id: string;
+  baseline_version: string;
+  label: string;
+  description?: string | null;
+  overrides: { ref: string; field: string; value: number }[];
+  created_at: string | null;
+}

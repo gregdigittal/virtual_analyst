@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from apps.api.app.services.llm.provider import (
@@ -44,9 +43,9 @@ async def _run_anthropic_mocked() -> LLMResponse:
         return await provider.complete(messages, schema, "test_task")
 
 
-def test_anthropic_provider_returns_valid_structured_output() -> None:
+async def test_anthropic_provider_returns_valid_structured_output() -> None:
     """AnthropicProvider.complete returns LLMResponse with parsed dict content (mocked)."""
-    result = asyncio.run(_run_anthropic_mocked())
+    result = await _run_anthropic_mocked()
     assert isinstance(result, LLMResponse)
     assert result.content == {"answer": "4"}
     assert result.provider == "anthropic"
@@ -77,9 +76,9 @@ async def _run_openai_mocked() -> LLMResponse:
         return await provider.complete(messages, schema, "test_task")
 
 
-def test_openai_provider_returns_valid_structured_output() -> None:
+async def test_openai_provider_returns_valid_structured_output() -> None:
     """OpenAIProvider.complete returns LLMResponse with parsed dict content (mocked)."""
-    result = asyncio.run(_run_openai_mocked())
+    result = await _run_openai_mocked()
     assert isinstance(result, LLMResponse)
     assert result.content == {"value": 42}
     assert result.provider == "openai"

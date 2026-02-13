@@ -32,6 +32,9 @@ dependencies = [
     "anthropic>=0.39.0",
     "openai>=1.55.0",
     "jsonschema>=4.20.0",
+    "stripe>=8.0.0",
+    "cryptography>=41.0.0",
+    "openpyxl>=3.1.0",
 ]
 
 [project.optional-dependencies]
@@ -81,6 +84,7 @@ packages = [
     "apps.api.app.routers",
     "apps.api.app.services",
     "apps.api.app.services.llm",
+    "apps.api.app.services.billing",
     "apps.worker",
     "shared",
     "shared.fm_shared",

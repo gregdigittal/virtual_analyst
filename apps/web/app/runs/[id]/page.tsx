@@ -224,7 +224,7 @@ export default function RunDetailPage() {
               </p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setTab("statements")}
@@ -247,6 +247,18 @@ export default function RunDetailPage() {
             >
               KPIs
             </button>
+            <Link
+              href={`/runs/${runId}/mc`}
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              MC
+            </Link>
+            <Link
+              href={`/runs/${runId}/valuation`}
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              Valuation
+            </Link>
           </div>
         </div>
         {error && (
