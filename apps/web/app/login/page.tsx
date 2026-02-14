@@ -3,6 +3,7 @@
 import { VAButton, VAInput } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
@@ -105,7 +106,13 @@ function LoginForm() {
           </VAButton>
         </form>
         <p className="text-center text-sm text-va-text2">
-          No account? Sign up is via Supabase Dashboard or API.
+          No account?{" "}
+          <Link
+            href="/signup"
+            className="text-va-blue hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded-va-xs"
+          >
+            Sign up
+          </Link>
         </p>
       </div>
     </main>

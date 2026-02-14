@@ -286,6 +286,12 @@ r### VA-P3-02: Async MC execution (M) — DONE
 - Import wizard and covenant alerts
 - AC: Import creates draft; breaches trigger alerts
 
+### VA-P4-06: Sign up with SSO (Google, Microsoft) (M)
+- Allow users to sign up and sign in using Google and Microsoft OAuth (in addition to email/password).
+- Configure Supabase Auth providers (Google OAuth 2.0, Microsoft Azure AD / Entra ID); optional tenant-level allowlist (e.g. restrict to certain domains).
+- Landing and login/signup pages: “Continue with Google” and “Continue with Microsoft” buttons; post-OAuth redirect to app or signup completion (e.g. link to tenant if required).
+- AC: User can sign up and sign in with Google; user can sign up and sign in with Microsoft; existing email/password flow still works; redirect after SSO lands on correct app route (e.g. /baselines or onboarding).
+
 ---
 
 ## Phase 5 — Excel + Memos + Collaboration
@@ -311,14 +317,14 @@ r### VA-P3-02: Async MC execution (M) — DONE
 
 ## Phase 6 — Team Collaboration & Workflow Engine
 
-### VA-P6-01: Team & hierarchy data model (M)
-- Migration 0011: teams, team_members, job_functions tables with RLS
-- Seed default job functions on tenant creation
+### VA-P6-01: Team & hierarchy data model (M) — DONE
+- Migration 0019: teams, team_members, job_functions tables with RLS; seed default job functions for existing tenants
 - AC: Teams CRUD works; hierarchy (reports_to) validates within team; RLS enforced
 
-### VA-P6-02: Team management API (M)
-- CRUD for teams, members, job functions
-- AC: POST/GET/PATCH/DELETE teams; add/remove/update members; list job functions
+### VA-P6-02: Team management API (M) — DONE
+- CRUD for teams, members, job functions (POST/GET/PATCH/DELETE teams; add/remove/update members; list job functions)
+- AC: POST/GET/PATCH/DELETE teams; add/remove/update members; list job functions; reports_to validated to same team
+- Implemented: GET/POST /api/v1/teams, GET/PATCH/DELETE /api/v1/teams/{team_id}, GET/POST/PATCH/DELETE members, GET /api/v1/teams/job-functions/list (ensures defaults for new tenants)
 
 ### VA-P6-03: Workflow template engine (L)
 - Migration 0011: workflow_templates, workflow_instances tables

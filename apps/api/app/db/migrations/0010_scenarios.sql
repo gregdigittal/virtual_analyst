@@ -17,7 +17,11 @@ create table if not exists scenarios (
 create index if not exists idx_scenarios_baseline on scenarios(tenant_id, baseline_id, baseline_version);
 
 alter table scenarios enable row level security;
+drop policy if exists "scenarios_select" on scenarios;
 create policy "scenarios_select" on scenarios for select using (tenant_id = current_setting('app.tenant_id', true));
+drop policy if exists "scenarios_insert" on scenarios;
 create policy "scenarios_insert" on scenarios for insert with check (tenant_id = current_setting('app.tenant_id', true));
+drop policy if exists "scenarios_update" on scenarios;
 create policy "scenarios_update" on scenarios for update using (tenant_id = current_setting('app.tenant_id', true));
+drop policy if exists "scenarios_delete" on scenarios;
 create policy "scenarios_delete" on scenarios for delete using (tenant_id = current_setting('app.tenant_id', true));
