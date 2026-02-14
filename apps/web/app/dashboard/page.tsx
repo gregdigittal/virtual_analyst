@@ -1,5 +1,6 @@
 "use client";
 
+import { VAButton, VACard } from "@/components/ui";
 import { Nav } from "@/components/nav";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -65,70 +66,75 @@ export default function DashboardPage() {
   if (!summary && !loading && !error) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-va-midnight">
       <Nav />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
             Performance dashboard
           </h1>
-          <button
+          <VAButton
+            variant="secondary"
             type="button"
             onClick={() => {
               setLoading(true);
               fetchSummary();
             }}
-            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent"
           >
             Refresh
-          </button>
+          </VAButton>
         </div>
         {error && (
-          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <div className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger">
             {error}
           </div>
         )}
         {loading && !summary ? (
-          <p className="text-muted-foreground">Loading…</p>
+          <p className="text-va-text2">Loading…</p>
         ) : summary ? (
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-sm text-muted-foreground">Request count</p>
-                <p className="text-2xl font-semibold">{summary.request_count}</p>
-                <p className="text-xs text-muted-foreground">
-                  Last 1,000 requests
+              <VACard className="p-4">
+                <p className="text-sm text-va-text2">Request count</p>
+                <p className="font-mono text-2xl font-semibold text-va-text">
+                  {summary.request_count}
                 </p>
-              </div>
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-sm text-muted-foreground">Latency P50</p>
-                <p className="text-2xl font-semibold">
+                <p className="text-xs text-va-text2">Last 1,000 requests</p>
+              </VACard>
+              <VACard className="p-4">
+                <p className="text-sm text-va-text2">Latency P50</p>
+                <p className="font-mono text-2xl font-semibold text-va-text">
                   {summary.latency_p50_ms.toFixed(1)} ms
                 </p>
-              </div>
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-sm text-muted-foreground">Latency P95</p>
-                <p className="text-2xl font-semibold">
+              </VACard>
+              <VACard className="p-4">
+                <p className="text-sm text-va-text2">Latency P95</p>
+                <p className="font-mono text-2xl font-semibold text-va-text">
                   {summary.latency_p95_ms.toFixed(1)} ms
                 </p>
-              </div>
+              </VACard>
             </div>
             {Object.keys(summary.by_endpoint).length > 0 && (
-              <div className="rounded-lg border bg-card p-4">
-                <h2 className="mb-3 text-sm font-medium">Latency by endpoint (avg ms)</h2>
+              <VACard className="p-4">
+                <h2 className="mb-3 text-sm font-medium text-va-text">
+                  Latency by endpoint (avg ms)
+                </h2>
                 <ul className="space-y-1 text-sm">
                   {Object.entries(summary.by_endpoint)
                     .sort(([, a], [, b]) => b - a)
                     .map(([path, avg]) => (
-                      <li key={path} className="flex justify-between gap-4">
-                        <span className="truncate font-mono text-muted-foreground">
+                      <li
+                        key={path}
+                        className="flex justify-between gap-4 text-va-text"
+                      >
+                        <span className="truncate font-mono text-va-text2">
                           {path}
                         </span>
-                        <span>{avg.toFixed(1)}</span>
+                        <span className="font-mono">{avg.toFixed(1)}</span>
                       </li>
                     ))}
                 </ul>
-              </div>
+              </VACard>
             )}
           </div>
         ) : null}

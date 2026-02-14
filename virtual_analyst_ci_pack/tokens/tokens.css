@@ -1,0 +1,22 @@
+:root {
+  --va-midnight: #0B1020;
+  --va-ink: #10172A;
+  --va-surface: #0F172A;
+  --va-panel: #121A33;
+  --va-border: #22304F;
+  --va-blue: #3B82F6;
+  --va-violet: #7C3AED;
+  --va-magenta: #EC4899;
+  --va-ice: #E6F0FF;
+  --va-muted: #94A3B8;
+  --va-text: #E5E7EB;
+  --va-text-2: #B6C2D1;
+  --va-success: #22C55E;
+  --va-warning: #F59E0B;
+  --va-danger: #EF4444;
+}
+
+.va-bg { background: var(--va-midnight); color: var(--va-text); }
+.va-card { background: rgba(255,255,255,0.03); border: 1px solid var(--va-border); border-radius: 18px; }
+.va-glow-blue { box-shadow: 0 0 0 1px rgba(59,130,246,0.35), 0 0 30px rgba(59,130,246,0.25); }
+.va-glow-violet { box-shadow: 0 0 0 1px rgba(124,58,237,0.35), 0 0 30px rgba(124,58,237,0.25); }

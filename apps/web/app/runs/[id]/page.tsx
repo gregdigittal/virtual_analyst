@@ -1,6 +1,7 @@
 "use client";
 
 import { api, type StatementsData, type KpiItem } from "@/lib/api";
+import { VAButton, VACard } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -25,14 +26,19 @@ function StatementTable({
 }) {
   return (
     <div className="mb-8">
-      <h3 className="mb-2 text-lg font-medium">{title}</h3>
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full min-w-[600px] text-sm">
+      <h3 className="font-brand mb-2 text-lg font-medium text-va-text">
+        {title}
+      </h3>
+      <div className="overflow-x-auto rounded-va-lg border border-va-border">
+        <table className="w-full min-w-[600px] text-sm text-va-text">
           <thead>
-            <tr className="border-b border-border bg-muted/50">
+            <tr className="border-b border-va-border bg-va-surface">
               <th className="px-3 py-2 text-left font-medium">Line item</th>
               {periods.map((p) => (
-                <th key={p} className="px-3 py-2 text-right font-medium">
+                <th
+                  key={p}
+                  className="px-3 py-2 text-right font-medium font-mono"
+                >
                   {p}
                 </th>
               ))}
@@ -44,16 +50,16 @@ function StatementTable({
                 key={row.label}
                 className={
                   i % 2 === 0
-                    ? "border-b border-border/50"
-                    : "border-b border-border/50 bg-muted/20"
+                    ? "border-b border-va-border/50"
+                    : "border-b border-va-border/50 bg-va-surface/50"
                 }
               >
                 <td className="px-3 py-2 font-medium">{row.label}</td>
                 {row.values.map((v, j) => (
                   <td
                     key={j}
-                    className={`px-3 py-2 text-right ${
-                      v < 0 ? "text-red-600" : ""
+                    className={`px-3 py-2 text-right font-mono ${
+                      v < 0 ? "text-va-danger" : ""
                     }`}
                   >
                     {formatNum(v)}
@@ -202,60 +208,52 @@ export default function RunDetailPage() {
   const cfRows = buildStatementRows(cfList, periodCount);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-va-midnight">
       <Nav />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6 flex items-center gap-4">
           <Link
             href="/runs"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded"
           >
             ← Runs
           </Link>
         </div>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
               Run {runId}
             </h1>
             {run && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Status: {run.status}
-              </p>
+              <p className="mt-1 text-sm text-va-text2">Status: {run.status}</p>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <VAButton
               type="button"
+              variant={tab === "statements" ? "primary" : "ghost"}
               onClick={() => setTab("statements")}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                tab === "statements"
-                  ? "bg-blue-600 text-white"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
+              className="!py-1.5"
             >
               Statements
-            </button>
-            <button
+            </VAButton>
+            <VAButton
               type="button"
+              variant={tab === "kpis" ? "primary" : "ghost"}
               onClick={() => setTab("kpis")}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                tab === "kpis"
-                  ? "bg-blue-600 text-white"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
+              className="!py-1.5"
             >
               KPIs
-            </button>
+            </VAButton>
             <Link
               href={`/runs/${runId}/mc`}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="rounded-va-sm border border-va-border bg-transparent px-3 py-1.5 text-sm font-medium text-va-text2 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
             >
               MC
             </Link>
             <Link
               href={`/runs/${runId}/valuation`}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="rounded-va-sm border border-va-border bg-transparent px-3 py-1.5 text-sm font-medium text-va-text2 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
             >
               Valuation
             </Link>
@@ -263,14 +261,14 @@ export default function RunDetailPage() {
         </div>
         {error && (
           <div
-            className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+            className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
             role="alert"
           >
             {error}
           </div>
         )}
         {loading ? (
-          <p className="text-muted-foreground">Loading run…</p>
+          <p className="text-va-text2">Loading run…</p>
         ) : tab === "statements" ? (
           <div>
             {isRows.length > 0 && (
@@ -294,26 +292,25 @@ export default function RunDetailPage() {
                 periods={periods}
               />
             )}
-            {isRows.length === 0 && bsRows.length === 0 && cfRows.length === 0 && (
-              <p className="text-muted-foreground">
-                No statement data for this run.
-              </p>
-            )}
+            {isRows.length === 0 &&
+              bsRows.length === 0 &&
+              cfRows.length === 0 && (
+                <p className="text-va-text2">
+                  No statement data for this run.
+                </p>
+              )}
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {kpis.length === 0 ? (
-              <p className="text-muted-foreground">No KPI data for this run.</p>
+              <p className="text-va-text2">No KPI data for this run.</p>
             ) : (
               kpis.map((kpi, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg border border-border bg-card p-4"
-                >
-                  <pre className="text-xs text-muted-foreground">
+                <VACard key={i} className="p-4">
+                  <pre className="font-mono text-xs text-va-text2">
                     {JSON.stringify(kpi, null, 2)}
                   </pre>
-                </div>
+                </VACard>
               ))
             )}
           </div>

@@ -15,25 +15,25 @@ export default async function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-start gap-6 px-6 py-16">
       <div className="space-y-3">
-        <p className="text-sm uppercase tracking-widest text-muted-foreground">
+        <p className="font-brand text-sm uppercase tracking-widest text-va-text2">
           Virtual Analyst
         </p>
-        <h1 className="text-4xl font-semibold tracking-tight">
+        <h1 className="font-brand text-4xl font-semibold tracking-tight text-va-text">
           Deterministic financial modeling with an LLM-assisted draft layer.
         </h1>
-        <p className="text-lg text-muted-foreground">
+        <p className="text-lg text-va-text2">
           This environment is ready for hosted testing and continuous delivery.
         </p>
       </div>
       <div className="flex flex-col gap-4">
         <Link
           href="/login"
-          className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+          className="inline-flex items-center rounded-va-sm bg-va-blue px-4 py-2 font-medium text-va-text hover:bg-va-blue/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight shadow-va-glow-blue"
         >
           Sign in
         </Link>
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-card-foreground">
-          API health: <span className="font-medium">/api/v1/health/live</span>
+        <div className="rounded-va-lg border border-va-border bg-va-panel/80 p-4 text-sm text-va-text">
+          API health: <span className="font-mono font-medium">/api/v1/health/live</span>
         </div>
       </div>
     </main>

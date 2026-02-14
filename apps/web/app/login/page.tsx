@@ -1,6 +1,8 @@
 "use client";
 
+import { VAButton, VAInput } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
@@ -35,20 +37,27 @@ function LoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Sign in to Virtual Analyst
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <main className="mx-auto flex min-h-screen flex-col justify-center px-6 py-12">
+      <div className="mx-auto w-full max-w-md space-y-8">
+        <div className="flex justify-center">
+          <Image
+            src="/va-wordmark.svg"
+            alt="Virtual Analyst"
+            width={400}
+            height={107}
+            className="h-auto w-full max-w-[320px]"
+            priority
+          />
+        </div>
+        <div className="space-y-2 text-center">
+          <p className="text-sm text-va-text2">
             Use your email and password to continue.
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div
-              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+              className="rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
               role="alert"
             >
               {error}
@@ -57,46 +66,45 @@ function LoginForm() {
           <div>
             <label
               htmlFor="email"
-              className="mb-1 block text-sm font-medium text-foreground"
+              className="mb-1 block text-sm font-medium text-va-text"
             >
               Email
             </label>
-            <input
+            <VAInput
               id="email"
               type="email"
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
             <label
               htmlFor="password"
-              className="mb-1 block text-sm font-medium text-foreground"
+              className="mb-1 block text-sm font-medium text-va-text"
             >
               Password
             </label>
-            <input
+            <VAInput
               id="password"
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-          <button
+          <VAButton
             type="submit"
+            variant="primary"
             disabled={loading}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+            className="w-full"
           >
             {loading ? "Signing in…" : "Sign in"}
-          </button>
+          </VAButton>
         </form>
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-va-text2">
           No account? Sign up is via Supabase Dashboard or API.
         </p>
       </div>
@@ -106,7 +114,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<main className="flex min-h-screen items-center justify-center"><p className="text-muted-foreground">Loading…</p></main>}>
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center">
+          <p className="text-va-text2">Loading…</p>
+        </main>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

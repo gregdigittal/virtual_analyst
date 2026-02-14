@@ -6,10 +6,13 @@ Backend: Supabase Storage (bucket 'artifacts', path tenant_id/artifact_type/id.j
 from __future__ import annotations
 
 import json
+import logging
 import re as _re
 from typing import Any
 
 from shared.fm_shared.errors import StorageError
+
+_log = logging.getLogger(__name__)
 
 _SAFE_SEGMENT = _re.compile(r"^[\w\-\.]+$")
 
@@ -82,3 +85,14 @@ class ArtifactStore:
             if key.startswith(prefix) and key.endswith(".json"):
                 out.append(key.replace(prefix, "").replace(".json", ""))
         return out
+
+    def delete(self, tenant_id: str, artifact_type: str, artifact_id: str) -> None:
+        """Remove an artifact. No-op if not found."""
+        path = _path(tenant_id, artifact_type, artifact_id)
+        if self._client:
+            try:
+                self._client.storage.from_("artifacts").remove([path])
+            except Exception as exc:
+                _log.warning("artifact_delete_failed", extra={"path": path, "error": str(exc)})
+        else:
+            self._memory.pop(path, None)

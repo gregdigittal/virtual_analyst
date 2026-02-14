@@ -3,15 +3,36 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 47.4% 11.2%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 47.4% 11.2%;
-  --border: 214.3 31.8% 91.4%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --va-midnight: #0B1020;
+  --va-ink: #10172A;
+  --va-surface: #0F172A;
+  --va-panel: #121A33;
+  --va-border: #22304F;
+  --va-blue: #3B82F6;
+  --va-violet: #7C3AED;
+  --va-magenta: #EC4899;
+  --va-ice: #E6F0FF;
+  --va-muted: #94A3B8;
+  --va-text: #E5E7EB;
+  --va-text-2: #B6C2D1;
+  --va-success: #22C55E;
+  --va-warning: #F59E0B;
+  --va-danger: #EF4444;
+  --background: 222 47% 4%;
+  --foreground: 220 14% 96%;
+  --card: 222 30% 8%;
+  --card-foreground: 220 14% 96%;
+  --border: 222 30% 18%;
+  --muted-foreground: 220 14% 65%;
 }
 
 body {
-  color: hsl(var(--foreground));
-  background: hsl(var(--background));
+  color: var(--va-text);
+  background: var(--va-midnight);
+}
+
+/* Focus rings: va.blue, no heavy glow (AA) */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--va-blue);
 }

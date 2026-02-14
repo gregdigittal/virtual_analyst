@@ -302,9 +302,10 @@ r### VA-P3-02: Async MC execution (M) — DONE
 - HTML/PDF outputs from runs
 - AC: Memo outputs contain correct data
 
-### VA-P5-04: Document management + collaboration (M)
+### VA-P5-04: Document management + collaboration (M) — DONE
 - Attachments, comments, activity feed
 - AC: Documents viewable; comments notify users
+- Implemented: migration 0018 (document_attachments, comments + RLS); POST/GET/DELETE /api/v1/documents (upload/list/download/delete); POST/GET/DELETE /api/v1/comments (@mentions → notifications); GET /api/v1/activity (audit + comments merged feed)
 
 ---
 

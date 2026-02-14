@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { VACard } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -50,86 +51,116 @@ export default function RunValuationPage() {
   const evRange = mult?.implied_ev_range as [number, number] | undefined;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-va-midnight">
       <Nav />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6 flex items-center gap-4">
           <Link
             href="/runs"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded"
           >
             ← Runs
           </Link>
           <Link
             href={`/runs/${runId}`}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded"
           >
             Run {runId}
           </Link>
         </div>
-        <h1 className="mb-4 text-2xl font-semibold tracking-tight">
+        <h1 className="font-brand mb-4 text-2xl font-semibold tracking-tight text-va-text">
           Valuation
         </h1>
         {error && (
           <div
-            className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+            className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
             role="alert"
           >
             {error}
           </div>
         )}
         {loading ? (
-          <p className="text-muted-foreground">Loading valuation…</p>
+          <p className="text-va-text2">Loading valuation…</p>
         ) : data ? (
           <div className="grid gap-6 sm:grid-cols-2">
             {dcf && (
-              <div className="rounded-lg border border-border bg-card p-4">
-                <h2 className="mb-3 text-lg font-medium">DCF</h2>
-                <dl className="space-y-2 text-sm">
+              <VACard className="p-4">
+                <h2 className="font-brand mb-3 text-lg font-medium text-va-text">
+                  DCF
+                </h2>
+                <dl className="space-y-2 text-sm text-va-text">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Enterprise value</dt>
-                    <dd className="font-medium">
+                    <dt className="text-va-text2">Enterprise value</dt>
+                    <dd className="font-medium font-mono">
                       {typeof dcf.enterprise_value === "number"
-                        ? dcf.enterprise_value.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                        ? dcf.enterprise_value.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })
                         : "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">PV explicit</dt>
-                    <dd>{typeof dcf.pv_explicit === "number" ? dcf.pv_explicit.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}</dd>
+                    <dt className="text-va-text2">PV explicit</dt>
+                    <dd className="font-mono">
+                      {typeof dcf.pv_explicit === "number"
+                        ? dcf.pv_explicit.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })
+                        : "—"}
+                    </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">PV terminal</dt>
-                    <dd>{typeof dcf.pv_terminal === "number" ? dcf.pv_terminal.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}</dd>
+                    <dt className="text-va-text2">PV terminal</dt>
+                    <dd className="font-mono">
+                      {typeof dcf.pv_terminal === "number"
+                        ? dcf.pv_terminal.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })
+                        : "—"}
+                    </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">WACC</dt>
-                    <dd>{typeof dcf.wacc === "number" ? `${(dcf.wacc * 100).toFixed(1)}%` : "—"}</dd>
+                    <dt className="text-va-text2">WACC</dt>
+                    <dd className="font-mono">
+                      {typeof dcf.wacc === "number"
+                        ? `${(dcf.wacc * 100).toFixed(1)}%`
+                        : "—"}
+                    </dd>
                   </div>
                 </dl>
-              </div>
+              </VACard>
             )}
             {mult && (
-              <div className="rounded-lg border border-border bg-card p-4">
-                <h2 className="mb-3 text-lg font-medium">Multiples</h2>
-                <dl className="space-y-2 text-sm">
+              <VACard className="p-4">
+                <h2 className="font-brand mb-3 text-lg font-medium text-va-text">
+                  Multiples
+                </h2>
+                <dl className="space-y-2 text-sm text-va-text">
                   {evRange && (
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Implied EV range</dt>
-                      <dd className="font-medium">
-                        {evRange[0].toLocaleString(undefined, { maximumFractionDigits: 0 })} – {evRange[1].toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      <dt className="text-va-text2">Implied EV range</dt>
+                      <dd className="font-medium font-mono">
+                        {evRange[0].toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}{" "}
+                        –{" "}
+                        {evRange[1].toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
                       </dd>
                     </div>
                   )}
                 </dl>
-              </div>
+              </VACard>
             )}
             {!dcf && !mult && (
-              <p className="text-muted-foreground">No valuation data for this run.</p>
+              <p className="text-va-text2">
+                No valuation data for this run.
+              </p>
             )}
           </div>
         ) : (
-          <p className="text-muted-foreground">No valuation data for this run.</p>
+          <p className="text-va-text2">No valuation data for this run.</p>
         )}
       </main>
     </div>

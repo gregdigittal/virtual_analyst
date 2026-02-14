@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { VAButton, VACard } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -58,52 +59,52 @@ export default function BaselineDetailPage() {
   if (!tenantId && !loading) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-va-midnight">
       <Nav />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6 flex items-center gap-4">
           <Link
             href="/baselines"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded"
           >
             ← Baselines
           </Link>
         </div>
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
             Baseline {id}
           </h1>
-          <button
+          <VAButton
             type="button"
+            variant="primary"
             onClick={createRun}
             disabled={runCreating || !config}
-            className="rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {runCreating ? "Creating run…" : "Run model"}
-          </button>
+          </VAButton>
         </div>
         {error && (
           <div
-            className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+            className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
             role="alert"
           >
             {error}
           </div>
         )}
         {loading ? (
-          <p className="text-muted-foreground">Loading…</p>
+          <p className="text-va-text2">Loading…</p>
         ) : config ? (
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-sm text-muted-foreground">
+          <VACard className="p-4">
+            <p className="text-sm text-va-text2">
               Model config loaded. Use &quot;Run model&quot; to execute and view
               statements and KPIs.
             </p>
-            <pre className="mt-3 max-h-96 overflow-auto rounded bg-muted/50 p-3 text-xs">
+            <pre className="mt-3 max-h-96 overflow-auto rounded-va-xs bg-va-surface p-3 font-mono text-xs text-va-text2">
               {JSON.stringify(config, null, 2)}
             </pre>
-          </div>
+          </VACard>
         ) : (
-          <p className="text-muted-foreground">Baseline not found.</p>
+          <p className="text-va-text2">Baseline not found.</p>
         )}
       </main>
     </div>

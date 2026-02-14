@@ -41,8 +41,14 @@ def reset_llm_router() -> None:
     _llm_router = None
 
 
+_artifact_store: ArtifactStore | None = None
+
+
 def get_artifact_store() -> ArtifactStore:
     """Return ArtifactStore with Supabase client when configured, else in-memory."""
+    global _artifact_store
+    if _artifact_store is not None:
+        return _artifact_store
     settings = get_settings()
     client: Any = None
     if settings.supabase_url and (settings.supabase_service_key or settings.supabase_anon_key):
@@ -55,4 +61,10 @@ def get_artifact_store() -> ArtifactStore:
             )
         except Exception:
             pass
-    return ArtifactStore(supabase_client=client)
+    _artifact_store = ArtifactStore(supabase_client=client)
+    return _artifact_store
+
+
+def reset_artifact_store() -> None:
+    global _artifact_store
+    _artifact_store = None

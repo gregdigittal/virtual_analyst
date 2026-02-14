@@ -1,6 +1,7 @@
 "use client";
 
 import { api, type NotificationItem } from "@/lib/api";
+import { VAButton, VACard } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -58,50 +59,46 @@ export default function NotificationsPage() {
   if (!tenantId && !loading) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-va-midnight">
       <Nav />
       <main className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
             Notifications
           </h1>
           {unreadCount > 0 && (
-            <span className="text-sm text-muted-foreground">
-              {unreadCount} unread
-            </span>
+            <span className="text-sm text-va-text2">{unreadCount} unread</span>
           )}
         </div>
         {error && (
           <div
-            className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+            className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
             role="alert"
           >
             {error}
           </div>
         )}
         {loading ? (
-          <p className="text-muted-foreground">Loading…</p>
+          <p className="text-va-text2">Loading…</p>
         ) : items.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-6 text-center text-muted-foreground">
+          <VACard className="p-6 text-center text-va-text2">
             No notifications yet. Notifications are created when a draft is
             marked ready to commit or when a run completes.
-          </div>
+          </VACard>
         ) : (
           <ul className="space-y-2">
             {items.map((n) => (
               <li
                 key={n.id}
-                className={`rounded-lg border border-border bg-card p-4 ${
+                className={`rounded-va-lg border border-va-border bg-va-panel/80 p-4 ${
                   n.read_at ? "opacity-75" : ""
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground">{n.title}</p>
+                    <p className="font-medium text-va-text">{n.title}</p>
                     {n.body && (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {n.body}
-                      </p>
+                      <p className="mt-1 text-sm text-va-text2">{n.body}</p>
                     )}
                     {n.entity_type && n.entity_id && (
                       <Link
@@ -112,25 +109,26 @@ export default function NotificationsPage() {
                               ? `/runs/${n.entity_id}`
                               : "#"
                         }
-                        className="mt-2 inline-block text-sm text-blue-600 hover:underline"
+                        className="mt-2 inline-block text-sm text-va-blue hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded"
                       >
                         View →
                       </Link>
                     )}
                     {n.created_at && (
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-va-text2">
                         {new Date(n.created_at).toLocaleString()}
                       </p>
                     )}
                   </div>
                   {!n.read_at && (
-                    <button
+                    <VAButton
                       type="button"
+                      variant="secondary"
                       onClick={() => markRead(n.id)}
-                      className="shrink-0 rounded border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
+                      className="shrink-0 !py-1 !text-xs"
                     >
                       Mark read
-                    </button>
+                    </VAButton>
                   )}
                 </div>
               </li>
