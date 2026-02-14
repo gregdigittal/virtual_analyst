@@ -151,7 +151,7 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
 
     acc_depr = [0.0] * horizon
     for t in range(horizon):
-        acc_depr[t] = sum(da_per_month[: t + 1])
+        acc_depr[t] = acc_depr[t - 1] + da_per_month[t] if t > 0 else da_per_month[0]
 
     # Equity: initial + retained earnings (no dividends for now)
     re = [initial_equity]

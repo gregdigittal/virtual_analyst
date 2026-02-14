@@ -82,20 +82,29 @@ create table if not exists llm_routing_policies (
 -- RLS
 -- ============================================================
 alter table billing_subscriptions enable row level security;
+drop policy if exists "billing_subscriptions_select" on billing_subscriptions;
+drop policy if exists "billing_subscriptions_insert" on billing_subscriptions;
+drop policy if exists "billing_subscriptions_update" on billing_subscriptions;
 create policy "billing_subscriptions_select" on billing_subscriptions for select using (tenant_id = current_setting('app.tenant_id', true));
 create policy "billing_subscriptions_insert" on billing_subscriptions for insert with check (tenant_id = current_setting('app.tenant_id', true));
 create policy "billing_subscriptions_update" on billing_subscriptions for update using (tenant_id = current_setting('app.tenant_id', true));
 
 alter table usage_meters enable row level security;
+drop policy if exists "usage_meters_select" on usage_meters;
+drop policy if exists "usage_meters_insert" on usage_meters;
+drop policy if exists "usage_meters_update" on usage_meters;
 create policy "usage_meters_select" on usage_meters for select using (tenant_id = current_setting('app.tenant_id', true));
 create policy "usage_meters_insert" on usage_meters for insert with check (tenant_id = current_setting('app.tenant_id', true));
 create policy "usage_meters_update" on usage_meters for update using (tenant_id = current_setting('app.tenant_id', true));
 
 alter table llm_call_logs enable row level security;
+drop policy if exists "llm_call_logs_select" on llm_call_logs;
+drop policy if exists "llm_call_logs_insert" on llm_call_logs;
 create policy "llm_call_logs_select" on llm_call_logs for select using (tenant_id = current_setting('app.tenant_id', true));
 create policy "llm_call_logs_insert" on llm_call_logs for insert with check (tenant_id = current_setting('app.tenant_id', true));
 
 alter table llm_routing_policies enable row level security;
+drop policy if exists "llm_routing_policies_select" on llm_routing_policies;
 create policy "llm_routing_policies_select" on llm_routing_policies for select using (
   tenant_id = current_setting('app.tenant_id', true) or tenant_id is null
 );
@@ -157,3 +166,8 @@ as $$
   where billing_subscriptions.stripe_subscription_id = p_stripe_sid
   limit 1;
 $$;
+
+-- Index for Stripe webhook lookup
+create index if not exists idx_billing_subscriptions_stripe_sid
+  on billing_subscriptions(stripe_subscription_id)
+  where stripe_subscription_id is not null;

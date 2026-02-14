@@ -464,9 +464,15 @@ async def patch_draft(
                             )
 
                 if workspace_update is not None:
+                    _ALLOWED_WORKSPACE_KEYS = {
+                        "assumptions", "driver_blueprint", "distributions", "metadata",
+                        "evidence", "debt_facilities", "cost_centres", "revenue_streams",
+                    }
                     current = store.load(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id)
-                    merged = {**current, **workspace_update}
-                    store.save(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id, merged)
+                    for k, v in workspace_update.items():
+                        if k in _ALLOWED_WORKSPACE_KEYS:
+                            current[k] = v
+                    store.save(x_tenant_id, DRAFT_WORKSPACE_TYPE, draft_session_id, current)
 
             row2 = await conn.fetchrow(
                 """SELECT draft_session_id, status FROM draft_sessions

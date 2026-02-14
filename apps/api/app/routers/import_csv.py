@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json as _json
 import uuid
 from typing import Any
 
@@ -93,7 +94,6 @@ async def import_csv(
     if len(content) > MAX_CSV_BYTES:
         raise HTTPException(400, f"CSV too large (max {MAX_CSV_BYTES // 1024}KB)")
 
-    import json as _json
     mapping: dict[str, str] = {}
     if column_mapping:
         try:

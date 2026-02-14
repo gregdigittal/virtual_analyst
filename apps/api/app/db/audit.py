@@ -37,6 +37,7 @@ async def create_audit_event(
     payload = {
         "audit_event_id": audit_event_id,
         "tenant_id": tenant_id,
+        "user_id": user_id,
         "event_type": event_type,
         "event_category": event_category,
         "resource_type": resource_type,

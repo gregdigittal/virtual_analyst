@@ -2,6 +2,7 @@ services:
   - type: web
     name: virtual-analyst-api
     runtime: python
+    pythonVersion: "3.12.0"
     plan: free
     region: oregon
     buildCommand: pip install .

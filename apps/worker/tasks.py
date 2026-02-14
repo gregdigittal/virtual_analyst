@@ -57,21 +57,19 @@ def _artifact_store() -> ArtifactStore:
     return ArtifactStore(supabase_client=client)
 
 
-def _set_mc_progress(tenant_id: str, run_id: str, sims_completed: int, total: int) -> None:
+def _set_mc_progress(tenant_id: str, run_id: str, current: int, total: int) -> None:
     try:
         import redis
 
         r = redis.from_url(REDIS_URL)
-        key = f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}"
-        pct = round(100.0 * sims_completed / total, 1) if total else 0.0
-        r.setex(
-            key,
-            MC_PROGRESS_TTL,
-            json.dumps({"sims_completed": sims_completed, "total": total, "pct": pct}),
-        )
-        r.close()
-    except Exception as e:
-        logger.warning("mc_progress_redis_failed", error=str(e))
+        try:
+            key = f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}"
+            payload = json.dumps({"current": current, "total": total, "pct": round(current / max(total, 1) * 100, 1)})
+            r.setex(key, MC_PROGRESS_TTL, payload)
+        finally:
+            r.close()
+    except Exception:
+        pass
 
 
 def _clear_mc_progress(tenant_id: str, run_id: str) -> None:
@@ -79,8 +77,10 @@ def _clear_mc_progress(tenant_id: str, run_id: str) -> None:
         import redis
 
         r = redis.from_url(REDIS_URL)
-        r.delete(f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}")
-        r.close()
+        try:
+            r.delete(f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}")
+        finally:
+            r.close()
     except Exception:
         pass
 
@@ -153,8 +153,8 @@ async def _run_mc_execute_async(
             )
 
         # Monte Carlo with progress (long-running, outside transaction)
-        def progress_cb(sims_done: int, total: int) -> None:
-            _set_mc_progress(tenant_id, run_id, sims_done, total)
+        def progress_cb(current: int, total: int) -> None:
+            _set_mc_progress(tenant_id, run_id, current, total)
 
         mc_result = run_monte_carlo(
             config,
@@ -190,7 +190,10 @@ async def _run_mc_execute_async(
                 run_id,
             )
     finally:
-        await conn.execute("SET app.tenant_id = ''")
+        try:
+            await conn.execute("SET app.tenant_id = ''")
+        except Exception:
+            pass
         await conn.close()
 
 
@@ -227,13 +230,12 @@ def run_mc_execute(
             )
         )
         return {"run_id": run_id, "status": "succeeded"}
-    except (EngineError, StatementImbalanceError, ValueError) as e:
-        logger.exception("run_mc_execute_failed", run_id=run_id, error=str(e))
-        asyncio.run(_run_mc_fail_async(tenant_id, run_id, str(e)))
-        raise
     except Exception as e:
-        logger.exception("run_mc_execute_failed", run_id=run_id, error=str(e))
-        asyncio.run(_run_mc_fail_async(tenant_id, run_id, str(e)))
+        logger.exception("mc_simulation_failed", tenant_id=tenant_id, run_id=run_id, error=str(e))
+        try:
+            asyncio.run(_run_mc_fail_async(tenant_id, run_id, str(e)))
+        except Exception as fail_err:
+            logger.error("mc_fail_update_failed", error=str(fail_err))
         raise
 
 
@@ -252,6 +254,10 @@ async def _run_mc_fail_async(tenant_id: str, run_id: str, error_message: str) ->
             error_message[:2000] if error_message else None,
         )
     finally:
+        try:
+            await conn.execute("SET app.tenant_id = ''")
+        except Exception:
+            pass
         await conn.close()
 
 

@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import Response
+from pydantic import BaseModel, Field as PydField
 
 from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import EVENT_RUN_ACCESSED, EVENT_RUN_CREATED, create_audit_event
@@ -31,6 +32,18 @@ from shared.fm_shared.analysis.valuation import dcf_valuation, multiples_valuati
 from apps.api.app.services.excel_export import build_run_excel
 
 router = APIRouter(prefix="/runs", tags=["runs"])
+
+
+class CreateRunBody(BaseModel):
+    baseline_id: str
+    mode: str = "deterministic"
+    num_simulations: int = PydField(default=1000, ge=1, le=100_000)
+    seed: int = PydField(default=42, ge=0)
+    scenario_id: str | None = None
+    scenario_overrides: list[dict[str, Any]] | None = None
+    dcf_config: dict[str, Any] | None = None
+    multiples_config: dict[str, Any] | None = None
+
 
 MC_PROGRESS_KEY = "run:mc_progress"
 
@@ -60,20 +73,18 @@ def _get_mc_progress(tenant_id: str, run_id: str) -> dict[str, Any] | None:
 
 @router.post("", status_code=201)
 async def create_run(
-    body: dict[str, Any],
+    body: CreateRunBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
-    baseline_id = body.get("baseline_id")
-    if not baseline_id:
-        raise HTTPException(400, "baseline_id required")
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    mc_enabled = body.get("mc_enabled") is True
-    num_simulations = int(body.get("num_simulations", 1000))
-    seed = int(body.get("seed", 42))
-    scenario_id = body.get("scenario_id")
+    baseline_id = body.baseline_id
+    mc_enabled = body.mode != "deterministic"
+    num_simulations = body.num_simulations
+    seed = body.seed
+    scenario_id = body.scenario_id
 
     async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
@@ -473,6 +484,9 @@ async def get_run_sensitivity(
     refs = [d.ref for d in config.distributions] if config.distributions else []
     if not refs:
         return {"base_fcf": base_fcf, "pct": pct, "drivers": [], "target_metric": "terminal_fcf"}
+    MAX_SENSITIVITY_DRIVERS = 30
+    if len(refs) > MAX_SENSITIVITY_DRIVERS:
+        raise HTTPException(400, f"Too many drivers for sensitivity ({len(refs)}); max {MAX_SENSITIVITY_DRIVERS}")
     drivers_data: list[dict[str, Any]] = []
     for ref in refs:
         overrides_low = [ScenarioOverride(ref=ref, field="multiplier", value=1.0 - pct)]

@@ -24,7 +24,7 @@ def _is_breach(actual: float, operator: str, threshold: float) -> bool:
         return actual > threshold
     if operator == ">=":
         return actual < threshold
-    return False
+    raise ValueError(f"Unsupported covenant operator: {operator!r}")
 
 
 def check_covenants(

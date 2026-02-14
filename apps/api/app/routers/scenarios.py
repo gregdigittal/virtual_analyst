@@ -6,8 +6,10 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from pydantic import BaseModel
 
 from apps.api.app.db import ensure_tenant, tenant_conn
+from apps.api.app.db.audit import EVENT_SCENARIO_CREATED, EVENT_SCENARIO_DELETED, create_audit_event
 from apps.api.app.deps import get_artifact_store
 from shared.fm_shared.errors import StorageError
 from shared.fm_shared.model import ModelConfig, calculate_kpis, generate_statements, run_engine
@@ -17,16 +19,30 @@ from shared.fm_shared.storage import ArtifactStore
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
 
+class CreateScenarioBody(BaseModel):
+    baseline_id: str
+    label: str = ""
+    description: str = ""
+    overrides: list[dict[str, Any]] = []
+
+
+class UpdateScenarioBody(BaseModel):
+    label: str | None = None
+    description: str | None = None
+    overrides: list[dict[str, Any]] | None = None
+
+
 @router.post("", status_code=201)
 async def create_scenario(
-    body: dict[str, Any],
+    body: CreateScenarioBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
 ) -> dict[str, Any]:
     """Create a scenario for a baseline with overrides (ref, field, value)."""
-    baseline_id = body.get("baseline_id")
-    label = body.get("label") or "Unnamed"
-    overrides = body.get("overrides") or []
-    description = body.get("description")
+    baseline_id = body.baseline_id
+    label = body.label or "Unnamed"
+    overrides = body.overrides
+    description = body.description
     if not baseline_id:
         raise HTTPException(400, "baseline_id required")
     if not x_tenant_id:
@@ -56,6 +72,7 @@ async def create_scenario(
                 description,
                 overrides_json,
             )
+            await create_audit_event(conn, x_tenant_id, EVENT_SCENARIO_CREATED, "scenario", "scenario", scenario_id, user_id=x_user_id or None)
     return {
         "scenario_id": scenario_id,
         "baseline_id": baseline_id,
@@ -172,6 +189,7 @@ async def get_scenario(
 async def delete_scenario(
     scenario_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
 ) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -183,6 +201,7 @@ async def delete_scenario(
         )
         if result == "DELETE 0":
             raise HTTPException(404, "Scenario not found")
+        await create_audit_event(conn, x_tenant_id, EVENT_SCENARIO_DELETED, "scenario", "scenario", scenario_id, user_id=x_user_id or None)
 
 
 @router.post("/compare")
@@ -198,6 +217,9 @@ async def compare_scenarios(
         raise HTTPException(400, "baseline_id required")
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
+    MAX_COMPARE_SCENARIOS = 10
+    if len(scenario_ids) > MAX_COMPARE_SCENARIOS:
+        raise HTTPException(400, f"Too many scenarios to compare ({len(scenario_ids)}); max {MAX_COMPARE_SCENARIOS}")
     async with tenant_conn(x_tenant_id) as conn:
         row = await conn.fetchrow(
             """SELECT baseline_id, baseline_version FROM model_baselines

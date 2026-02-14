@@ -25,24 +25,27 @@ async def list_notifications(
         if unread_only:
             rows = await conn.fetch(
                 """SELECT id, tenant_id, user_id, type, title, body, entity_type, entity_id, read_at, created_at
-                   FROM notifications WHERE tenant_id = $1 AND read_at IS NULL
-                   ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
+                   FROM notifications WHERE tenant_id = $1 AND (user_id = $2 OR user_id IS NULL) AND read_at IS NULL
+                   ORDER BY created_at DESC LIMIT $3 OFFSET $4""",
                 x_tenant_id,
+                x_user_id,
                 limit,
                 offset,
             )
         else:
             rows = await conn.fetch(
                 """SELECT id, tenant_id, user_id, type, title, body, entity_type, entity_id, read_at, created_at
-                   FROM notifications WHERE tenant_id = $1
-                   ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
+                   FROM notifications WHERE tenant_id = $1 AND (user_id = $2 OR user_id IS NULL)
+                   ORDER BY created_at DESC LIMIT $3 OFFSET $4""",
                 x_tenant_id,
+                x_user_id,
                 limit,
                 offset,
             )
         unread_count_row = await conn.fetchrow(
-            "SELECT count(*)::int AS n FROM notifications WHERE tenant_id = $1 AND read_at IS NULL",
+            "SELECT count(*)::int AS n FROM notifications WHERE tenant_id = $1 AND (user_id = $2 OR user_id IS NULL) AND read_at IS NULL",
             x_tenant_id,
+            x_user_id,
         )
         unread_count = unread_count_row["n"] if unread_count_row else 0
         items = [
@@ -67,6 +70,7 @@ async def list_notifications(
 async def mark_notification_read(
     notification_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -77,12 +81,14 @@ async def mark_notification_read(
             x_tenant_id,
         )
         row = await conn.fetchrow(
-            "SELECT id, read_at FROM notifications WHERE id = $1::uuid AND tenant_id = $2",
+            "SELECT id, user_id, read_at FROM notifications WHERE id = $1::uuid AND tenant_id = $2",
             notification_id,
             x_tenant_id,
         )
         if not row:
             raise HTTPException(404, "Notification not found")
+        if row["user_id"] and row["user_id"] != x_user_id:
+            raise HTTPException(403, "Cannot mark another user's notification as read")
         return {
             "id": notification_id,
             "read_at": row["read_at"].isoformat() if row["read_at"] else None,

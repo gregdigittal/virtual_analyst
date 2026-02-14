@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPaths = ["/baselines", "/runs", "/dashboard"];
+const protectedPaths = ["/baselines", "/runs", "/dashboard", "/drafts", "/scenarios", "/notifications"];
 
 function isProtected(pathname: string): boolean {
   return protectedPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -27,16 +27,16 @@ export async function middleware(request: NextRequest) {
   });
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (isProtected(request.nextUrl.pathname) && !session) {
+  if (isProtected(request.nextUrl.pathname) && !user) {
     const redirect = new URL("/login", request.url);
     redirect.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(redirect);
   }
 
-  if (request.nextUrl.pathname === "/login" && session) {
+  if (request.nextUrl.pathname === "/login" && user) {
     return NextResponse.redirect(new URL("/baselines", request.url));
   }
 
@@ -44,5 +44,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/baselines/:path*", "/runs/:path*", "/dashboard/:path*"],
+  matcher: [
+    "/",
+    "/login",
+    "/baselines/:path*",
+    "/runs/:path*",
+    "/dashboard/:path*",
+    "/drafts/:path*",
+    "/scenarios/:path*",
+    "/notifications/:path*",
+  ],
 };

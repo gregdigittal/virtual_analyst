@@ -167,13 +167,9 @@ def run_engine(
                 try:
                     time_series[nid][t] = evaluate(formula.expression, variables)
                 except EvalError as e:
-                    logger.warning(
-                        "formula_eval_fallback",
-                        node_id=nid,
-                        period=t,
-                        expression=formula.expression,
-                        error=str(e),
-                    )
-                    time_series[nid][t] = 0.0
+                    raise EngineError(
+                        f"Formula evaluation failed for node '{nid}' at period {t}: {e}",
+                        code="ERR_ENG_FORMULA_EVAL",
+                    ) from e
 
     return time_series

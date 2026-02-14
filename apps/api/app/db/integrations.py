@@ -7,17 +7,21 @@ import json
 from typing import Any
 
 import asyncpg
+import structlog
+
+_logger = structlog.get_logger()
 
 
 def _encode_oauth(data: dict[str, Any]) -> bytes:
-    """Encrypt OAuth payload for storage (Fernet if key configured, else base64 fallback)."""
+    """Encrypt OAuth payload for storage. Requires OAUTH_ENCRYPTION_KEY."""
     raw = json.dumps(data).encode("utf-8")
     from apps.api.app.core.settings import get_settings
     key = get_settings().oauth_encryption_key
-    if key:
-        from cryptography.fernet import Fernet
-        return Fernet(key.encode()).encrypt(raw)
-    return base64.b64encode(raw)
+    if not key:
+        _logger.critical("oauth_encryption_key_missing", msg="OAuth tokens will be stored as base64 (NOT encrypted). Set OAUTH_ENCRYPTION_KEY in production.")
+        return base64.b64encode(raw)
+    from cryptography.fernet import Fernet
+    return Fernet(key.encode()).encrypt(raw)
 
 
 def _decode_oauth(raw: bytes | None) -> dict[str, Any]:
@@ -32,10 +36,11 @@ def _decode_oauth(raw: bytes | None) -> dict[str, Any]:
             decrypted = Fernet(key.encode()).decrypt(raw)
             return json.loads(decrypted.decode("utf-8"))
         except Exception:
-            pass
+            _logger.error("oauth_decrypt_failed", msg="Fernet decryption failed; falling back to base64. Possible key rotation or data corruption.")
     try:
         return json.loads(base64.b64decode(raw).decode("utf-8"))
     except Exception:
+        _logger.error("oauth_decode_failed", msg="Both Fernet and base64 decoding failed for OAuth data.")
         return {}
 
 

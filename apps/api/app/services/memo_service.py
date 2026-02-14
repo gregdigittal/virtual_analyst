@@ -72,7 +72,7 @@ def generate_memo_html(
 ) -> str:
     """Generate HTML memo from run statements (and optional KPIs). No LLM; data-only sections."""
     if memo_type not in MEMO_TYPES:
-        memo_type = "investment_committee"
+        raise ValueError(f"Unknown memo_type {memo_type!r}; must be one of {list(MEMO_TYPES)}")
     sections_titles = SECTION_TITLES.get(memo_type, SECTION_TITLES["investment_committee"])
     is_list = statements.get("income_statement") or []
     bs_list = statements.get("balance_sheet") or []

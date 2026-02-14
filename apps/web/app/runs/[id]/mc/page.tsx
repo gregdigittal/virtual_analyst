@@ -109,7 +109,7 @@ export default function RunMcPage() {
                       const p95 = p?.p95?.[last];
                       return (
                         <tr key={metric} className="border-b border-border/50">
-                          <td className="px-3 py-2 font-medium capitalize">{metric.replace("_", " ")}</td>
+                          <td className="px-3 py-2 font-medium capitalize">{metric.replaceAll("_", " ")}</td>
                           <td className="px-3 py-2 text-right">{p5 != null ? p5.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}</td>
                           <td className="px-3 py-2 text-right">{p50 != null ? p50.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}</td>
                           <td className="px-3 py-2 text-right">{p95 != null ? p95.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}</td>

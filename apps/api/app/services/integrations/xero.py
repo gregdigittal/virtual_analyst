@@ -107,7 +107,7 @@ class XeroAdapter(ERPAdapter):
             )
             r.raise_for_status()
             data = r.json()
-        return data["access_token"]
+        return data["access_token"], data.get("refresh_token", refresh_token)
 
     async def discover(self, access_token: str, tenant_id: str | None = None) -> DiscoveryResult:
         xero_tenant = tenant_id

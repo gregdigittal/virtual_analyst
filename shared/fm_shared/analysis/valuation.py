@@ -43,7 +43,7 @@ def dcf_valuation(
     DCF: PV of explicit FCFs + PV of terminal value.
     Terminal value: perpetuity growth (FCF_last * (1+g)/(wacc-g)) or exit multiple (not used here without EBITDA).
     """
-    if not fcf_series or wacc <= -1.0:
+    if not fcf_series or wacc <= 0.0:
         return DCFResult(wacc=wacc)
     n = min(len(fcf_series), projection_years * 12) if projection_years else len(fcf_series)
     fcf = fcf_series[:n]

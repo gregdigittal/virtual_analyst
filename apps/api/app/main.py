@@ -48,13 +48,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allowed_origins_list(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Request-ID"],
 )
 
-app.middleware("http")(logging_middleware)
-app.middleware("http")(security_headers_middleware)
 app.middleware("http")(metrics_middleware)
+app.middleware("http")(security_headers_middleware)
+app.middleware("http")(logging_middleware)
 
 init_rate_limiting(app, settings.rate_limit)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -71,6 +71,19 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
     stripe_price_id_professional: str | None = Field(default=None, alias="STRIPE_PRICE_ID_PROFESSIONAL")
     stripe_price_id_starter: str | None = Field(default=None, alias="STRIPE_PRICE_ID_STARTER")
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        if self.environment not in ("development", "test"):
+            if self.oauth_state_secret == "change-me-in-production":
+                import warnings
+                warnings.warn("OAUTH_STATE_SECRET is still default — change it for production!", stacklevel=2)
+            if not self.oauth_encryption_key:
+                import warnings
+                warnings.warn("OAUTH_ENCRYPTION_KEY is empty — OAuth tokens will NOT be encrypted!", stacklevel=2)
+        if self.pool_min_size > self.pool_max_size:
+            raise ValueError(f"DB_POOL_MIN_SIZE ({self.pool_min_size}) > DB_POOL_MAX_SIZE ({self.pool_max_size})")
+        return self
 
     def cors_allowed_origins_list(self) -> list[str]:
         return [item.strip() for item in self.cors_allowed_origins.split(",") if item.strip()]

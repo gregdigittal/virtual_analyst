@@ -147,7 +147,7 @@ export default function ScenariosPage() {
                     <tbody>
                       {["revenue", "ebitda", "net_income", "fcf"].map((metric) => (
                         <tr key={metric} className="border-b border-border/50">
-                          <td className="px-3 py-2 font-medium capitalize">{metric.replace("_", " ")}</td>
+                          <td className="px-3 py-2 font-medium capitalize">{metric.replaceAll("_", " ")}</td>
                           {compareResult.scenarios.map((row: Record<string, unknown>) => (
                             <td key={String(row.label)} className="px-3 py-2 text-right">
                               {typeof row[metric] === "number"

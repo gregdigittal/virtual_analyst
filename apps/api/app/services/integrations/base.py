@@ -44,8 +44,8 @@ class ERPAdapter(ABC):
         ...
 
     @abstractmethod
-    async def refresh_token(self, refresh_token: str) -> str:
-        """Refresh access token; returns new access_token."""
+    async def refresh_token(self, refresh_token: str) -> tuple[str, str]:
+        """Return (new_access_token, new_refresh_token)."""
         ...
 
     @abstractmethod

@@ -37,6 +37,13 @@ class CreateExcelConnectionBody(BaseModel):
     permissions_json: dict[str, Any] | None = Field(default=None)
 
 
+class UpdateExcelConnectionBody(BaseModel):
+    label: str | None = None
+    mode: str | None = None  # "readonly" or "readwrite"
+    bindings_json: list[dict[str, Any]] | None = None
+    status: str | None = None
+
+
 def _get_by_path(data: dict | list, path: str) -> Any:
     """Get value at dot-separated path, e.g. income_statement.0.revenue."""
     parts = path.split(".")
@@ -116,7 +123,7 @@ async def get_excel_connection(
 @router.patch("/connections/{excel_connection_id}")
 async def update_excel_connection(
     excel_connection_id: str,
-    body: dict[str, Any],
+    body: UpdateExcelConnectionBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
 ) -> dict[str, Any]:
     """Update connection (label, mode, bindings_json, sync_json, status)."""
@@ -131,11 +138,11 @@ async def update_excel_connection(
                 conn,
                 x_tenant_id,
                 excel_connection_id,
-                label=body.get("label"),
-                mode=body.get("mode"),
-                bindings_json=body.get("bindings_json") or body.get("bindings"),
-                sync_json=body.get("sync_json"),
-                status=body.get("status"),
+                label=body.label,
+                mode=body.mode,
+                bindings_json=body.bindings_json,
+                sync_json=None,
+                status=body.status,
             )
     return {"excel_connection_id": excel_connection_id, "updated": True}
 
@@ -244,10 +251,10 @@ async def excel_push(
             x_tenant_id,
             excel_connection_id,
             direction="push",
-            status="succeeded",
+            status="received",
             diff_json={"changed": changes, "errors": []},
             initiated_by=x_user_id or None,
             bindings_synced=len(changes),
             target_json=row["target_json"],
         )
-    return {"received": len(changes), "status": "logged"}
+    return {"received": len(changes), "status": "received"}

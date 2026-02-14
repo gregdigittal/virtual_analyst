@@ -25,16 +25,19 @@ async def metrics_middleware(request: Request, call_next):
     finally:
         duration = time.time() - start
         api_requests_active.dec()
+        # Use route template to avoid label cardinality explosion
+        route = request.scope.get("route")
+        endpoint = route.path if route else request.url.path
         api_requests_total.labels(
             method=request.method,
-            endpoint=request.url.path,
+            endpoint=endpoint,
             status_code=str(status_code),
         ).inc()
         api_request_duration_seconds.labels(
             method=request.method,
-            endpoint=request.url.path,
+            endpoint=endpoint,
         ).observe(duration)
         if not request.url.path.startswith("/api/v1/metrics"):
-            record_request_latency(request.url.path, duration)
+            record_request_latency(endpoint, duration)
 
     return response

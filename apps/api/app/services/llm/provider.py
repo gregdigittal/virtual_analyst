@@ -105,9 +105,11 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(self, api_key: str | None, model: str = "claude-sonnet-4-5-20250929") -> None:
         if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not configured")
+            raise ValueError("Anthropic API key is required")
         self._api_key = api_key
         self._model = model
+        import anthropic
+        self._client = anthropic.AsyncAnthropic(api_key=api_key)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -122,10 +124,8 @@ class AnthropicProvider(LLMProvider):
         max_tokens: int = 4096,
         temperature: float = 0.2,
     ) -> LLMResponse:
-        import anthropic
-
         schema = _ensure_additional_properties_false(response_schema)
-        client = anthropic.AsyncAnthropic(api_key=self._api_key)
+        client = self._client
         system = ""
         api_messages: list[dict[str, Any]] = []
         for m in messages:
@@ -186,9 +186,11 @@ class OpenAIProvider(LLMProvider):
 
     def __init__(self, api_key: str | None, model: str = "gpt-4o") -> None:
         if not api_key:
-            raise ValueError("OPENAI_API_KEY not configured")
+            raise ValueError("OpenAI API key is required")
         self._api_key = api_key
         self._model = model
+        from openai import AsyncOpenAI
+        self._client = AsyncOpenAI(api_key=api_key)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -203,10 +205,8 @@ class OpenAIProvider(LLMProvider):
         max_tokens: int = 4096,
         temperature: float = 0.2,
     ) -> LLMResponse:
-        from openai import AsyncOpenAI
-
         schema = _ensure_additional_properties_false(response_schema)
-        client = AsyncOpenAI(api_key=self._api_key)
+        client = self._client
         api_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
         start = time.perf_counter()
         response = await client.chat.completions.create(

@@ -6,12 +6,21 @@ Backend: Supabase Storage (bucket 'artifacts', path tenant_id/artifact_type/id.j
 from __future__ import annotations
 
 import json
+import re as _re
 from typing import Any
 
 from shared.fm_shared.errors import StorageError
 
+_SAFE_SEGMENT = _re.compile(r"^[\w\-\.]+$")
+
 
 def _path(tenant_id: str, artifact_type: str, artifact_id: str) -> str:
+    for label, val in [("tenant_id", tenant_id), ("artifact_type", artifact_type), ("artifact_id", artifact_id)]:
+        if not val or not _SAFE_SEGMENT.match(val):
+            raise StorageError(
+                f"Invalid {label}: must be alphanumeric/dash/underscore/dot, got {val!r}",
+                code="ERR_STOR_INVALID_PATH",
+            )
     return f"{tenant_id}/{artifact_type}/{artifact_id}.json"
 
 

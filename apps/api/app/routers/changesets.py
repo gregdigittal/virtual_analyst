@@ -181,6 +181,8 @@ async def merge_changeset(
                 raise HTTPException(409, "Changeset already merged")
             if row["status"] == STATUS_ABANDONED:
                 raise HTTPException(409, "Changeset abandoned")
+            if row["status"] != STATUS_TESTED:
+                raise HTTPException(409, f"Changeset must be tested before merge; current status: {row['status']}")
             versions = await conn.fetch(
                 """SELECT baseline_version FROM model_baselines
                    WHERE tenant_id = $1 AND baseline_id = $2""",

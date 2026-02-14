@@ -126,6 +126,7 @@ async def stripe_webhook(
             row = await get_tenant_by_stripe_subscription_id(conn, sid)
         if row:
             tenant_id, subscription_id = row
+            # Stripe webhooks resolve tenant from subscription; use resolved tenant_id for RLS context
             async with tenant_conn(tenant_id) as conn:
                 await update_subscription_status(conn, tenant_id, subscription_id, our_status)
     elif event.type == "subscription.deleted":
@@ -135,6 +136,7 @@ async def stripe_webhook(
             row = await get_tenant_by_stripe_subscription_id(conn, sid)
         if row:
             tenant_id, subscription_id = row
+            # Stripe webhooks resolve tenant from subscription; use resolved tenant_id for RLS context
             async with tenant_conn(tenant_id) as conn:
                 await db_cancel_subscription(conn, tenant_id, subscription_id)
     return JSONResponse(content={"received": True})

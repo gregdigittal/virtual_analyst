@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -81,24 +82,33 @@ async def export_events(
         )
 
     if export_format == "csv":
-        buf = io.StringIO()
-        if not events:
-            buf.write("audit_event_id,tenant_id,user_id,event_type,event_category,timestamp,resource_type,resource_id,checksum\n")
-        else:
-            writer = csv.DictWriter(
-                buf,
-                fieldnames=["audit_event_id", "tenant_id", "user_id", "event_type", "event_category", "timestamp", "resource_type", "resource_id", "checksum"],
-                extrasaction="ignore",
-            )
-            writer.writeheader()
-            for e in events:
-                row = {k: (e.get(k) or "") for k in writer.fieldnames}
-                writer.writerow(row)
-        body = buf.getvalue().encode("utf-8")
+        def csv_generator():
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["audit_event_id", "tenant_id", "user_id", "event_type", "event_category", "resource_type", "resource_id", "timestamp", "event_data"])
+            yield output.getvalue()
+            output.truncate(0)
+            output.seek(0)
+            for row in events:
+                writer.writerow([
+                    row.get("audit_event_id"),
+                    row.get("tenant_id"),
+                    row.get("user_id"),
+                    row.get("event_type"),
+                    row.get("event_category"),
+                    row.get("resource_type"),
+                    row.get("resource_id"),
+                    str(row.get("timestamp") or ""),
+                    json.dumps(dict(row.get("event_data") or {})),
+                ])
+                yield output.getvalue()
+                output.truncate(0)
+                output.seek(0)
+
         return StreamingResponse(
-            iter([body]),
+            csv_generator(),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=audit_events.csv"},
+            headers={"Content-Disposition": 'attachment; filename="audit_export.csv"'},
         )
 
     import json
