@@ -20,20 +20,14 @@ Generated from `VIRTUAL_ANALYST_BACKLOG.md`. Items marked **— DONE** in the ma
 
 ## Phase 7 — Budgeting & Board Pack
 
-| ID | Complexity | Summary |
-|----|------------|--------|
-| VA-P7-01 | M | Budget data model & migrations — budgets, line items, versions, RLS |
-| VA-P7-02 | L | Budget CRUD & department allocation API — line items, departments, clone |
-| VA-P7-03 | M | Budget templates & LLM-assisted seeding — templates, budget_initialization |
-| VA-P7-04 | L | Actuals import & variance analysis engine — variance, drill-down |
-| VA-P7-05 | M | Rolling forecast engine — reforecast, actuals lock, LLM projection |
-| VA-P7-06 | M | Budget approval workflow integration — workflow template, CFO approval |
-| VA-P7-07 | L | Board pack composer — sections, LLM narrative, branding |
-| VA-P7-08 | L | Board pack export — PDF/PPTX/HTML, charts |
-| VA-P7-09 | M | Board pack scheduling & distribution — recurring, email, history |
-| VA-P7-10 | L | Budget & board pack UI — budgets, variance, reforecast, board-packs |
-| VA-P7-11 | M | Budget KPI dashboard — burn rate, runway, alerts, CFO view |
-| VA-P7-12 | L | Test suite — Phase 7 (budgets, variance, reforecast, board pack, workflow) |
+**All Phase 7 items complete (VA-P7-01–VA-P7-12).**
+
+- VA-P7-01–07: Budget model, CRUD, templates, actuals/variance, reforecast, approval workflow, board pack composer
+- VA-P7-08: Board pack export (PDF/PPTX/HTML, branding, &lt;10MB)
+- VA-P7-09: Pack scheduling, run-now, history, distribute stub
+- VA-P7-10: Budgets & board-packs UI (Next.js)
+- VA-P7-11: Budget KPI dashboard (burn rate, runway, utilisation, variance trend, alerts)
+- VA-P7-12: Phase 7 integration tests
 
 ---
 
@@ -58,6 +52,6 @@ Generated from `VIRTUAL_ANALYST_BACKLOG.md`. Items marked **— DONE** in the ma
 |-------|-----------|
 | P5 | 0 |
 | P6 | 0 |
-| P7 | 12 |
+| P7 | 0 |
 | Post-launch | 10 themes |
-| **Total (numbered)** | **12** |
+| **Total (numbered)** | **0** |
