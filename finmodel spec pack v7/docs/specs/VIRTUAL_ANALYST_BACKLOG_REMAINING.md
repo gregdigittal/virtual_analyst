@@ -8,28 +8,13 @@ Generated from `VIRTUAL_ANALYST_BACKLOG.md`. Items marked **— DONE** in the ma
 
 ## Phase 5 — Excel + Memos + Collaboration
 
-| ID | Complexity | Summary |
-|----|------------|--------|
-| VA-P5-01 | L | Excel export + live links API — export, connection management — DONE |
-| VA-P5-02 | L | Office.js add-in — Auth, bindings, pull/push workflows |
-| VA-P5-03 | M | Memo pack generator — HTML/PDF outputs from runs — DONE |
+**All Phase 5 items complete (VA-P5-01–VA-P5-04).**
 
 ---
 
 ## Phase 6 — Team Collaboration & Workflow Engine
 
-| ID | Complexity | Summary |
-|----|------------|--------|
-| VA-P6-03 | L | Workflow template engine — workflow_templates, workflow_instances, stage rules, seed templates — DONE |
-| VA-P6-04 | L | Task assignment system — create/claim/submit, deadlines — DONE |
-| VA-P6-05 | L | Review & correction pipeline — reviews, change_summaries, approve/return/reject — DONE |
-| VA-P6-06 | M | Learning feedback system — review_summary LLM, acknowledgment |
-| VA-P6-07 | M | Workflow notifications — task/review/deadline events, email templates |
-| VA-P6-08 | M | Team management UI — /settings/teams, hierarchy tree, job functions — DONE |
-| VA-P6-09 | L | Task inbox UI — /inbox, assignment cards, create wizard — DONE |
-| VA-P6-10 | L | Review workspace UI — /inbox/{id}/review, methodology, change tracking — DONE |
-| VA-P6-11 | M | Learning feedback UI — /inbox/feedback, diffs, acknowledge |
-| VA-P6-12 | L | Test suite — Phase 6 (teams, workflow, assignments, reviews, integration) |
+**All Phase 6 items complete (VA-P6-01–VA-P6-12).**
 
 ---
 
@@ -63,7 +48,7 @@ Generated from `VIRTUAL_ANALYST_BACKLOG.md`. Items marked **— DONE** in the ma
 - AI-assisted review suggestions (flag unusual assumptions)  
 - Peer comparison (anonymous benchmarking)  
 - Board pack benchmarking (industry median)  
-- Natural language budget queries (e.g. “which department is over budget?”)
+- Natural language budget queries (e.g. "which department is over budget?")
 
 ---
 
@@ -71,8 +56,8 @@ Generated from `VIRTUAL_ANALYST_BACKLOG.md`. Items marked **— DONE** in the ma
 
 | Phase | Remaining |
 |-------|-----------|
-| P5 | 1 |
-| P6 | 4 |
+| P5 | 0 |
+| P6 | 0 |
 | P7 | 12 |
 | Post-launch | 10 themes |
-| **Total (numbered)** | **18** |
+| **Total (numbered)** | **12** |
