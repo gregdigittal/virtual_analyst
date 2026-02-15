@@ -871,6 +871,27 @@ async def clone_budget(
             await ensure_budget_version(
                 conn, x_tenant_id, new_budget_id, new_version_id, 1, x_user_id or None
             )
+            # Copy budget_periods from source to clone (R8-02)
+            period_rows = await conn.fetch(
+                """SELECT period_ordinal, period_start, period_end, label
+                   FROM budget_periods WHERE tenant_id = $1 AND budget_id = $2
+                   ORDER BY period_ordinal""",
+                x_tenant_id,
+                budget_id,
+            )
+            for pr in period_rows:
+                await conn.execute(
+                    """INSERT INTO budget_periods (tenant_id, budget_id, period_id, period_ordinal, period_start, period_end, label)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)
+                       ON CONFLICT (tenant_id, budget_id, period_ordinal) DO NOTHING""",
+                    x_tenant_id,
+                    new_budget_id,
+                    _period_id(),
+                    pr["period_ordinal"],
+                    pr["period_start"],
+                    pr["period_end"],
+                    pr["label"],
+                )
             rows = await conn.fetch(
                 """SELECT line_item_id, account_ref, notes FROM budget_line_items
                    WHERE tenant_id = $1 AND budget_id = $2 AND version_id = $3""",

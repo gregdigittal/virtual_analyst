@@ -76,12 +76,12 @@ async def mark_notification_read(
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         await conn.execute(
-            """UPDATE notifications SET read_at = now() WHERE id = $1::uuid AND tenant_id = $2""",
+            """UPDATE notifications SET read_at = now() WHERE id = $1 AND tenant_id = $2""",
             notification_id,
             x_tenant_id,
         )
         row = await conn.fetchrow(
-            "SELECT id, user_id, read_at FROM notifications WHERE id = $1::uuid AND tenant_id = $2",
+            "SELECT id, user_id, read_at FROM notifications WHERE id = $1 AND tenant_id = $2",
             notification_id,
             x_tenant_id,
         )

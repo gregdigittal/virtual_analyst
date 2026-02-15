@@ -8,8 +8,9 @@ Run migrations in order against your Postgres database.
    - `0001_init.sql` — tenants, users, draft_sessions, model_baselines, model_changesets, ventures, venture_artifacts, runs, run_artifacts  
    - `0002_functions_and_rls.sql` — `current_tenant_id()`, `generate_id()`, RLS on all baseline tables  
 
-2. **Pending (0008–0027)**  
-   - Either run **`RUN_ALL_PENDING_MIGRATIONS.sql`** in one go, or run `0008_notifications.sql` through `0027_notifications_id_text.sql` in numeric order.
+2. **Pending (0008–0031)**  
+   - **Preferred:** Run **`APPLY_ALL_MIGRATIONS.sql`** once — it applies all migrations 0008 through 0031 in order.  
+   - Alternative: Run **`RUN_ALL_PENDING_MIGRATIONS.sql`** (through 0028), then `0029_standardize_rls_function.sql`, `0030_core_delete_policies.sql`, `0031_comments_docs_update_policies.sql`. Or run individual files `0008_notifications.sql` through `0031_comments_docs_update_policies.sql` in numeric order.
 
 ## Example
 
