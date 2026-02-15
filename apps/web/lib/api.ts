@@ -1,12 +1,26 @@
 /**
  * API client for Virtual Analyst backend.
  * Uses NEXT_PUBLIC_API_URL and X-Tenant-ID from caller.
+ * When setAccessToken() is set, requests include Authorization: Bearer for API auth (C1).
  */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+/**
+ * Module-level access token. ONLY safe in client-side ("use client") contexts. R6-09.
+ * Do NOT import api.ts from server components or getServerSideProps — the token
+ * would persist across requests in the Node.js process.
+ */
+let _accessToken: string | null = null;
+
+/** Set the Supabase access token so all API requests send Authorization: Bearer (C1). Clear with setAccessToken(null) on logout. */
+export function setAccessToken(token: string | null): void {
+  _accessToken = token;
+}
+
 export interface ApiOptions {
   tenantId: string;
+  userId?: string;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
 }
@@ -24,17 +38,20 @@ export class ApiError extends Error {
 
 async function request<T>(
   path: string,
-  { tenantId, method = "GET", body }: ApiOptions
+  { tenantId, userId, method = "GET", body }: ApiOptions
 ): Promise<T> {
   const headers: Record<string, string> = {
     "X-Tenant-ID": tenantId,
     "Content-Type": "application/json",
+    ...(userId && { "X-User-ID": userId }),
+    ...(_accessToken && { Authorization: `Bearer ${_accessToken}` }),
   };
   const res = await fetch(`${API_URL}${path}`, {
     method,
     headers,
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
+  if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({ detail: res.statusText }));
   if (!res.ok) {
     throw new ApiError(
@@ -176,6 +193,7 @@ export interface NotificationsResponse {
 }
 
 export const api = {
+  setAccessToken,
   baselines: {
     list: (tenantId: string) =>
       request<BaselinesResponse>("/api/v1/baselines", { tenantId }),
@@ -318,6 +336,240 @@ export const api = {
         { tenantId, method: "POST", body }
       ),
   },
+  teams: {
+    list: (tenantId: string, limit?: number, offset?: number) =>
+      request<TeamsListResponse>(
+        `/api/v1/teams?${new URLSearchParams({
+          ...(limit != null && { limit: String(limit) }),
+          ...(offset != null && { offset: String(offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    create: (
+      tenantId: string,
+      userId: string,
+      body: { name: string; description?: string | null }
+    ) =>
+      request<{ team_id: string; name: string; description: string | null }>(
+        "/api/v1/teams",
+        {
+          tenantId,
+          userId,
+          method: "POST",
+          body: { name: body.name, description: body.description ?? null },
+        }
+      ),
+    get: (tenantId: string, teamId: string) =>
+      request<TeamDetail>(`/api/v1/teams/${encodeURIComponent(teamId)}`, {
+        tenantId,
+      }),
+    update: (
+      tenantId: string,
+      teamId: string,
+      body: { name?: string; description?: string | null }
+    ) =>
+      request<TeamDetail>(
+        `/api/v1/teams/${encodeURIComponent(teamId)}`,
+        { tenantId, method: "PATCH", body }
+      ),
+    delete: (tenantId: string, teamId: string) =>
+      request<void>(
+        `/api/v1/teams/${encodeURIComponent(teamId)}`,
+        { tenantId, method: "DELETE" }
+      ),
+    listJobFunctions: (tenantId: string) =>
+      request<JobFunctionsResponse>("/api/v1/teams/job-functions/list", {
+        tenantId,
+      }),
+    listMembers: (tenantId: string, teamId: string, limit?: number, offset?: number) =>
+      request<MembersResponse>(
+        `/api/v1/teams/${encodeURIComponent(teamId)}/members?${new URLSearchParams({
+          ...(limit != null && { limit: String(limit) }),
+          ...(offset != null && { offset: String(offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    addMember: (
+      tenantId: string,
+      teamId: string,
+      body: { user_id: string; job_function_id: string; reports_to?: string | null }
+    ) =>
+      request<TeamMember>(
+        `/api/v1/teams/${encodeURIComponent(teamId)}/members`,
+        { tenantId, method: "POST", body }
+      ),
+    updateMember: (
+      tenantId: string,
+      teamId: string,
+      userId: string,
+      body: { job_function_id?: string; reports_to?: string | null }
+    ) =>
+      request<TeamMember>(
+        `/api/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
+        { tenantId, method: "PATCH", body }
+      ),
+    removeMember: (tenantId: string, teamId: string, userId: string) =>
+      request<void>(
+        `/api/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
+        { tenantId, method: "DELETE" }
+      ),
+  },
+  workflows: {
+    listTemplates: (tenantId: string, limit?: number, offset?: number) =>
+      request<WorkflowTemplatesResponse>(
+        `/api/v1/workflows/templates?${new URLSearchParams({
+          ...(limit != null && { limit: String(limit) }),
+          ...(offset != null && { offset: String(offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    getTemplate: (tenantId: string, templateId: string) =>
+      request<WorkflowTemplate>(
+        `/api/v1/workflows/templates/${encodeURIComponent(templateId)}`,
+        { tenantId }
+      ),
+    createInstance: (
+      tenantId: string,
+      body: { template_id: string; entity_type: string; entity_id: string }
+    ) =>
+      request<WorkflowInstance>("/api/v1/workflows/instances", {
+        tenantId,
+        method: "POST",
+        body,
+      }),
+    getInstance: (tenantId: string, instanceId: string) =>
+      request<WorkflowInstance>(
+        `/api/v1/workflows/instances/${encodeURIComponent(instanceId)}`,
+        { tenantId }
+      ),
+    listInstances: (
+      tenantId: string,
+      opts?: { entity_type?: string; entity_id?: string; status?: string; limit?: number; offset?: number }
+    ) =>
+      request<WorkflowInstancesResponse>(
+        `/api/v1/workflows/instances?${new URLSearchParams(
+          opts
+            ? Object.fromEntries(
+                Object.entries(opts).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])
+              )
+            : {}
+        ).toString()}`,
+        { tenantId }
+      ),
+  },
+  assignments: {
+    list: (
+      tenantId: string,
+      opts?: { assignee_user_id?: string; status?: string; entity_type?: string; limit?: number; offset?: number },
+      userId?: string
+    ) =>
+      request<AssignmentsResponse>(
+        `/api/v1/assignments?${new URLSearchParams(
+          opts
+            ? Object.fromEntries(
+                Object.entries(opts).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])
+              )
+            : {}
+        ).toString()}`,
+        { tenantId, ...(userId && { userId }) }
+      ),
+    listPool: (tenantId: string, limit?: number, offset?: number) =>
+      request<AssignmentsResponse>(
+        `/api/v1/assignments/pool?${new URLSearchParams({
+          ...(limit != null && { limit: String(limit) }),
+          ...(offset != null && { offset: String(offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    get: (tenantId: string, assignmentId: string) =>
+      request<AssignmentItem>(
+        `/api/v1/assignments/${encodeURIComponent(assignmentId)}`,
+        { tenantId }
+      ),
+    create: (
+      tenantId: string,
+      userId: string,
+      body: {
+        entity_type: string;
+        entity_id: string;
+        assignee_user_id?: string | null;
+        workflow_instance_id?: string | null;
+        instructions?: string | null;
+        deadline?: string | null;
+      }
+    ) =>
+      request<AssignmentItem>("/api/v1/assignments", {
+        tenantId,
+        userId,
+        method: "POST",
+        body,
+      }),
+    claim: (tenantId: string, userId: string, assignmentId: string) =>
+      request<AssignmentItem>(
+        `/api/v1/assignments/${encodeURIComponent(assignmentId)}/claim`,
+        { tenantId, userId, method: "POST" }
+      ),
+    submit: (tenantId: string, userId: string, assignmentId: string) =>
+      request<AssignmentItem>(
+        `/api/v1/assignments/${encodeURIComponent(assignmentId)}/submit`,
+        { tenantId, userId, method: "POST" }
+      ),
+    update: (
+      tenantId: string,
+      assignmentId: string,
+      body: { status?: string; instructions?: string; deadline?: string }
+    ) =>
+      request<AssignmentItem>(
+        `/api/v1/assignments/${encodeURIComponent(assignmentId)}`,
+        { tenantId, method: "PATCH", body }
+      ),
+    submitReview: (
+      tenantId: string,
+      userId: string,
+      assignmentId: string,
+      body: {
+        decision: "approved" | "request_changes" | "rejected";
+        notes?: string | null;
+        corrections?: { path: string; old_value?: string | null; new_value?: string | null; reason?: string | null }[];
+      }
+    ) =>
+      request<ReviewItem>(
+        `/api/v1/assignments/${encodeURIComponent(assignmentId)}/review`,
+        { tenantId, userId, method: "POST", body }
+      ),
+    listReviews: (tenantId: string, assignmentId: string, limit?: number, offset?: number) => {
+      const params = new URLSearchParams();
+      if (limit != null) params.set("limit", String(limit));
+      if (offset != null) params.set("offset", String(offset));
+      const qs = params.toString();
+      return request<{ reviews: ReviewItem[]; limit: number; offset: number }>(
+        `/api/v1/assignments/${encodeURIComponent(assignmentId)}/reviews${qs ? `?${qs}` : ""}`,
+        { tenantId }
+      );
+    },
+  },
+  feedback: {
+    list: (
+      tenantId: string,
+      userId: string,
+      opts?: { limit?: number; offset?: number; unacknowledgedOnly?: boolean }
+    ) => {
+      const params = new URLSearchParams();
+      if (opts?.limit != null) params.set("limit", String(opts.limit));
+      if (opts?.offset != null) params.set("offset", String(opts.offset));
+      if (opts?.unacknowledgedOnly === true) params.set("unacknowledged_only", "true");
+      const qs = params.toString();
+      return request<FeedbackListResponse>(
+        `/api/v1/feedback${qs ? `?${qs}` : ""}`,
+        { tenantId, userId }
+      );
+    },
+    acknowledge: (tenantId: string, userId: string, summaryId: string) =>
+      request<{ summary_id: string; acknowledged: boolean }>(
+        `/api/v1/feedback/${encodeURIComponent(summaryId)}/acknowledge`,
+        { tenantId, userId, method: "POST" }
+      ),
+  },
 };
 
 export interface ScenarioItem {
@@ -328,4 +580,138 @@ export interface ScenarioItem {
   description?: string | null;
   overrides: { ref: string; field: string; value: number }[];
   created_at: string | null;
+}
+
+export interface TeamSummary {
+  team_id: string;
+  name: string;
+  description: string | null;
+  created_at: string | null;
+  created_by: string | null;
+}
+
+export interface TeamsListResponse {
+  teams: TeamSummary[];
+}
+
+export interface TeamMember {
+  user_id: string;
+  job_function_id: string;
+  reports_to: string | null;
+  created_at: string | null;
+}
+
+export interface TeamDetail {
+  team_id: string;
+  name: string;
+  description: string | null;
+  created_at: string | null;
+  created_by: string | null;
+  members: TeamMember[];
+}
+
+export interface JobFunction {
+  job_function_id: string;
+  name: string;
+  created_at: string | null;
+}
+
+export interface JobFunctionsResponse {
+  job_functions: JobFunction[];
+}
+
+export interface MembersResponse {
+  members: TeamMember[];
+}
+
+export interface WorkflowTemplateStage {
+  stage_id: string;
+  name: string;
+  assignee_rule: string;
+  assignee_config?: Record<string, unknown>;
+}
+
+export interface WorkflowTemplate {
+  template_id: string;
+  name: string;
+  description: string | null;
+  stages: WorkflowTemplateStage[];
+  created_at: string | null;
+}
+
+export interface WorkflowTemplatesResponse {
+  templates: WorkflowTemplate[];
+  limit: number;
+  offset: number;
+}
+
+export interface WorkflowInstance {
+  instance_id: string;
+  template_id: string;
+  entity_type: string;
+  entity_id: string;
+  current_stage_index: number;
+  status: string;
+  created_at: string | null;
+  created_by: string | null;
+  updated_at: string | null;
+}
+
+export interface WorkflowInstancesResponse {
+  instances: WorkflowInstance[];
+  limit: number;
+  offset: number;
+}
+
+export interface AssignmentItem {
+  assignment_id: string;
+  workflow_instance_id: string | null;
+  entity_type: string;
+  entity_id: string;
+  assignee_user_id: string | null;
+  assigned_by_user_id: string | null;
+  status: string;
+  deadline: string | null;
+  instructions: string | null;
+  created_at: string | null;
+  submitted_at: string | null;
+}
+
+export interface ReviewItem {
+  review_id: string;
+  assignment_id: string;
+  reviewer_user_id: string;
+  decision: string;
+  notes: string | null;
+  corrections: { path: string; old_value?: string | null; new_value?: string | null; reason?: string | null }[];
+  created_at: string | null;
+}
+
+export interface AssignmentsResponse {
+  assignments: AssignmentItem[];
+  limit: number;
+  offset: number;
+}
+
+export interface FeedbackLearningPoint {
+  point: string;
+  category?: string | null;
+}
+
+export interface FeedbackItem {
+  summary_id: string;
+  review_id: string;
+  assignment_id: string;
+  summary_text: string;
+  learning_points: FeedbackLearningPoint[];
+  acknowledged_at: string | null;
+  created_at: string | null;
+  decision: string;
+  corrections: { path: string; old_value?: string | null; new_value?: string | null; reason?: string | null }[];
+}
+
+export interface FeedbackListResponse {
+  items: FeedbackItem[];
+  limit: number;
+  offset: number;
 }

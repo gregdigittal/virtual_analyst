@@ -1,9 +1,15 @@
-"""Memo pack generator (VA-P5-03): template-driven HTML from run data."""
+"""Memo pack generator (VA-P5-03): template-driven HTML from run data; HTML/PDF export."""
 
 from __future__ import annotations
 
 import html as _html
+from io import BytesIO
 from typing import Any
+
+try:
+    from xhtml2pdf import pisa
+except ImportError:
+    pisa = None  # type: ignore[assignment]
 
 MEMO_TYPES = ("investment_committee", "credit_memo", "valuation_note")
 
@@ -113,3 +119,14 @@ def generate_memo_html(
         html_parts.append(sec["content"])
     html_parts.append("</body></html>")
     return "".join(html_parts)
+
+
+def html_to_pdf(html: str) -> bytes:
+    """Render HTML to PDF bytes (VA-P5-03). Requires xhtml2pdf."""
+    if pisa is None:
+        raise RuntimeError("PDF export requires xhtml2pdf; pip install xhtml2pdf")
+    buf = BytesIO()
+    status = pisa.CreatePDF(html.encode("utf-8"), dest=buf, encoding="utf-8")
+    if status.err:
+        raise RuntimeError("PDF generation failed")
+    return buf.getvalue()

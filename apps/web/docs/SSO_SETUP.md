@@ -27,6 +27,10 @@ You can have multiple entries simultaneously. Add whichever environments you nee
 
 After OAuth, Supabase redirects to `/auth/callback` with a PKCE `code` parameter. The callback route handler (`app/auth/callback/route.ts`) exchanges the code for a session and then redirects the user to `/baselines` (default) or the `next` query parameter path.
 
-## 3. Optional: tenant / domain allowlist
+## 3. API auth (JWT verification)
+
+So the backend can trust tenant/user instead of trusting client-sent headers, set **SUPABASE_JWT_SECRET** on the API (same value as in Supabase: **Project Settings → API → JWT Secret**). The API will then verify `Authorization: Bearer <access_token>` and set `X-Tenant-ID` / `X-User-ID` from the token. The web app sends the Supabase access token with API requests when the user is signed in.
+
+## 4. Optional: tenant / domain allowlist
 
 To restrict sign-in to certain domains (e.g. your company), use Supabase Auth hooks or enforce in your API after the user is created. The VA app does not enforce domain allowlisting by default.

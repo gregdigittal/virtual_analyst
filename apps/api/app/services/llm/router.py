@@ -21,6 +21,12 @@ DEFAULT_POLICY = {
         {"task_label": "evidence_extraction", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 2048, "temperature": 0.1},
         {"task_label": "memo_generation", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 8192, "temperature": 0.3},
         {"task_label": "template_initialization", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.2},
+        {"task_label": "review_summary", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 1024, "temperature": 0.2},
+        {"task_label": "review_summary", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 1024, "temperature": 0.2},
+        {"task_label": "budget_initialization", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.2},
+        {"task_label": "budget_initialization", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.2},
+        {"task_label": "budget_reforecast", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.2},
+        {"task_label": "budget_reforecast", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.2},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }
@@ -48,7 +54,8 @@ def _resolve_candidates(task_label: str, policy: dict[str, Any] | None = None) -
     return out
 
 
-def _build_provider(provider_key: str, model: str) -> LLMProvider | None:
+def _create_provider(provider_key: str, model: str) -> LLMProvider | None:
+    """Create a new provider instance (used by cache)."""
     settings = get_settings()
     if provider_key == "anthropic":
         if not settings.anthropic_api_key:
@@ -62,6 +69,8 @@ def _build_provider(provider_key: str, model: str) -> LLMProvider | None:
 
 
 class LLMRouter:
+    """Routes LLM calls by task_label; caches provider instances by (provider_key, model) (C5)."""
+
     def __init__(self) -> None:
         settings = get_settings()
         self._circuit = CircuitBreaker(
@@ -70,6 +79,16 @@ class LLMRouter:
         )
         self._policy: dict[str, Any] | None = None
         self._billing: BillingService | None = None
+        self._provider_cache: dict[tuple[str, str], LLMProvider] = {}
+
+    def _get_provider(self, provider_key: str, model: str) -> LLMProvider | None:
+        key = (provider_key, model)
+        if key not in self._provider_cache:
+            provider = _create_provider(provider_key, model)
+            if provider is not None:
+                self._provider_cache[key] = provider
+            return provider
+        return self._provider_cache[key]
 
     def set_policy(self, policy: dict[str, Any]) -> None:
         self._policy = policy
@@ -110,7 +129,7 @@ class LLMRouter:
         for provider_key, model, rule_max_tokens, rule_temp in candidates:
             if self._circuit.is_open(provider_key):
                 continue
-            provider = _build_provider(provider_key, model)
+            provider = self._get_provider(provider_key, model)
             if provider is None:
                 continue
             try:

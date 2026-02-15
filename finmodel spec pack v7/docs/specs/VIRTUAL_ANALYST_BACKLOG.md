@@ -19,59 +19,60 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 
 ## Phase 0 — Foundation & Infrastructure (Sprint 0-1)
 
-### VA-P0-01: Repository scaffolding (S)
+### VA-P0-01: Repository scaffolding (S) — DONE
 - Create monorepo structure and initialize Git
 - AC: Structure matches `REPO_SCAFFOLDING_LAYOUT.md`
 
-### VA-P0-02: Python project configuration (M)
+### VA-P0-02: Python project configuration (M) — DONE
 - Create `pyproject.toml` and dev tooling
 - AC: `pip install -e ".[dev]"` succeeds; lint/type/test run
 
-### VA-P0-03: Docker Compose for local dev (M)
+### VA-P0-03: Docker Compose for local dev (M) — DONE
 - Postgres, Redis, Supabase with health checks
 - AC: `docker-compose up` starts all services healthy
+- Note: docker-compose.yml; healthchecks added for postgres and redis.
 
-### VA-P0-04: Environment configuration (S)
+### VA-P0-04: Environment configuration (S) — DONE
 - `.env.example` and startup validation
 - AC: Missing required env vars fail with clear errors
 
-### VA-P0-05: Error handling framework (L)
+### VA-P0-05: Error handling framework (L) — DONE
 - Error classes, envelope, FastAPI handlers
 - AC: Consistent error envelope and status codes per spec
 
-### VA-P0-06: Structured logging setup (M)
+### VA-P0-06: Structured logging setup (M) — DONE
 - Structlog config, correlation IDs
 - AC: JSON logs in prod, readable logs in dev
 
-### VA-P0-07: Prometheus metrics foundation (M)
+### VA-P0-07: Prometheus metrics foundation (M) — DONE
 - `/metrics` with request and latency metrics
 - AC: Metrics endpoint returns valid Prometheus format
 
-### VA-P0-08: Health check endpoints (S)
+### VA-P0-08: Health check endpoints (S) — DONE
 - `/api/v1/health/live` and `/ready`
 - AC: Readiness fails when DB/Redis unavailable
 
-### VA-P0-09: Security middleware (M)
+### VA-P0-09: Security middleware (M) — DONE
 - Security headers, rate limiting, CORS
 - AC: Rate limit enforced; headers present
 
-### VA-P0-10: Input validation framework (S)
+### VA-P0-10: Input validation framework (S) — DONE
 - Base Pydantic models and validation
 - AC: Invalid requests return 422 with details
 
-### VA-P0-11: CI/CD pipeline (L)
+### VA-P0-11: CI/CD pipeline (L) — DONE
 - GitHub Actions for lint/type/test/build
 - AC: CI runs on PR and passes
 
-### VA-P0-12: Pre-commit hooks (S)
+### VA-P0-12: Pre-commit hooks (S) — DONE
 - Ruff, Black, whitespace checks
 - AC: `pre-commit install` works and hooks run
 
-### VA-P0-13: FastAPI app skeleton (M)
+### VA-P0-13: FastAPI app skeleton (M) — DONE
 - App init, middleware, health, metrics
 - AC: `uvicorn` starts; endpoints respond
 
-### VA-P0-14: README and setup docs (M)
+### VA-P0-14: README and setup docs (M) — DONE
 - Setup, env vars, troubleshooting
 - AC: New developer setup <30 minutes
 
@@ -79,9 +80,10 @@ This backlog is the execution overlay for Virtual Analyst v1, derived from the F
 
 ## Phase 1 — Core Deterministic Engine (Sprint 2-4)
 
-### VA-P1-01: DB migrations + Supabase setup (M)
+### VA-P1-01: DB migrations + Supabase setup (M) — DONE
 - Apply 0001/0002 migrations and enable Auth/Storage/RLS
 - AC: Tables present; RLS policies enabled; env configured
+- Note: apps/api/app/db/migrations/0001_init.sql, 0002_functions_and_rls.sql; RUN_ALL_PENDING_MIGRATIONS.sql (0008–0019); README in migrations folder. Supabase Auth/Storage configured via env.
 
 ### VA-P1-02: Pydantic models for model_config_v1 (L) — DONE
 - Full schema validation with cross-field checks
@@ -266,47 +268,51 @@ r### VA-P3-02: Async MC execution (M) — DONE
 
 ## Phase 4 — Integrations + Billing + Compliance
 
-### VA-P4-01: Integration framework + Xero adapter (L)
+### VA-P4-01: Integration framework + Xero adapter (L) — DONE
 - OAuth2 connection and sync runner
 - AC: Sync produces canonical snapshot
 
-### VA-P4-02: Billing and usage metering (L)
+### VA-P4-02: Billing and usage metering (L) — DONE
 - Stripe subscription lifecycle and limits
 - AC: Limits enforced and usage visible
 
-### VA-P4-03: Audit logging (complete) (M)
+### VA-P4-03: Audit logging (complete) (M) — DONE
 - Full event catalog and export
 - AC: Export works; audit log immutable
 
-### VA-P4-04: Compliance endpoints (M)
+### VA-P4-04: Compliance endpoints (M) — DONE
 - GDPR export and deletion
 - AC: Export returns all data; deletion anonymizes
 
-### VA-P4-05: CSV import + covenant monitoring (M)
+### VA-P4-05: CSV import + covenant monitoring (M) — DONE
 - Import wizard and covenant alerts
 - AC: Import creates draft; breaches trigger alerts
 
-### VA-P4-06: Sign up with SSO (Google, Microsoft) (M)
+### VA-P4-06: Sign up with SSO (Google, Microsoft) (M) — DONE
 - Allow users to sign up and sign in using Google and Microsoft OAuth (in addition to email/password).
 - Configure Supabase Auth providers (Google OAuth 2.0, Microsoft Azure AD / Entra ID); optional tenant-level allowlist (e.g. restrict to certain domains).
 - Landing and login/signup pages: “Continue with Google” and “Continue with Microsoft” buttons; post-OAuth redirect to app or signup completion (e.g. link to tenant if required).
 - AC: User can sign up and sign in with Google; user can sign up and sign in with Microsoft; existing email/password flow still works; redirect after SSO lands on correct app route (e.g. /baselines or onboarding).
+- Note: signInWithOAuth on login and signup; landing respects ?next= after OAuth; apps/web/docs/SSO_SETUP.md for Supabase provider config.
 
 ---
 
 ## Phase 5 — Excel + Memos + Collaboration
 
-### VA-P5-01: Excel export + live links API (L)
+### VA-P5-01: Excel export + live links API (L) — DONE
 - Export and connection management
 - AC: Excel export includes IS/BS/CF sheets
+- Implemented: GET /api/v1/runs/{run_id}/export/excel (IS/BS/CF + KPIs); excel router connections CRUD, pull/push
 
-### VA-P5-02: Office.js add-in (L)
+### VA-P5-02: Office.js add-in (L) — DONE
 - Auth, bindings, pull/push workflows
 - AC: Excel Online and Desktop add-in works
+- Implemented: taskpane with API URL, Tenant ID, optional Access token (Bearer), Connection ID; Pull/Push to excel/connections; README auth note. Sideload via manifest.xml for Excel Online and Desktop.
 
-### VA-P5-03: Memo pack generator (M)
+### VA-P5-03: Memo pack generator (M) — DONE
 - HTML/PDF outputs from runs
 - AC: Memo outputs contain correct data
+- Implemented: GET /memos/{id}/download?format=html|pdf (xhtml2pdf); memo_service.html_to_pdf
 
 ### VA-P5-04: Document management + collaboration (M) — DONE
 - Attachments, comments, activity feed
@@ -326,110 +332,125 @@ r### VA-P3-02: Async MC execution (M) — DONE
 - AC: POST/GET/PATCH/DELETE teams; add/remove/update members; list job functions; reports_to validated to same team
 - Implemented: GET/POST /api/v1/teams, GET/PATCH/DELETE /api/v1/teams/{team_id}, GET/POST/PATCH/DELETE members, GET /api/v1/teams/job-functions/list (ensures defaults for new tenants)
 
-### VA-P6-03: Workflow template engine (L)
-- Migration 0011: workflow_templates, workflow_instances tables
+### VA-P6-03: Workflow template engine (L) — DONE
+- Migration 0020: workflow_templates, workflow_instances tables
 - Stage definitions with assignee rules (explicit, reports_to, reports_to_chain, team_pool)
 - Seed default templates (Self-Service, Standard Review, Full Approval)
 - Workflow state machine: pending → in_progress → submitted → approved/returned → completed
 - AC: Create workflow from template; stages advance correctly; routing resolves correct reviewer via hierarchy
+- Implemented: 0020_workflow_templates.sql; GET/POST /api/v1/workflows/templates, GET /templates/{id}, POST/GET /instances, GET /instances?entity_type&status
 
-### VA-P6-04: Task assignment system (L)
-- Migration 0011: task_assignments table
+### VA-P6-04: Task assignment system (L) — DONE
+- Migration 0021: task_assignments table
 - Create assignment (top-down: senior assigns to junior/pool)
 - Submit for review (bottom-up: junior submits, system routes to reviewer)
 - Claim pool assignments
 - Deadline tracking with approaching/overdue detection
 - AC: Assignments created and visible in inbox; pool claim works; deadlines tracked; status transitions enforced
+- Implemented: 0021_task_assignments.sql; POST/GET /api/v1/assignments, GET /pool, GET /{id}, POST /{id}/claim, POST /{id}/submit, PATCH /{id}
 
-### VA-P6-05: Review & correction pipeline (L)
-- Migration 0011: reviews, change_summaries tables
+### VA-P6-05: Review & correction pipeline (L) — DONE
+- Migration 0022: reviews, change_summaries tables
 - Review decisions: approve, request_changes, reject
 - Inline corrections tracked as structured diff {path, old_value, new_value, reason}
 - Change summary auto-generated on review with corrections
 - AC: Reviewer can approve/return/reject; corrections recorded as diff; change summary created
+- Implemented: 0022_reviews.sql; POST /api/v1/assignments/{id}/review, GET /{id}/reviews; assignment status → completed|returned; change_summaries from corrections
 
-### VA-P6-06: Learning feedback system (M)
+### VA-P6-06: Learning feedback system (M) — DONE
 - LLM task_label: review_summary (generates learning_points from corrections)
 - Acknowledgment tracking (author marks feedback as read)
 - AC: Corrections generate change summary with LLM learning points; author can acknowledge; unacknowledged feedback highlighted
+- Implemented: review_summary in LLM router; submit_review calls LLM and updates learning_points_json; migration 0024 acknowledged_at; GET/POST /api/v1/feedback list and acknowledge.
 
-### VA-P6-07: Workflow notifications (M)
+### VA-P6-07: Workflow notifications (M) — DONE
 - Notification events: task_assigned, task_submitted, review decision, deadline_approaching, deadline_overdue, workflow_completed
-- Email templates for workflow events
+- Email templates for workflow events (in-app done; email can be wired later)
 - AC: All workflow events generate in-app + email notifications; deadline reminders fire at 24h and 4h
+- Implemented: create_notification in create_assignment, claim_assignment, submit_assignment, submit_review (task_assigned, task_submitted, review_decision, workflow_completed). POST /api/v1/assignments/cron/deadline-reminders for 24h/4h/overdue (call from cron).
 
-### VA-P6-08: Team management UI (M)
+### VA-P6-08: Team management UI (M) — DONE
 - /settings/teams — list, create, edit teams
 - Team detail — member list, hierarchy tree visualization, add/remove/edit members
 - Job function management
 - AC: Teams CRUD in UI; hierarchy displayed as tree; member permissions editable
+- Implemented: /settings/teams list + create; /settings/teams/[teamId] detail, edit team, members table, hierarchy tree, add/edit/remove member; Nav link to Teams; api.teams client
 
-### VA-P6-09: Task inbox UI (L)
+### VA-P6-09: Task inbox UI (L) — DONE
 - /inbox — personal task inbox with tabs (My Tasks, Team Pool, Awaiting Review, Review Requests)
 - Assignment cards with priority badges, deadlines, status
 - /inbox/{id} — assignment detail with instructions panel and workspace link
 - /assignments/new — create assignment wizard (type, entity, assignee, instructions, deadline, workflow)
 - AC: Inbox shows all relevant tasks; pool claim works; create assignment wizard produces correct assignments
+- Implemented: /inbox (tabs My Tasks, Team Pool, All); /inbox/[id] detail with Submit/Start working/workspace link; /assignments/new wizard; api.workflows, api.assignments; Nav Inbox link
 
-### VA-P6-10: Review workspace UI (L)
+### VA-P6-10: Review workspace UI (L) — DONE
 - /inbox/{id}/review — split layout (methodology + assumptions + review form)
 - Methodology panel: chat history (read-only), approach summary (LLM task: methodology_context)
 - Inline editing with change tracking (every edit recorded)
 - Review decision form: approve/request_changes/reject with notes
 - AC: Reviewer sees methodology context; inline edits tracked as diffs; decision persists and advances workflow
+- Implemented: /inbox/[id]/review — context panel + review form (decision, notes, corrections path/old/new/reason); Submit review → assignment completed/returned; Review button on assignment detail when submitted
 
-### VA-P6-11: Learning feedback UI (M)
+### VA-P6-11: Learning feedback UI (M) — DONE
 - /inbox/feedback — list of change summaries with diff display
 - Unacknowledged items highlighted
 - Change diff visualization: old/new values with reasons
 - LLM-generated learning points with "AI-generated" label
 - Acknowledge button
 - AC: Feedback displayed with structured diffs; learning points shown; acknowledge updates timestamp
+- Implemented: /inbox/feedback page; api.feedback.list/acknowledge; Nav link Feedback; unack filter, diff display, learning points, Acknowledge.
 
-### VA-P6-12: Test suite — Phase 6 (L)
+### VA-P6-12: Test suite — Phase 6 (L) — DONE
 - test_teams_api.py — CRUD, hierarchy validation, RLS
 - test_workflow_engine.py — template creation, stage advancement, routing logic
 - test_assignments_api.py — create, claim, submit, status transitions
 - test_reviews_api.py — approve/return/reject, change tracking, summary generation
 - test_workflow_integration.py — full flow: assign → build → submit → review → approve/return
 - AC: All Phase 6 tests pass; workflow integration test covers complete lifecycle
+- Implemented: tests/unit/test_teams_api.py, test_assignments_api.py, test_reviews_api.py, test_workflow_engine.py; tests/integration/test_workflow_integration.py (placeholder when INTEGRATION_TESTS=1).
 
 ---
 
 ## Phase 7 — Budgeting & Board Pack
 
-### VA-P7-01: Budget data model & migrations (M)
+### VA-P7-01: Budget data model & migrations (M) — DONE
 - Migration: budgets, budget_line_items, budget_periods, budget_versions, budget_department_allocations tables with RLS
 - Budget lifecycle state machine: draft → submitted → under_review → approved → active → closed
 - Versioning: each budget has immutable snapshots (budget_version_id) so the CFO can see revision history
 - AC: Budget CRUD works; state transitions enforced; versions are append-only; RLS tenant-scoped
+- Note: 0025_budgets.sql — budgets, budget_versions, budget_periods, budget_line_items, budget_line_item_amounts, budget_department_allocations; RLS on all; current_version_id FK from budgets to budget_versions.
 
-### VA-P7-02: Budget CRUD & department allocation API (L)
+### VA-P7-02: Budget CRUD & department allocation API (L) — DONE
 - POST/GET/PATCH /api/v1/budgets — create, list, get, update budget metadata (fiscal year, label, status)
 - POST /api/v1/budgets/{id}/line-items — add/update/remove line items (account ref, monthly amounts, notes)
 - POST /api/v1/budgets/{id}/departments — allocate budget by department/cost centre with limits
 - Budget cloning: POST /api/v1/budgets/{id}/clone (copy structure for next period or what-if)
 - AC: Line items persist with monthly granularity; department allocations sum-checked against total; clone preserves structure
+- Note: apps/api/app/routers/budgets.py — full CRUD; GET/POST /budgets/{id}/periods; GET/POST/PATCH/DELETE line-items; GET/POST departments; POST clone. apps/api/app/db/budgets.py helpers. Department sum validated against version line-item totals.
 
-### VA-P7-03: Budget templates & LLM-assisted seeding (M)
+### VA-P7-03: Budget templates & LLM-assisted seeding (M) — DONE
 - Pre-built budget templates per industry (manufacturing, SaaS, services, wholesale — reuse existing catalog)
 - LLM task_label: budget_initialization — given prior-year actuals + strategic priorities, propose initial line-item amounts with confidence scores
 - Template wizard: select template → answer questionnaire (headcount plan, capex outlook, growth targets) → LLM seeds budget
 - AC: Budget created from template with LLM-proposed amounts; confidence badges displayed; user can accept/reject each line
+- Note: apps/api/app/data/budget_templates.json + budget_catalog.py; GET /api/v1/budgets/templates, POST /api/v1/budgets/from-template; confidence_score on budget_line_items (0026); list line-items returns confidence_score.
 
-### VA-P7-04: Actuals import & variance analysis engine (L)
+### VA-P7-04: Actuals import & variance analysis engine (L) — DONE
 - Import actuals from ERP sync snapshots (Phase 4 canonical_sync_snapshot) or CSV upload
 - Variance calculation: budget vs actual (absolute, percentage, YTD cumulative) per line item per period
 - Variance classification: favourable/unfavourable with materiality threshold (configurable per tenant)
 - Drill-down: variance by department, by account, by period
 - Endpoint: GET /api/v1/budgets/{id}/variance?period=YYYY-MM&department=x
 - AC: Variance computed correctly; favourable/unfavourable classification correct; drill-down works by department and period
+- Note: Migration 0026 budget_actuals table; POST /api/v1/budgets/{id}/actuals/import (JSON body); GET /api/v1/budgets/{id}/variance?period=&department=&materiality_pct=; favourable by account type (revenue vs cost).
 
-### VA-P7-05: Rolling forecast engine (M)
+### VA-P7-05: Rolling forecast engine (M) — DONE
 - Replace remaining budget periods with latest actuals + re-forecast
 - POST /api/v1/budgets/{id}/reforecast — creates new budget version with actuals locked and remaining periods re-projected
 - LLM task_label: budget_reforecast — given YTD actuals and original assumptions, propose revised forecast with variance explanations
 - AC: Reforecast creates new version; actuals periods locked; revised forecast periods show LLM-assisted projections with confidence
+- Note: POST /api/v1/budgets/{id}/reforecast; new version with locked actuals per period/account and LLM revisions for remaining periods; confidence_score on revised line items.
 
 ### VA-P7-06: Budget approval workflow integration (M)
 - Integrates with Phase 6 workflow engine

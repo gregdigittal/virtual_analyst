@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
 from apps.api.app.deps import get_artifact_store
-from apps.api.app.services.memo_service import MEMO_TYPES, generate_memo_html
+from apps.api.app.services.memo_service import MEMO_TYPES, generate_memo_html, html_to_pdf
 from shared.fm_shared.errors import StorageError
 from shared.fm_shared.storage import ArtifactStore
 
@@ -94,8 +94,8 @@ async def create_memo(
 async def list_memos(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     memo_type: str | None = Query(None, description="Filter by type"),
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List memo packs for the tenant."""
     if not x_tenant_id:
@@ -165,14 +165,14 @@ async def get_memo(
 async def download_memo(
     memo_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    download_format: str = Query("html", alias="format", description="html or (pdf/docx when implemented)"),
+    download_format: str = Query("html", alias="format", description="html or pdf"),
     store: ArtifactStore = Depends(get_artifact_store),
 ) -> Response:
-    """Download memo as HTML (or PDF/DOCX when implemented)."""
+    """Download memo as HTML or PDF (VA-P5-03)."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    if download_format != "html":
-        raise HTTPException(400, "Only format=html is supported")
+    if download_format not in ("html", "pdf"):
+        raise HTTPException(400, "format must be html or pdf")
     try:
         data = store.load(x_tenant_id, MEMO_ARTIFACT_TYPE, memo_id)
     except StorageError as e:
@@ -180,7 +180,20 @@ async def download_memo(
             raise HTTPException(404, "Memo not found") from e
         raise
     html = data.get("html", "")
-    return HTMLResponse(content=html, headers={"Content-Disposition": f'attachment; filename="{memo_id}.html"'})  # type: ignore[arg-type]
+    if download_format == "html":
+        return HTMLResponse(
+            content=html,
+            headers={"Content-Disposition": f'attachment; filename="{memo_id}.html"'},
+        )  # type: ignore[arg-type]
+    try:
+        pdf_bytes = html_to_pdf(html)
+    except RuntimeError as e:
+        raise HTTPException(501, str(e)) from e
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{memo_id}.pdf"'},
+    )
 
 
 @router.delete("/{memo_id}")

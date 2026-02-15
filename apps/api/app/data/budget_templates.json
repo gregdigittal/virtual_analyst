@@ -1,0 +1,82 @@
+{
+  "artifact_type": "budget_template_catalog_v1",
+  "templates": [
+    {
+      "template_id": "manufacturing",
+      "label": "Manufacturing",
+      "industry": "manufacturing",
+      "question_plan": [
+        { "section": "Headcount & Capacity", "questions": [
+          { "id": "hc_1", "q": "Planned headcount by function (production, admin, sales). Any hiring ramp?" },
+          { "id": "cap_1", "q": "Capacity utilization target and shift assumptions." }
+        ]},
+        { "section": "Capex & Investment", "questions": [
+          { "id": "capex_1", "q": "Planned capex (equipment, fit-out, IT). Timing and amounts." },
+          { "id": "capex_2", "q": "Depreciation method and useful lives." }
+        ]},
+        { "section": "Growth & Revenue", "questions": [
+          { "id": "gr_1", "q": "Revenue growth target (% or absolute). Volume vs price mix." },
+          { "id": "gr_2", "q": "Key cost drivers: materials, labor, energy. Any known price changes?" }
+        ]}
+      ],
+      "default_account_refs": ["Revenue", "COGS", "Gross Profit", "Payroll", "Rent", "Utilities", "Depreciation", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "saas",
+      "label": "SaaS",
+      "industry": "software",
+      "question_plan": [
+        { "section": "Headcount Plan", "questions": [
+          { "id": "hc_1", "q": "Planned headcount: engineering, sales, marketing, G&A. Hiring plan by quarter?" },
+          { "id": "hc_2", "q": "Average fully-loaded cost per head by function." }
+        ]},
+        { "section": "Capex Outlook", "questions": [
+          { "id": "capex_1", "q": "Infrastructure, tooling, office. Any large one-off spends?" }
+        ]},
+        { "section": "Growth Targets", "questions": [
+          { "id": "gr_1", "q": "ARR/MRR growth target. New vs expansion vs churn assumptions." },
+          { "id": "gr_2", "q": "CAC and payback period targets." }
+        ]}
+      ],
+      "default_account_refs": ["Subscription Revenue", "Professional Services", "Total Revenue", "Hosting & Infra", "Payroll", "Sales & Marketing", "R&D", "G&A", "EBITDA"]
+    },
+    {
+      "template_id": "services",
+      "label": "Services",
+      "industry": "services",
+      "question_plan": [
+        { "section": "Headcount & Delivery", "questions": [
+          { "id": "hc_1", "q": "Billable vs non-billable headcount. Utilization target." },
+          { "id": "hc_2", "q": "Average bill rate and cost per consultant." }
+        ]},
+        { "section": "Capex Outlook", "questions": [
+          { "id": "capex_1", "q": "Office, software, equipment. Any major investments?" }
+        ]},
+        { "section": "Growth Targets", "questions": [
+          { "id": "gr_1", "q": "Revenue growth target. Pipeline and win-rate assumptions." },
+          { "id": "gr_2", "q": "Gross margin and overhead ratio targets." }
+        ]}
+      ],
+      "default_account_refs": ["Revenue", "Direct Labor", "Gross Profit", "Payroll (Overhead)", "Rent", "Travel", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "wholesale",
+      "label": "Wholesale Distribution",
+      "industry": "distribution",
+      "question_plan": [
+        { "section": "Headcount & Operations", "questions": [
+          { "id": "hc_1", "q": "Warehouse, sales, admin headcount. Seasonal peaks?" },
+          { "id": "hc_2", "q": "Volume and throughput assumptions." }
+        ]},
+        { "section": "Capex Outlook", "questions": [
+          { "id": "capex_1", "q": "Warehouse, vehicles, systems. Capex by period." }
+        ]},
+        { "section": "Growth Targets", "questions": [
+          { "id": "gr_1", "q": "Revenue growth. Category mix and margin targets." },
+          { "id": "gr_2", "q": "Inventory and working capital assumptions." }
+        ]}
+      ],
+      "default_account_refs": ["Revenue", "COGS", "Gross Profit", "Payroll", "Warehouse & Logistics", "Rent", "Other OpEx", "EBITDA"]
+    }
+  ]
+}

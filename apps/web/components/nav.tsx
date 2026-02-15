@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,13 +15,11 @@ export function Nav() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
+      const ctx = await getAuthContext();
+      if (!ctx) return;
+      api.setAccessToken(ctx.accessToken);
       try {
-        const res = await api.notifications.list(session.user.id, false, 1, 0);
+        const res = await api.notifications.list(ctx.tenantId, false, 1, 0);
         if (!cancelled) setUnreadCount(res.unread_count);
       } catch {
         if (!cancelled) setUnreadCount(0);
@@ -32,6 +31,7 @@ export function Nav() {
   }, []);
 
   async function handleSignOut() {
+    api.setAccessToken(null);
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
@@ -91,6 +91,24 @@ export function Nav() {
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
+          </Link>
+          <Link
+            href="/settings/teams"
+            className="text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1"
+          >
+            Teams
+          </Link>
+          <Link
+            href="/inbox"
+            className="text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1"
+          >
+            Inbox
+          </Link>
+          <Link
+            href="/inbox/feedback"
+            className="text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1"
+          >
+            Feedback
           </Link>
         </div>
         <button

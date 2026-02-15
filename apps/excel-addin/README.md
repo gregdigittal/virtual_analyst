@@ -16,6 +16,7 @@ Minimal Office.js task pane add-in for Excel. Connects to the Virtual Analyst AP
 3. In the task pane, set:
    - **API base URL**: e.g. `https://localhost:8000/api/v1` (or your deployed API).
    - **Tenant ID**: Your `X-Tenant-ID` header value.
+   - **Access token (optional)**: Supabase access token for API auth (C1). When set, requests send `Authorization: Bearer <token>` so the API can verify tenant/user.
    - **Connection ID**: An Excel connection ID from `GET /api/v1/excel/connections` (e.g. `ex_xxxx`).
 
 4. **Pull**: Fetches current values for all bindings from the run and logs the sync event. (Writing values into cells by named range requires additional logic in `taskpane.js` using `Excel.run`.)

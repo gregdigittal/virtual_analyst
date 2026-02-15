@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(safeNext, origin));
     }
+    console.error("[auth/callback] code exchange failed:", error.message);
   }
 
   // If code is missing or exchange failed, send to login with an error hint

@@ -3,14 +3,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export default async function LandingPage() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/baselines");
+    const params = await searchParams;
+    const next = params?.next;
+    const safeNext =
+      next && next.startsWith("/") && !next.startsWith("//")
+        ? next
+        : "/baselines";
+    redirect(safeNext);
   }
 
   return (

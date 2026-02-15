@@ -1,7 +1,7 @@
 -- =============================================================================
--- Virtual Analyst — Pending migrations (0008 through 0019)
+-- Virtual Analyst — Pending migrations (0008 through 0027)
 -- Run in order against your database. Skip any you have already applied.
--- Prerequisites: migrations 0001–0007 must already be applied (tenants, users,
+-- Prerequisites: migrations 0001–0002 must already be applied (tenants, users,
 -- model_baselines, runs, etc.).
 -- =============================================================================
 
@@ -563,3 +563,387 @@ create policy "team_members_select" on team_members for select using (tenant_id 
 create policy "team_members_insert" on team_members for insert with check (tenant_id = current_setting('app.tenant_id', true));
 create policy "team_members_update" on team_members for update using (tenant_id = current_setting('app.tenant_id', true));
 create policy "team_members_delete" on team_members for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+-- ############################################################################
+-- 0020_workflow_templates.sql (VA-P6-03)
+-- ############################################################################
+create table if not exists workflow_templates (
+  tenant_id text not null references tenants(id) on delete cascade,
+  template_id text not null,
+  name text not null,
+  description text,
+  stages_json jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (tenant_id, template_id)
+);
+create index if not exists idx_workflow_templates_tenant on workflow_templates(tenant_id);
+create table if not exists workflow_instances (
+  tenant_id text not null references tenants(id) on delete cascade,
+  instance_id text not null,
+  template_id text not null,
+  entity_type text not null,
+  entity_id text not null,
+  current_stage_index integer not null default 0,
+  status text not null default 'pending'
+    check (status in ('pending','in_progress','submitted','approved','returned','completed')),
+  created_at timestamptz not null default now(),
+  created_by text references users(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (tenant_id, instance_id),
+  foreign key (tenant_id, template_id) references workflow_templates(tenant_id, template_id) on delete restrict
+);
+create index if not exists idx_workflow_instances_tenant on workflow_instances(tenant_id);
+create index if not exists idx_workflow_instances_entity on workflow_instances(tenant_id, entity_type, entity_id);
+create index if not exists idx_workflow_instances_status on workflow_instances(tenant_id, status);
+alter table workflow_templates enable row level security;
+drop policy if exists "workflow_templates_select" on workflow_templates;
+drop policy if exists "workflow_templates_insert" on workflow_templates;
+drop policy if exists "workflow_templates_update" on workflow_templates;
+drop policy if exists "workflow_templates_delete" on workflow_templates;
+create policy "workflow_templates_select" on workflow_templates for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "workflow_templates_insert" on workflow_templates for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "workflow_templates_update" on workflow_templates for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "workflow_templates_delete" on workflow_templates for delete using (tenant_id = current_setting('app.tenant_id', true));
+alter table workflow_instances enable row level security;
+drop policy if exists "workflow_instances_select" on workflow_instances;
+drop policy if exists "workflow_instances_insert" on workflow_instances;
+drop policy if exists "workflow_instances_update" on workflow_instances;
+drop policy if exists "workflow_instances_delete" on workflow_instances;
+create policy "workflow_instances_select" on workflow_instances for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "workflow_instances_insert" on workflow_instances for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "workflow_instances_update" on workflow_instances for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "workflow_instances_delete" on workflow_instances for delete using (tenant_id = current_setting('app.tenant_id', true));
+insert into workflow_templates (tenant_id, template_id, name, description, stages_json)
+select t.id, v.template_id, v.name, v.description, v.stages_json::jsonb
+from tenants t
+cross join (values
+  ('tpl_self_service', 'Self-Service', 'Single stage; any team member can claim',
+   '[{"stage_id":"s1","name":"Complete","assignee_rule":"team_pool","assignee_config":{}}]'),
+  ('tpl_standard_review', 'Standard Review', 'Assignee works; manager reviews',
+   '[{"stage_id":"s1","name":"Prepare","assignee_rule":"explicit","assignee_config":{}},{"stage_id":"s2","name":"Review","assignee_rule":"reports_to","assignee_config":{}}]'),
+  ('tpl_full_approval', 'Full Approval', 'Analyst -> Manager -> Director/CFO',
+   '[{"stage_id":"s1","name":"Prepare","assignee_rule":"explicit","assignee_config":{}},{"stage_id":"s2","name":"Manager Review","assignee_rule":"reports_to","assignee_config":{}},{"stage_id":"s3","name":"Director Approval","assignee_rule":"reports_to_chain","assignee_config":{}}]')
+) as v(template_id, name, description, stages_json)
+on conflict (tenant_id, template_id) do nothing;
+
+-- ############################################################################
+-- 0021_task_assignments.sql (VA-P6-04)
+-- ############################################################################
+create table if not exists task_assignments (
+  tenant_id text not null references tenants(id) on delete cascade,
+  assignment_id text not null,
+  workflow_instance_id text,
+  entity_type text not null,
+  entity_id text not null,
+  assignee_user_id text references users(id) on delete cascade,
+  assigned_by_user_id text references users(id) on delete set null,
+  status text not null default 'draft'
+    check (status in ('draft','assigned','in_progress','submitted','approved','returned','completed')),
+  deadline timestamptz,
+  instructions text,
+  created_at timestamptz not null default now(),
+  submitted_at timestamptz,
+  primary key (tenant_id, assignment_id)
+);
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'fk_task_assignments_workflow') then
+    alter table task_assignments
+      add constraint fk_task_assignments_workflow
+      foreign key (tenant_id, workflow_instance_id) references workflow_instances(tenant_id, instance_id) on delete set null;
+  end if;
+end $$;
+create index if not exists idx_task_assignments_tenant on task_assignments(tenant_id);
+create index if not exists idx_task_assignments_assignee on task_assignments(tenant_id, assignee_user_id);
+create index if not exists idx_task_assignments_status on task_assignments(tenant_id, status);
+create index if not exists idx_task_assignments_entity on task_assignments(tenant_id, entity_type, entity_id);
+create index if not exists idx_task_assignments_deadline on task_assignments(tenant_id, deadline) where deadline is not null;
+alter table task_assignments enable row level security;
+drop policy if exists "task_assignments_select" on task_assignments;
+drop policy if exists "task_assignments_insert" on task_assignments;
+drop policy if exists "task_assignments_update" on task_assignments;
+drop policy if exists "task_assignments_delete" on task_assignments;
+create policy "task_assignments_select" on task_assignments for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "task_assignments_insert" on task_assignments for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "task_assignments_update" on task_assignments for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "task_assignments_delete" on task_assignments for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+-- ############################################################################
+-- 0022_reviews.sql (VA-P6-05)
+-- ############################################################################
+create table if not exists reviews (
+  tenant_id text not null references tenants(id) on delete cascade,
+  review_id text not null,
+  assignment_id text not null,
+  reviewer_user_id text not null references users(id) on delete cascade,
+  decision text not null check (decision in ('approved', 'request_changes', 'rejected')),
+  notes text,
+  corrections_json jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (tenant_id, review_id),
+  foreign key (tenant_id, assignment_id) references task_assignments(tenant_id, assignment_id) on delete cascade
+);
+create index if not exists idx_reviews_assignment on reviews(tenant_id, assignment_id);
+create index if not exists idx_reviews_reviewer on reviews(tenant_id, reviewer_user_id);
+create table if not exists change_summaries (
+  tenant_id text not null references tenants(id) on delete cascade,
+  summary_id text not null,
+  review_id text not null,
+  summary_text text not null,
+  learning_points_json jsonb default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (tenant_id, summary_id),
+  foreign key (tenant_id, review_id) references reviews(tenant_id, review_id) on delete cascade
+);
+create index if not exists idx_change_summaries_review on change_summaries(tenant_id, review_id);
+alter table reviews enable row level security;
+drop policy if exists "reviews_select" on reviews;
+drop policy if exists "reviews_insert" on reviews;
+drop policy if exists "reviews_update" on reviews;
+drop policy if exists "reviews_delete" on reviews;
+create policy "reviews_select" on reviews for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "reviews_insert" on reviews for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "reviews_update" on reviews for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "reviews_delete" on reviews for delete using (tenant_id = current_setting('app.tenant_id', true));
+alter table change_summaries enable row level security;
+drop policy if exists "change_summaries_select" on change_summaries;
+drop policy if exists "change_summaries_insert" on change_summaries;
+drop policy if exists "change_summaries_update" on change_summaries;
+drop policy if exists "change_summaries_delete" on change_summaries;
+create policy "change_summaries_select" on change_summaries for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "change_summaries_insert" on change_summaries for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "change_summaries_update" on change_summaries for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "change_summaries_delete" on change_summaries for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+-- ############################################################################
+-- 0023_workflow_instances_updated_at_trigger.sql (R5-11)
+-- ############################################################################
+create or replace function update_workflow_instances_updated_at()
+returns trigger as $$
+begin
+  NEW.updated_at = now();
+  return NEW;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_workflow_instances_updated_at on workflow_instances;
+create trigger trg_workflow_instances_updated_at
+  before update on workflow_instances
+  for each row execute function update_workflow_instances_updated_at();
+
+-- ############################################################################
+-- 0024_feedback_acknowledged.sql (VA-P6-06)
+-- ############################################################################
+alter table change_summaries
+  add column if not exists acknowledged_at timestamptz;
+
+create index if not exists idx_change_summaries_acknowledged
+  on change_summaries(tenant_id, acknowledged_at) where acknowledged_at is null;
+
+-- ############################################################################
+-- 0025_budgets.sql (VA-P7-01)
+-- ############################################################################
+-- Budget data model: budgets, budget_versions, budget_periods, budget_line_items,
+-- budget_line_item_amounts, budget_department_allocations. Lifecycle: draft →
+-- submitted → under_review → approved → active → closed.
+
+create table if not exists budgets (
+  tenant_id text not null references tenants(id) on delete cascade,
+  budget_id text not null,
+  label text not null,
+  fiscal_year text not null,
+  status text not null check (status in (
+    'draft', 'submitted', 'under_review', 'approved', 'active', 'closed'
+  )),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by text references users(id) on delete set null,
+  primary key (tenant_id, budget_id)
+);
+create index if not exists idx_budgets_tenant_status on budgets(tenant_id, status);
+create index if not exists idx_budgets_tenant_fiscal on budgets(tenant_id, fiscal_year);
+
+create table if not exists budget_versions (
+  tenant_id text not null references tenants(id) on delete cascade,
+  budget_id text not null,
+  version_id text not null,
+  version_number int not null,
+  created_at timestamptz not null default now(),
+  created_by text references users(id) on delete set null,
+  primary key (tenant_id, budget_id, version_id),
+  foreign key (tenant_id, budget_id) references budgets(tenant_id, budget_id) on delete cascade
+);
+create index if not exists idx_budget_versions_budget on budget_versions(tenant_id, budget_id);
+
+alter table budgets add column if not exists current_version_id text;
+alter table budgets drop constraint if exists fk_budgets_current_version;
+alter table budgets
+  add constraint fk_budgets_current_version
+  foreign key (tenant_id, budget_id, current_version_id)
+  references budget_versions(tenant_id, budget_id, version_id) on delete set null;
+
+create table if not exists budget_periods (
+  tenant_id text not null references tenants(id) on delete cascade,
+  budget_id text not null,
+  period_id text not null,
+  period_ordinal int not null,
+  period_start date not null,
+  period_end date not null,
+  label text,
+  primary key (tenant_id, budget_id, period_id),
+  foreign key (tenant_id, budget_id) references budgets(tenant_id, budget_id) on delete cascade,
+  unique (tenant_id, budget_id, period_ordinal)
+);
+create index if not exists idx_budget_periods_budget on budget_periods(tenant_id, budget_id);
+
+create table if not exists budget_line_items (
+  tenant_id text not null references tenants(id) on delete cascade,
+  line_item_id text not null,
+  budget_id text not null,
+  version_id text not null,
+  account_ref text not null,
+  notes text,
+  primary key (tenant_id, line_item_id),
+  foreign key (tenant_id, budget_id, version_id)
+    references budget_versions(tenant_id, budget_id, version_id) on delete cascade,
+  unique (tenant_id, budget_id, version_id, account_ref)
+);
+create index if not exists idx_budget_line_items_version on budget_line_items(tenant_id, budget_id, version_id);
+
+create table if not exists budget_line_item_amounts (
+  tenant_id text not null references tenants(id) on delete cascade,
+  line_item_id text not null,
+  period_ordinal int not null,
+  amount numeric not null default 0,
+  primary key (tenant_id, line_item_id, period_ordinal),
+  foreign key (tenant_id, line_item_id)
+    references budget_line_items(tenant_id, line_item_id) on delete cascade
+);
+create index if not exists idx_budget_line_item_amounts_line on budget_line_item_amounts(tenant_id, line_item_id);
+
+create table if not exists budget_department_allocations (
+  tenant_id text not null references tenants(id) on delete cascade,
+  allocation_id text not null,
+  budget_id text not null,
+  version_id text not null,
+  department_ref text not null,
+  amount_limit numeric not null,
+  primary key (tenant_id, allocation_id),
+  foreign key (tenant_id, budget_id, version_id)
+    references budget_versions(tenant_id, budget_id, version_id) on delete cascade,
+  unique (tenant_id, budget_id, version_id, department_ref)
+);
+create index if not exists idx_budget_department_alloc_version on budget_department_allocations(tenant_id, budget_id, version_id);
+
+alter table budgets enable row level security;
+drop policy if exists "budgets_select" on budgets;
+drop policy if exists "budgets_insert" on budgets;
+drop policy if exists "budgets_update" on budgets;
+drop policy if exists "budgets_delete" on budgets;
+create policy "budgets_select" on budgets for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budgets_insert" on budgets for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "budgets_update" on budgets for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budgets_delete" on budgets for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+alter table budget_versions enable row level security;
+drop policy if exists "budget_versions_select" on budget_versions;
+drop policy if exists "budget_versions_insert" on budget_versions;
+drop policy if exists "budget_versions_update" on budget_versions;
+drop policy if exists "budget_versions_delete" on budget_versions;
+create policy "budget_versions_select" on budget_versions for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_versions_insert" on budget_versions for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_versions_update" on budget_versions for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_versions_delete" on budget_versions for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+alter table budget_periods enable row level security;
+drop policy if exists "budget_periods_select" on budget_periods;
+drop policy if exists "budget_periods_insert" on budget_periods;
+drop policy if exists "budget_periods_update" on budget_periods;
+drop policy if exists "budget_periods_delete" on budget_periods;
+create policy "budget_periods_select" on budget_periods for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_periods_insert" on budget_periods for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_periods_update" on budget_periods for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_periods_delete" on budget_periods for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+alter table budget_line_items enable row level security;
+drop policy if exists "budget_line_items_select" on budget_line_items;
+drop policy if exists "budget_line_items_insert" on budget_line_items;
+drop policy if exists "budget_line_items_update" on budget_line_items;
+drop policy if exists "budget_line_items_delete" on budget_line_items;
+create policy "budget_line_items_select" on budget_line_items for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_line_items_insert" on budget_line_items for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_line_items_update" on budget_line_items for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_line_items_delete" on budget_line_items for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+alter table budget_line_item_amounts enable row level security;
+drop policy if exists "budget_line_item_amounts_select" on budget_line_item_amounts;
+drop policy if exists "budget_line_item_amounts_insert" on budget_line_item_amounts;
+drop policy if exists "budget_line_item_amounts_update" on budget_line_item_amounts;
+drop policy if exists "budget_line_item_amounts_delete" on budget_line_item_amounts;
+create policy "budget_line_item_amounts_select" on budget_line_item_amounts for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_line_item_amounts_insert" on budget_line_item_amounts for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_line_item_amounts_update" on budget_line_item_amounts for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_line_item_amounts_delete" on budget_line_item_amounts for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+alter table budget_department_allocations enable row level security;
+drop policy if exists "budget_department_allocations_select" on budget_department_allocations;
+drop policy if exists "budget_department_allocations_insert" on budget_department_allocations;
+drop policy if exists "budget_department_allocations_update" on budget_department_allocations;
+drop policy if exists "budget_department_allocations_delete" on budget_department_allocations;
+create policy "budget_department_allocations_select" on budget_department_allocations for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_department_allocations_insert" on budget_department_allocations for insert with check (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_department_allocations_update" on budget_department_allocations for update using (tenant_id = current_setting('app.tenant_id', true));
+create policy "budget_department_allocations_delete" on budget_department_allocations for delete using (tenant_id = current_setting('app.tenant_id', true));
+
+-- ############################################################################
+-- 0026_budget_actuals_and_confidence.sql (VA-P7-03/04/05)
+-- Prerequisite: 0025 must be applied first.
+-- ############################################################################
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'budget_line_items') then
+    alter table budget_line_items add column if not exists confidence_score numeric;
+    comment on column budget_line_items.confidence_score is 'Optional 0-1 confidence from LLM budget_initialization or budget_reforecast.';
+  end if;
+end $$;
+
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'budgets') then
+    create table if not exists budget_actuals (
+      tenant_id text not null references tenants(id) on delete cascade,
+      budget_id text not null,
+      period_ordinal int not null,
+      account_ref text not null,
+      amount numeric not null,
+      department_ref text not null default '',
+      source text not null check (source in ('csv', 'erp')),
+      created_at timestamptz not null default now(),
+      primary key (tenant_id, budget_id, period_ordinal, account_ref, department_ref),
+      foreign key (tenant_id, budget_id) references budgets(tenant_id, budget_id) on delete cascade
+    );
+    create index if not exists idx_budget_actuals_budget_period on budget_actuals(tenant_id, budget_id, period_ordinal);
+    create index if not exists idx_budget_actuals_department on budget_actuals(tenant_id, budget_id, department_ref) where department_ref != '';
+    alter table budget_actuals enable row level security;
+    drop policy if exists "budget_actuals_select" on budget_actuals;
+    drop policy if exists "budget_actuals_insert" on budget_actuals;
+    drop policy if exists "budget_actuals_update" on budget_actuals;
+    drop policy if exists "budget_actuals_delete" on budget_actuals;
+    create policy "budget_actuals_select" on budget_actuals for select using (tenant_id = current_setting('app.tenant_id', true));
+    create policy "budget_actuals_insert" on budget_actuals for insert with check (tenant_id = current_setting('app.tenant_id', true));
+    create policy "budget_actuals_update" on budget_actuals for update using (tenant_id = current_setting('app.tenant_id', true));
+    create policy "budget_actuals_delete" on budget_actuals for delete using (tenant_id = current_setting('app.tenant_id', true));
+  end if;
+end $$;
+
+-- ############################################################################
+-- 0027_notifications_id_text.sql (R7-10: ntf_ prefix)
+-- ############################################################################
+do $$
+begin
+  if exists (select 1 from information_schema.columns c join information_schema.tables t on t.table_name = c.table_name and t.table_schema = c.table_schema
+             where t.table_schema = 'public' and t.table_name = 'notifications' and c.column_name = 'id' and c.data_type = 'uuid') then
+    alter table notifications alter column id drop default;
+    alter table notifications alter column id type text using id::text;
+  end if;
+end $$;

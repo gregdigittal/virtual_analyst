@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d finmodel_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -18,17 +23,16 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  supabase:
-    image: supabase/supabase-dev:latest
-    environment:
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "54321:8000"
-    volumes:
-      - supabase_data:/var/lib/postgresql/data
+  # Supabase: use the Supabase CLI for local dev (npx supabase start).
+  # See https://supabase.com/docs/guides/local-development
+  # The CLI starts its own containers for Auth, Storage, Studio, etc.
 
 volumes:
   postgres_data:
   redis_data:
-  supabase_data:

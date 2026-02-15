@@ -6,6 +6,7 @@
   const statusEl = document.getElementById("status");
   const apiUrlEl = document.getElementById("apiUrl");
   const tenantIdEl = document.getElementById("tenantId");
+  const tokenEl = document.getElementById("accessToken");
   const connectionIdEl = document.getElementById("connectionId");
   const btnPull = document.getElementById("btnPull");
   const btnPush = document.getElementById("btnPush");
@@ -17,6 +18,8 @@
   function getHeaders() {
     const tenantId = (tenantIdEl && tenantIdEl.value) || "";
     const headers = { "X-Tenant-ID": tenantId, "Content-Type": "application/json" };
+    const token = (tokenEl && tokenEl.value) || "";
+    if (token) headers["Authorization"] = "Bearer " + token.trim();
     return headers;
   }
 

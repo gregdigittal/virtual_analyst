@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     supabase_url: str = Field(default="http://localhost:54321", alias="SUPABASE_URL")
     supabase_anon_key: str = Field(default="", alias="SUPABASE_ANON_KEY")
     supabase_service_key: str = Field(default="", alias="SUPABASE_SERVICE_KEY")
+    supabase_jwt_secret: str | None = Field(default=None, alias="SUPABASE_JWT_SECRET")
+    """JWT secret for verifying Supabase access tokens (Project Settings → API → JWT Secret). When set, auth middleware overwrites X-Tenant-ID / X-User-ID from the Bearer token."""
 
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
@@ -36,6 +38,8 @@ class Settings(BaseSettings):
     )
 
     rate_limit: str = Field(default="100/minute", alias="RATE_LIMIT")
+    cron_secret: str | None = Field(default=None, alias="CRON_SECRET")
+    """Shared secret for cron endpoints (e.g. X-Cron-Secret). When set, POST /api/v1/assignments/cron/deadline-reminders requires this header."""
 
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
