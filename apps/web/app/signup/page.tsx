@@ -18,6 +18,26 @@ function SignUpForm() {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
+  async function handleOAuth(provider: "google" | "azure") {
+    setError(null);
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const redirectTo = `${origin}/auth/callback${next && next !== "/baselines" ? `?next=${encodeURIComponent(next)}` : ""}`;
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: provider === "azure" ? "azure" : "google",
+        options: { redirectTo },
+      });
+      if (err) {
+        setError(err.message);
+        return;
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -123,6 +143,34 @@ function SignUpForm() {
           <p className="text-sm text-va-text2">
             Start your free trial. No credit card required.
           </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <VAButton
+            type="button"
+            variant="secondary"
+            disabled={loading}
+            className="w-full"
+            onClick={() => handleOAuth("google")}
+          >
+            Continue with Google
+          </VAButton>
+          <VAButton
+            type="button"
+            variant="secondary"
+            disabled={loading}
+            className="w-full"
+            onClick={() => handleOAuth("azure")}
+          >
+            Continue with Microsoft
+          </VAButton>
+        </div>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-va-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-va-midnight px-2 text-va-text2">Or</span>
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
