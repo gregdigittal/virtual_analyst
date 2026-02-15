@@ -172,6 +172,64 @@ export interface CommitResult {
   integrity?: { status: string; checks: unknown[] };
 }
 
+export interface BudgetSummary {
+  budget_id: string;
+  label: string;
+  fiscal_year: string;
+  status: string;
+  created_at?: string | null;
+}
+
+export interface BudgetDetail extends BudgetSummary {
+  current_version_id: string | null;
+  workflow_instance_id?: string | null;
+  updated_at?: string | null;
+  created_by?: string | null;
+}
+
+export interface BudgetVarianceItem {
+  account_ref: string;
+  period_ordinal: number;
+  budget_amount: number;
+  actual_amount: number;
+  variance_absolute: number;
+  variance_percent: number;
+  favourable: boolean;
+  material: boolean;
+}
+
+export interface BudgetDashboardWidget {
+  budget_id: string;
+  label: string;
+  burn_rate: number | null;
+  runway_months: number | null;
+  utilisation_pct: number | null;
+  variance_trend: { period_ordinal: number; budget_total: number; actual_total: number; variance_pct: number }[];
+  department_ranking: { department_ref: string; actual_total: number }[];
+  alerts: { type: string; message: string; threshold_pct?: number; period_ordinal?: number }[];
+}
+
+export interface BudgetDashboardResponse {
+  widgets: BudgetDashboardWidget[];
+  cfo_view: boolean;
+}
+
+export interface BoardPackSummary {
+  pack_id: string;
+  label: string;
+  run_id: string | null;
+  budget_id: string | null;
+  section_order: string[];
+  status: string;
+  branding_json: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export interface BoardPackDetail extends BoardPackSummary {
+  narrative_json: Record<string, unknown>;
+  error_message: string | null;
+}
+
 export interface NotificationItem {
   id: string;
   tenant_id: string;
@@ -456,6 +514,57 @@ export const api = {
         ).toString()}`,
         { tenantId }
       ),
+  },
+  budgets: {
+    list: (tenantId: string, status?: string) =>
+      request<{ budgets: BudgetSummary[]; limit: number; offset: number }>(
+        `/api/v1/budgets${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+        { tenantId }
+      ),
+    get: (tenantId: string, budgetId: string) =>
+      request<BudgetDetail>(`/api/v1/budgets/${encodeURIComponent(budgetId)}`, { tenantId }),
+    getDashboard: (tenantId: string, budgetId?: string) =>
+      request<BudgetDashboardResponse>(
+        `/api/v1/budgets/dashboard${budgetId ? `?budget_id=${encodeURIComponent(budgetId)}` : ""}`,
+        { tenantId }
+      ),
+    getVariance: (tenantId: string, budgetId: string, opts?: { period?: number; department?: string }) => {
+      const params = new URLSearchParams();
+      if (opts?.period != null) params.set("period", String(opts.period));
+      if (opts?.department) params.set("department", opts.department);
+      const qs = params.toString();
+      return request<{ variances: BudgetVarianceItem[]; materiality_pct: number }>(
+        `/api/v1/budgets/${encodeURIComponent(budgetId)}/variance${qs ? `?${qs}` : ""}`,
+        { tenantId }
+      );
+    },
+  },
+  boardPacks: {
+    list: (tenantId: string, status?: string) =>
+      request<{ items: BoardPackSummary[] }>(
+        `/api/v1/board-packs${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+        { tenantId }
+      ),
+    get: (tenantId: string, packId: string) =>
+      request<BoardPackDetail>(`/api/v1/board-packs/${encodeURIComponent(packId)}`, { tenantId }),
+    create: (
+      tenantId: string,
+      userId: string,
+      body: { label: string; run_id: string; budget_id?: string | null; section_order?: string[]; branding_json?: Record<string, unknown> }
+    ) =>
+      request<BoardPackSummary>("/api/v1/board-packs", {
+        tenantId,
+        userId,
+        method: "POST",
+        body,
+      }),
+    generate: (tenantId: string, packId: string) =>
+      request<{ pack_id: string; status: string; narrative_json: Record<string, unknown> }>(
+        `/api/v1/board-packs/${encodeURIComponent(packId)}/generate`,
+        { tenantId, method: "POST" }
+      ),
+    exportUrl: (packId: string, format: "html" | "pdf" | "pptx") =>
+      `${API_URL}/api/v1/board-packs/${encodeURIComponent(packId)}/export?format=${format}`,
   },
   assignments: {
     list: (

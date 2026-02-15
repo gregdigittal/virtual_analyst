@@ -166,7 +166,7 @@ async def list_budgets(
         offset_ph = idx
         args.extend([limit, offset])
         rows = await conn.fetch(
-            f"""SELECT budget_id, label, fiscal_year, status, current_version_id, created_at, updated_at
+            f"""SELECT budget_id, label, fiscal_year, status, current_version_id, workflow_instance_id, created_at, updated_at
                 FROM budgets WHERE {" AND ".join(conditions)}
                 ORDER BY created_at DESC LIMIT ${limit_ph} OFFSET ${offset_ph}""",
             *args,
@@ -179,6 +179,7 @@ async def list_budgets(
                 "fiscal_year": r["fiscal_year"],
                 "status": r["status"],
                 "current_version_id": r["current_version_id"],
+                "workflow_instance_id": r.get("workflow_instance_id"),
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
                 "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
             }
@@ -337,6 +338,108 @@ async def create_budget_from_template(
     }
 
 
+@router.get("/dashboard")
+async def get_budget_dashboard(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    budget_id: str | None = None,
+) -> dict[str, Any]:
+    """Budget KPI dashboard (VA-P7-11): burn rate, runway, utilisation %, variance trend, department ranking. CFO view when budget_id omitted."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        if budget_id:
+            budget_ids = [budget_id]
+            rows = await conn.fetch(
+                "SELECT budget_id, label, status, current_version_id FROM budgets WHERE tenant_id = $1 AND budget_id = $2",
+                x_tenant_id,
+                budget_id,
+            )
+            if not rows:
+                raise HTTPException(404, "Budget not found")
+        else:
+            rows = await conn.fetch(
+                "SELECT budget_id, label, status, current_version_id FROM budgets WHERE tenant_id = $1 ORDER BY created_at DESC",
+                x_tenant_id,
+            )
+            budget_ids = [r["budget_id"] for r in rows]
+        widgets: list[dict[str, Any]] = []
+        for b in rows:
+            vid = b["current_version_id"]
+            bid = b["budget_id"]
+            if not vid:
+                widgets.append({
+                    "budget_id": bid,
+                    "label": b["label"],
+                    "burn_rate": None,
+                    "runway_months": None,
+                    "utilisation_pct": None,
+                    "variance_trend": [],
+                    "department_ranking": [],
+                    "alerts": [],
+                })
+                continue
+            total_budget = await conn.fetchval(
+                """SELECT COALESCE(SUM(blia.amount), 0) FROM budget_line_items bli
+                   JOIN budget_line_item_amounts blia ON blia.tenant_id = bli.tenant_id AND blia.line_item_id = bli.line_item_id
+                   WHERE bli.tenant_id = $1 AND bli.budget_id = $2 AND bli.version_id = $3""",
+                x_tenant_id,
+                bid,
+                vid,
+            )
+            total_budget = float(total_budget or 0)
+            actual_rows = await conn.fetch(
+                """SELECT period_ordinal, COALESCE(SUM(amount), 0) AS total FROM budget_actuals
+                   WHERE tenant_id = $1 AND budget_id = $2 GROUP BY period_ordinal ORDER BY period_ordinal""",
+                x_tenant_id,
+                bid,
+            )
+            total_actual = sum(float(r["total"]) for r in actual_rows)
+            utilisation_pct = round((total_actual / total_budget * 100.0), 2) if total_budget else None
+            period_totals_budget = await conn.fetch(
+                """SELECT blia.period_ordinal, SUM(blia.amount) AS total FROM budget_line_items bli
+                   JOIN budget_line_item_amounts blia ON blia.tenant_id = bli.tenant_id AND blia.line_item_id = bli.line_item_id
+                   WHERE bli.tenant_id = $1 AND bli.budget_id = $2 AND bli.version_id = $3 GROUP BY blia.period_ordinal ORDER BY blia.period_ordinal""",
+                x_tenant_id,
+                bid,
+                vid,
+            )
+            budget_by_period = {r["period_ordinal"]: float(r["total"]) for r in period_totals_budget}
+            actual_by_period = {r["period_ordinal"]: float(r["total"]) for r in actual_rows}
+            variance_trend = []
+            for per in sorted(set(budget_by_period.keys()) | set(actual_by_period.keys())):
+                bval = budget_by_period.get(per, 0)
+                aval = actual_by_period.get(per, 0)
+                var_pct = (aval - bval) / bval * 100.0 if bval else (100.0 if aval else 0.0)
+                variance_trend.append({"period_ordinal": per, "budget_total": bval, "actual_total": aval, "variance_pct": round(var_pct, 2)})
+            dept_rows = await conn.fetch(
+                """SELECT department_ref, SUM(amount) AS total FROM budget_actuals
+                   WHERE tenant_id = $1 AND budget_id = $2 GROUP BY department_ref ORDER BY total DESC""",
+                x_tenant_id,
+                bid,
+            )
+            department_ranking = [{"department_ref": r["department_ref"] or "(none)", "actual_total": float(r["total"])} for r in dept_rows]
+            n_actual_periods = len(actual_by_period) or 0
+            burn_rate = (total_actual / n_actual_periods) if n_actual_periods > 0 else None
+            runway_months = (total_budget - total_actual) / (burn_rate or 1) if (total_budget and burn_rate and total_actual < total_budget) else None
+            alerts: list[dict[str, Any]] = []
+            if utilisation_pct is not None and utilisation_pct >= 90:
+                alerts.append({"type": "utilisation", "message": f"Budget utilisation at {utilisation_pct}%", "threshold_pct": 90})
+            for v in variance_trend:
+                if v["variance_pct"] and v["variance_pct"] < -10:
+                    alerts.append({"type": "unfavourable_variance", "period_ordinal": v["period_ordinal"], "message": f"Variance {v['variance_pct']}% in period {v['period_ordinal']}", "threshold_pct": 10})
+            widgets.append({
+                "budget_id": bid,
+                "label": b["label"],
+                "burn_rate": round(burn_rate, 2) if burn_rate is not None else None,
+                "runway_months": round(runway_months, 1) if runway_months is not None else None,
+                "utilisation_pct": utilisation_pct,
+                "variance_trend": variance_trend,
+                "department_ranking": department_ranking,
+                "alerts": alerts,
+            })
+    return {"widgets": widgets, "cfo_view": not budget_id}
+
+
 @router.get("/{budget_id}")
 async def get_budget_by_id(
     budget_id: str,
@@ -355,9 +458,63 @@ async def get_budget_by_id(
         "fiscal_year": row["fiscal_year"],
         "status": row["status"],
         "current_version_id": row["current_version_id"],
+        "workflow_instance_id": row.get("workflow_instance_id"),
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         "created_by": row["created_by"],
+    }
+
+
+BUDGET_APPROVAL_TEMPLATE_ID = "tpl_budget_approval"
+
+
+@router.post("/{budget_id}/submit", status_code=200)
+async def submit_budget(
+    budget_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Submit budget for approval (VA-P7-06). Creates workflow instance and sets status to submitted."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await get_budget(conn, x_tenant_id, budget_id)
+        if not row:
+            raise HTTPException(404, "Budget not found")
+        if row["status"] != "draft":
+            raise HTTPException(400, "Only draft budgets can be submitted for approval")
+        if row.get("workflow_instance_id"):
+            raise HTTPException(400, "Budget already submitted (workflow exists)")
+        instance_id = f"wf_{uuid.uuid4().hex[:14]}"
+        try:
+            async with conn.transaction():
+                await conn.execute(
+                    """INSERT INTO workflow_instances
+                       (tenant_id, instance_id, template_id, entity_type, entity_id, current_stage_index, status, created_by)
+                       VALUES ($1, $2, $3, 'budget', $4, 0, 'pending', $5)""",
+                    x_tenant_id,
+                    instance_id,
+                    BUDGET_APPROVAL_TEMPLATE_ID,
+                    budget_id,
+                    x_user_id or None,
+                )
+                await conn.execute(
+                    """UPDATE budgets SET status = 'submitted', workflow_instance_id = $1, updated_at = now()
+                       WHERE tenant_id = $2 AND budget_id = $3""",
+                    instance_id,
+                    x_tenant_id,
+                    budget_id,
+                )
+                row = await get_budget(conn, x_tenant_id, budget_id)
+        except asyncpg.ForeignKeyViolationError:
+            raise HTTPException(
+                500,
+                "Budget approval workflow template not found; run migration 0032",
+            )
+    return {
+        "budget_id": row["budget_id"],
+        "status": row["status"],
+        "workflow_instance_id": row.get("workflow_instance_id"),
     }
 
 
@@ -398,6 +555,7 @@ async def update_budget(
                 "fiscal_year": row["fiscal_year"],
                 "status": row["status"],
                 "current_version_id": row["current_version_id"],
+                "workflow_instance_id": row.get("workflow_instance_id"),
             }
         updates.append("updated_at = now()")
         n += 1
@@ -415,6 +573,7 @@ async def update_budget(
         "fiscal_year": row["fiscal_year"],
         "status": row["status"],
         "current_version_id": row["current_version_id"],
+        "workflow_instance_id": row.get("workflow_instance_id"),
     }
 
 

@@ -1,5 +1,5 @@
 -- =============================================================================
--- Virtual Analyst — APPLY ALL MIGRATIONS (0008 through 0031)
+-- Virtual Analyst — APPLY ALL MIGRATIONS (0008 through 0035)
 -- =============================================================================
 -- Run this single script against your database to apply all pending migrations.
 -- Prerequisites: 0001_init.sql and 0002_functions_and_rls.sql must already be applied.
@@ -1318,3 +1318,109 @@ create policy "comments_update" on comments for update
 drop policy if exists "document_attachments_update" on document_attachments;
 create policy "document_attachments_update" on document_attachments for update
   using (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0032_budget_approval_workflow.sql (VA-P7-06)
+-- ############################################################################
+alter table budgets add column if not exists workflow_instance_id text;
+comment on column budgets.workflow_instance_id is 'Set when budget is submitted for approval; links to workflow_instances(instance_id) for entity_type=budget.';
+insert into workflow_templates (tenant_id, template_id, name, description, stages_json)
+select t.id, v.template_id, v.name, v.description, v.stages_json::jsonb
+from tenants t
+cross join (values
+  ('tpl_budget_approval', 'Budget Approval', 'Department head -> Finance -> CFO -> Board presentation',
+   '[{"stage_id":"s1","name":"Department head review","assignee_rule":"reports_to","assignee_config":{}},{"stage_id":"s2","name":"Finance review","assignee_rule":"reports_to","assignee_config":{}},{"stage_id":"s3","name":"CFO approval","assignee_rule":"reports_to_chain","assignee_config":{}},{"stage_id":"s4","name":"Board presentation","assignee_rule":"team_pool","assignee_config":{}}]')
+) as v(template_id, name, description, stages_json)
+on conflict (tenant_id, template_id) do nothing;
+
+-- ############################################################################
+-- 0033_board_packs.sql (VA-P7-07)
+-- ############################################################################
+create table if not exists board_packs (
+  tenant_id text not null references tenants(id) on delete cascade,
+  pack_id text not null,
+  label text not null,
+  run_id text,
+  budget_id text,
+  section_order jsonb not null default '["executive_summary","income_statement","balance_sheet","cash_flow","budget_variance","kpi_dashboard","scenario_comparison","strategic_commentary"]'::jsonb,
+  status text not null default 'draft' check (status in ('draft', 'generating', 'ready', 'error')),
+  narrative_json jsonb default '{}'::jsonb,
+  error_message text,
+  created_at timestamptz not null default now(),
+  created_by text references users(id) on delete set null,
+  primary key (tenant_id, pack_id)
+);
+create index if not exists idx_board_packs_tenant on board_packs(tenant_id);
+create index if not exists idx_board_packs_status on board_packs(tenant_id, status);
+
+alter table board_packs enable row level security;
+drop policy if exists "board_packs_select" on board_packs;
+drop policy if exists "board_packs_insert" on board_packs;
+drop policy if exists "board_packs_update" on board_packs;
+drop policy if exists "board_packs_delete" on board_packs;
+create policy "board_packs_select" on board_packs for select using (tenant_id = current_tenant_id());
+create policy "board_packs_insert" on board_packs for insert with check (tenant_id = current_tenant_id());
+create policy "board_packs_update" on board_packs for update using (tenant_id = current_tenant_id());
+create policy "board_packs_delete" on board_packs for delete using (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0034_board_pack_branding.sql (VA-P7-07 / Phase 10 stub)
+-- ############################################################################
+alter table board_packs add column if not exists branding_json jsonb not null default '{}'::jsonb;
+comment on column board_packs.branding_json is 'Optional branding: logo_url, primary_color, terms_footer; applied on export (Phase 10).';
+
+-- ############################################################################
+-- 0035_board_pack_scheduling.sql (VA-P7-09)
+-- ############################################################################
+create table if not exists pack_schedules (
+  tenant_id text not null references tenants(id) on delete cascade,
+  schedule_id text not null,
+  label text not null,
+  run_id text,
+  budget_id text,
+  section_order jsonb not null default '["executive_summary","income_statement","balance_sheet","cash_flow","budget_variance","kpi_dashboard","scenario_comparison","strategic_commentary"]'::jsonb,
+  cron_expr text not null,
+  next_run_at timestamptz,
+  distribution_emails text[] default '{}',
+  enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  created_by text references users(id) on delete set null,
+  primary key (tenant_id, schedule_id)
+);
+create index if not exists idx_pack_schedules_tenant_next on pack_schedules(tenant_id, next_run_at) where enabled;
+
+create table if not exists pack_generation_history (
+  tenant_id text not null references tenants(id) on delete cascade,
+  history_id text not null,
+  schedule_id text,
+  pack_id text not null,
+  label text not null,
+  run_id text,
+  generated_at timestamptz not null default now(),
+  distributed_at timestamptz,
+  status text not null default 'ready' check (status in ('ready', 'distributed', 'failed')),
+  error_message text,
+  primary key (tenant_id, history_id)
+);
+create index if not exists idx_pack_history_tenant_generated on pack_generation_history(tenant_id, generated_at desc);
+create index if not exists idx_pack_history_schedule on pack_generation_history(tenant_id, schedule_id);
+
+alter table pack_schedules enable row level security;
+alter table pack_generation_history enable row level security;
+drop policy if exists "pack_schedules_select" on pack_schedules;
+drop policy if exists "pack_schedules_insert" on pack_schedules;
+drop policy if exists "pack_schedules_update" on pack_schedules;
+drop policy if exists "pack_schedules_delete" on pack_schedules;
+create policy "pack_schedules_select" on pack_schedules for select using (tenant_id = current_tenant_id());
+create policy "pack_schedules_insert" on pack_schedules for insert with check (tenant_id = current_tenant_id());
+create policy "pack_schedules_update" on pack_schedules for update using (tenant_id = current_tenant_id());
+create policy "pack_schedules_delete" on pack_schedules for delete using (tenant_id = current_tenant_id());
+
+drop policy if exists "pack_generation_history_select" on pack_generation_history;
+drop policy if exists "pack_generation_history_insert" on pack_generation_history;
+drop policy if exists "pack_generation_history_update" on pack_generation_history;
+drop policy if exists "pack_generation_history_delete" on pack_generation_history;
+create policy "pack_generation_history_select" on pack_generation_history for select using (tenant_id = current_tenant_id());
+create policy "pack_generation_history_insert" on pack_generation_history for insert with check (tenant_id = current_tenant_id());
+create policy "pack_generation_history_update" on pack_generation_history for update using (tenant_id = current_tenant_id());
+create policy "pack_generation_history_delete" on pack_generation_history for delete using (tenant_id = current_tenant_id());

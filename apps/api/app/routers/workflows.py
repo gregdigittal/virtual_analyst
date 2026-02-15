@@ -122,6 +122,63 @@ async def create_instance(
     }
 
 
+class UpdateInstanceBody(BaseModel):
+    status: str = Field(..., description="New status: in_progress, submitted, approved, returned, completed")
+
+
+@router.patch("/instances/{instance_id}", status_code=200)
+async def update_instance(
+    instance_id: str,
+    body: UpdateInstanceBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """Update workflow instance status (VA-P7-06). When status=completed and entity_type=budget, sets budget to active."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    valid = {"in_progress", "submitted", "approved", "returned", "completed"}
+    if body.status not in valid:
+        raise HTTPException(400, f"status must be one of {sorted(valid)}")
+    async with tenant_conn(x_tenant_id) as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                """SELECT entity_type, entity_id, status FROM workflow_instances
+                   WHERE tenant_id = $1 AND instance_id = $2""",
+                x_tenant_id,
+                instance_id,
+            )
+            if not row:
+                raise HTTPException(404, "Workflow instance not found")
+            current_status = row["status"]
+            allowed_transitions = {
+                "pending": {"in_progress", "submitted"},
+                "in_progress": {"submitted", "returned"},
+                "submitted": {"approved", "returned"},
+                "approved": {"completed"},
+                "returned": {"in_progress", "submitted"},
+            }
+            if body.status not in allowed_transitions.get(current_status, set()):
+                raise HTTPException(
+                    400,
+                    f"Cannot transition from '{current_status}' to '{body.status}'; "
+                    f"allowed: {sorted(allowed_transitions.get(current_status, set()))}",
+                )
+            await conn.execute(
+                """UPDATE workflow_instances SET status = $1, updated_at = now()
+                   WHERE tenant_id = $2 AND instance_id = $3""",
+                body.status,
+                x_tenant_id,
+                instance_id,
+            )
+            if body.status == "completed" and row["entity_type"] == "budget":
+                await conn.execute(
+                    """UPDATE budgets SET status = 'active', updated_at = now()
+                       WHERE tenant_id = $1 AND workflow_instance_id = $2""",
+                    x_tenant_id,
+                    instance_id,
+                )
+    return {"instance_id": instance_id, "status": body.status}
+
+
 @router.get("/instances/{instance_id}")
 async def get_instance(
     instance_id: str,

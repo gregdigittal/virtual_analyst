@@ -14,7 +14,7 @@ from apps.api.app.middleware.auth import auth_middleware
 from apps.api.app.middleware.logging import logging_middleware
 from apps.api.app.middleware.metrics import metrics_middleware
 from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
-from apps.api.app.routers import activity, assignments, audit, baselines, billing, budgets, changesets, comments, compliance, covenants, documents, drafts, excel, feedback, health, import_csv, integrations, jobs, memos, metrics_summary, notifications, runs, scenarios, teams, ventures, workflows
+from apps.api.app.routers import activity, assignments, audit, baselines, billing, board_pack_schedules, board_packs, budgets, changesets, comments, compliance, covenants, documents, drafts, excel, feedback, health, import_csv, integrations, jobs, memos, metrics_summary, notifications, runs, scenarios, teams, ventures, workflows
 from shared.fm_shared.errors import FinModelError, get_http_status
 from shared.fm_shared.logging import configure_logging
 from shared.fm_shared.metrics import metrics_app
@@ -109,6 +109,8 @@ app.include_router(teams.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(assignments.router, prefix="/api/v1")
 app.include_router(budgets.router, prefix="/api/v1")
+app.include_router(board_packs.router, prefix="/api/v1")
+app.include_router(board_pack_schedules.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
 app.mount("/metrics", metrics_app)
 

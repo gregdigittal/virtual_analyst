@@ -17,7 +17,7 @@ async def get_budget(
     """Return budget row or None."""
     return await conn.fetchrow(
         """SELECT budget_id, label, fiscal_year, status, current_version_id,
-                  created_at, updated_at, created_by
+                  created_at, updated_at, created_by, workflow_instance_id
            FROM budgets WHERE tenant_id = $1 AND budget_id = $2""",
         tenant_id,
         budget_id,

@@ -75,6 +75,18 @@ export function Nav() {
             Scenarios
           </Link>
           <Link
+            href="/budgets"
+            className="text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1"
+          >
+            Budgets
+          </Link>
+          <Link
+            href="/board-packs"
+            className="text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1"
+          >
+            Board packs
+          </Link>
+          <Link
             href="/dashboard"
             className="text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1"
           >
