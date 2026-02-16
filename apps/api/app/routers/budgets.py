@@ -20,11 +20,11 @@ from apps.api.app.db.budgets import (
     get_budget,
     get_version_line_item_totals,
 )
-from apps.api.app.deps import get_llm_router
+from apps.api.app.deps import get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.errors import LLMError
 
-router = APIRouter(prefix="/budgets", tags=["budgets"])
+router = APIRouter(prefix="/budgets", tags=["budgets"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 
 def _budget_id() -> str:
@@ -213,34 +213,36 @@ class CreateBudgetFromTemplateBody(BaseModel):
     num_periods: int = Field(default=12, ge=1, le=24)
 
 
-@router.post("/from-template", status_code=201)
-async def create_budget_from_template(
-    body: CreateBudgetFromTemplateBody,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    x_user_id: str = Header("", alias="X-User-ID"),
-    llm: LLMRouter = Depends(get_llm_router),
+async def create_budget_from_template_impl(
+    tenant_id: str,
+    user_id: str | None,
+    template_id: str,
+    label: str,
+    fiscal_year: str,
+    answers: dict[str, Any],
+    prior_year_actuals: list[dict[str, Any]] | None,
+    num_periods: int,
+    llm: LLMRouter,
 ) -> dict[str, Any]:
-    """Create a budget from a template; LLM proposes initial line-item amounts with confidence (VA-P7-03)."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
-    template = get_budget_template(body.template_id)
+    """Shared implementation: create budget from template (VA-P7-03, VA-P8-03 marketplace)."""
+    template = get_budget_template(template_id)
     if not template:
-        raise HTTPException(404, f"Template not found: {body.template_id}")
+        raise HTTPException(404, f"Template not found: {template_id}")
     question_plan = template.get("question_plan", [])
     account_refs = template.get("default_account_refs", ["Revenue", "COGS", "OpEx", "EBITDA"])
     system_text = _build_budget_initialization_prompt(
         template.get("label", ""),
-        body.fiscal_year,
+        fiscal_year,
         question_plan,
-        body.answers,
-        body.prior_year_actuals,
-        body.num_periods,
+        answers,
+        prior_year_actuals,
+        num_periods,
         account_refs,
     )
     messages = [{"role": "user", "content": "Generate initial budget line items with monthly amounts and confidence scores."}]
     try:
         response = await llm.complete_with_routing(
-            x_tenant_id,
+            tenant_id,
             [{"role": "system", "content": system_text}, *messages],
             BUDGET_INITIALIZATION_SCHEMA,
             "budget_initialization",
@@ -254,27 +256,27 @@ async def create_budget_from_template(
     line_items_payload = content.get("line_items") or []
     budget_id = _budget_id()
     version_id = _version_id()
-    async with tenant_conn(x_tenant_id) as conn:
+    async with tenant_conn(tenant_id) as conn:
         async with conn.transaction():
             await conn.execute(
                 """INSERT INTO budgets (tenant_id, budget_id, label, fiscal_year, status, created_by)
                    VALUES ($1, $2, $3, $4, 'draft', $5)""",
-                x_tenant_id,
+                tenant_id,
                 budget_id,
-                body.label,
-                body.fiscal_year,
-                x_user_id or None,
+                label,
+                fiscal_year,
+                user_id or None,
             )
             await ensure_budget_version(
-                conn, x_tenant_id, budget_id, version_id, 1, x_user_id or None
+                conn, tenant_id, budget_id, version_id, 1, user_id or None
             )
             # Derive year from fiscal_year (e.g. FY2026 -> 2026)
-            fy_str = body.fiscal_year.replace("FY", "").strip()
+            fy_str = fiscal_year.replace("FY", "").strip()
             try:
                 year = int(fy_str) if len(fy_str) == 4 else 2000 + int(fy_str[-2:]) if len(fy_str) >= 2 else 2026
             except ValueError:
                 year = 2026
-            for ord in range(1, body.num_periods + 1):
+            for ord in range(1, num_periods + 1):
                 month = ((ord - 1) % 12) + 1
                 year_offset = (ord - 1) // 12
                 period_year = year + year_offset
@@ -286,7 +288,7 @@ async def create_budget_from_template(
                     """INSERT INTO budget_periods (tenant_id, budget_id, period_id, period_ordinal, period_start, period_end, label)
                        VALUES ($1, $2, $3, $4, $5::date, $6::date, $7)
                        ON CONFLICT (tenant_id, budget_id, period_ordinal) DO NOTHING""",
-                    x_tenant_id,
+                    tenant_id,
                     budget_id,
                     period_id,
                     ord,
@@ -303,7 +305,7 @@ async def create_budget_from_template(
                 await conn.execute(
                     """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, confidence_score)
                        VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-                    x_tenant_id,
+                    tenant_id,
                     line_item_id,
                     budget_id,
                     version_id,
@@ -316,7 +318,7 @@ async def create_budget_from_template(
                         """INSERT INTO budget_line_item_amounts (tenant_id, line_item_id, period_ordinal, amount)
                            VALUES ($1, $2, $3, $4)
                            ON CONFLICT (tenant_id, line_item_id, period_ordinal) DO UPDATE SET amount = $4""",
-                        x_tenant_id,
+                        tenant_id,
                         line_item_id,
                         amt.get("period_ordinal", 0),
                         amt.get("amount", 0),
@@ -330,12 +332,35 @@ async def create_budget_from_template(
                 })
     return {
         "budget_id": budget_id,
-        "label": body.label,
-        "fiscal_year": body.fiscal_year,
+        "label": label,
+        "fiscal_year": fiscal_year,
         "status": "draft",
         "current_version_id": version_id,
         "line_items": created_lines,
     }
+
+
+@router.post("/from-template", status_code=201)
+async def create_budget_from_template(
+    body: CreateBudgetFromTemplateBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+    llm: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """Create a budget from a template; LLM proposes initial line-item amounts with confidence (VA-P7-03)."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    return await create_budget_from_template_impl(
+        tenant_id=x_tenant_id,
+        user_id=x_user_id or None,
+        template_id=body.template_id,
+        label=body.label,
+        fiscal_year=body.fiscal_year,
+        answers=body.answers,
+        prior_year_actuals=body.prior_year_actuals,
+        num_periods=body.num_periods,
+        llm=llm,
+    )
 
 
 @router.get("/dashboard")
@@ -438,6 +463,118 @@ async def get_budget_dashboard(
                 "alerts": alerts,
             })
     return {"widgets": widgets, "cfo_view": not budget_id}
+
+
+# --- VA-P8-10: Natural language budget queries ---
+
+NL_QUERY_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "answer": {"type": "string", "description": "Factual answer based only on the provided budget data; say if not determinable"},
+        "citations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source": {"type": "string", "description": "e.g. dashboard, budget_variance"},
+                    "budget_id": {"type": "string"},
+                    "detail": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["answer"],
+    "additionalProperties": False,
+}
+
+
+class NLQueryBody(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    budget_id: str | None = Field(default=None, description="Optional: scope to one budget")
+
+
+@router.post("/nl-query")
+async def natural_language_budget_query(
+    body: NLQueryBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    llm: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """Natural language budget query (VA-P8-10). Returns factual answer from dashboard/variance data; optional citations."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    # Fetch dashboard data to build context (reuse same queries as dashboard)
+    async with tenant_conn(x_tenant_id) as conn:
+        if body.budget_id:
+            rows = await conn.fetch(
+                "SELECT budget_id, label, status, current_version_id FROM budgets WHERE tenant_id = $1 AND budget_id = $2",
+                x_tenant_id,
+                body.budget_id,
+            )
+            if not rows:
+                raise HTTPException(404, "Budget not found")
+        else:
+            rows = await conn.fetch(
+                "SELECT budget_id, label, status, current_version_id FROM budgets WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 20",
+                x_tenant_id,
+            )
+        context_parts: list[str] = []
+        for b in rows:
+            bid = b["budget_id"]
+            label = b["label"]
+            vid = b["current_version_id"]
+            if not vid:
+                context_parts.append(f"Budget '{label}' ({bid}): no version yet.")
+                continue
+            total_budget = await conn.fetchval(
+                """SELECT COALESCE(SUM(blia.amount), 0) FROM budget_line_items bli
+                   JOIN budget_line_item_amounts blia ON blia.tenant_id = bli.tenant_id AND blia.line_item_id = bli.line_item_id
+                   WHERE bli.tenant_id = $1 AND bli.budget_id = $2 AND bli.version_id = $3""",
+                x_tenant_id, bid, vid,
+            )
+            total_budget = float(total_budget or 0)
+            actual_rows = await conn.fetch(
+                """SELECT period_ordinal, COALESCE(SUM(amount), 0) AS total FROM budget_actuals
+                   WHERE tenant_id = $1 AND budget_id = $2 GROUP BY period_ordinal""",
+                x_tenant_id, bid,
+            )
+            total_actual = sum(float(r["total"]) for r in actual_rows)
+            utilisation_pct = round((total_actual / total_budget * 100.0), 2) if total_budget else None
+            dept_rows = await conn.fetch(
+                """SELECT department_ref, SUM(amount) AS total FROM budget_actuals
+                   WHERE tenant_id = $1 AND budget_id = $2 GROUP BY department_ref ORDER BY total DESC""",
+                x_tenant_id, bid,
+            )
+            dept_str = "; ".join(f"{r['department_ref'] or '(none)'}: {float(r['total']):,.0f}" for r in dept_rows[:15])
+            context_parts.append(
+                f"Budget '{label}' (id={bid}): total_budget={total_budget:,.0f}, total_actual={total_actual:,.0f}, "
+                f"utilisation_pct={utilisation_pct}%; departments (actuals): {dept_str or 'none'}"
+            )
+        context_text = "\n".join(context_parts) if context_parts else "No budget data available."
+    prompt = (
+        "Answer the user's question using ONLY the following budget data. "
+        "Do not invent or assume any numbers. If the answer cannot be determined from the data, say so clearly. "
+        "Keep the answer concise (1-3 sentences).\n\nData:\n" + context_text + "\n\nQuestion: " + body.question
+    )
+    try:
+        response = await llm.complete_with_routing(
+            x_tenant_id,
+            [{"role": "user", "content": prompt}],
+            NL_QUERY_RESPONSE_SCHEMA,
+            "budget_nl_query",
+            max_tokens=512,
+            temperature=0.1,
+        )
+    except LLMError as e:
+        raise HTTPException(
+            503 if e.code == "ERR_LLM_ALL_PROVIDERS_FAILED" else 429,
+            detail=e.message,
+        ) from e
+    content = response.content or {}
+    return {
+        "answer": content.get("answer", "No answer generated."),
+        "citations": content.get("citations") or [],
+    }
 
 
 @router.get("/{budget_id}")

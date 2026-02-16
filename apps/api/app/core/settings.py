@@ -50,6 +50,8 @@ class Settings(BaseSettings):
 
     xero_client_id: str | None = Field(default=None, alias="XERO_CLIENT_ID")
     xero_client_secret: str | None = Field(default=None, alias="XERO_CLIENT_SECRET")
+    quickbooks_client_id: str | None = Field(default=None, alias="QUICKBOOKS_CLIENT_ID")
+    quickbooks_client_secret: str | None = Field(default=None, alias="QUICKBOOKS_CLIENT_SECRET")
     integration_callback_base_url: str = Field(
         default="http://localhost:3000",
         alias="INTEGRATION_CALLBACK_BASE_URL",

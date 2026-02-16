@@ -8,8 +8,9 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Query
 
 from apps.api.app.db import tenant_conn
+from apps.api.app.deps import require_role, ROLES_CAN_WRITE
 
-router = APIRouter(prefix="/feedback", tags=["feedback"])
+router = APIRouter(prefix="/feedback", tags=["feedback"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 
 @router.get("")

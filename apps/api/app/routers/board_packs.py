@@ -1,7 +1,8 @@
-"""Board pack composer API (VA-P7-07): create, list, get, generate narrative from run/budget data."""
+"""Board pack composer API (VA-P7-07): create, list, get, generate narrative from run/budget data. VA-P8-01: currency toggle on export."""
 
 from __future__ import annotations
 
+import copy
 import json
 import uuid
 from typing import Any
@@ -12,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
 from apps.api.app.db.budgets import get_budget
-from apps.api.app.deps import get_artifact_store, get_llm_router
+from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.services.board_pack_export import (
     build_board_pack_html,
     build_board_pack_pptx,
@@ -22,7 +23,7 @@ from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.errors import LLMError, StorageError
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/board-packs", tags=["board-packs"])
+router = APIRouter(prefix="/board-packs", tags=["board-packs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 DEFAULT_SECTION_ORDER = [
     "executive_summary",
@@ -398,14 +399,39 @@ async def patch_board_pack(
 MAX_EXPORT_BYTES = 10 * 1024 * 1024  # 10MB VA-P7-08
 
 
+# R11-05: Skip non-monetary keys so period_index, count, confidence_score, etc. are not scaled
+_NON_MONETARY_KEYS = frozenset({
+    "period_index", "period_ordinal", "period_number", "count", "sample_count",
+    "n_periods", "num_periods", "confidence", "confidence_score",
+    "variance_pct", "variance_percent", "utilisation_pct", "pct",
+    "p25", "p75",
+    "id", "version",
+})
+
+
+def _scale_numerics(obj: Any, rate: float, _key: str | None = None) -> Any:
+    """Recursively multiply monetary numeric values by rate (VA-P8-01). Skips known non-monetary keys."""
+    if _key and _key.lower() in _NON_MONETARY_KEYS:
+        return obj
+    if isinstance(obj, (int, float)):
+        return obj * rate
+    if isinstance(obj, dict):
+        return {k: _scale_numerics(v, rate, _key=k) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_scale_numerics(v, rate, _key=_key) for v in obj]
+    return obj
+
+
 @router.get("/{pack_id}/export")
 async def export_board_pack(
     pack_id: str,
     export_format: str = Query("html", alias="format", description="html, pdf, or pptx"),
+    currency: str | None = Query(None, description="Optional: display amounts in this currency (VA-P8-01); uses tenant FX rates"),
+    benchmark: bool = Query(False, description="Include industry benchmark section (VA-P8-09)"),
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
 ) -> Response:
-    """Export board pack as HTML, PDF, or PPTX (VA-P7-08). Cover, ToC, sections, branding; max 10MB."""
+    """Export board pack as HTML, PDF, or PPTX (VA-P7-08). Optional currency (VA-P8-01), benchmark section (VA-P8-09)."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     if export_format not in ("html", "pdf", "pptx"):
@@ -444,16 +470,63 @@ async def export_board_pack(
     if row["budget_id"]:
         budget_summary = await _fetch_budget_variance_summary(x_tenant_id, row["budget_id"])
 
+    display_currency: str | None = None
+    if currency:
+        async with tenant_conn(x_tenant_id) as conn:
+            settings_row = await conn.fetchrow(
+                "SELECT base_currency FROM tenant_currency_settings WHERE tenant_id = $1",
+                x_tenant_id,
+            )
+            base = (settings_row["base_currency"] if settings_row else "USD") or "USD"
+        if base != currency:
+            async with tenant_conn(x_tenant_id) as conn:
+                rate_row = await conn.fetchrow(
+                    """SELECT rate FROM fx_rates
+                       WHERE tenant_id = $1 AND from_currency = $2 AND to_currency = $3
+                       ORDER BY effective_date DESC LIMIT 1""",
+                    x_tenant_id,
+                    base,
+                    currency,
+                )
+            if not rate_row:
+                raise HTTPException(404, f"No FX rate for {base} -> {currency}; add rate in /api/v1/currency/rates")
+            rate = float(rate_row["rate"])
+            statements = _scale_numerics(copy.deepcopy(statements), rate)
+            kpis = _scale_numerics(copy.deepcopy(kpis), rate)
+        display_currency = currency
+
+    benchmark_metrics: list[dict[str, Any]] = []
+    so_with_bench = list(so) if so else list(DEFAULT_SECTION_ORDER)
+    if benchmark:
+        async with tenant_conn(x_tenant_id) as conn_b:
+            opt = await conn_b.fetchrow(
+                "SELECT industry_segment, size_segment FROM tenant_benchmark_opt_in WHERE tenant_id = $1",
+                x_tenant_id,
+            )
+            seg = f"{opt['industry_segment']}|{opt['size_segment']}" if opt else "general|general"
+            rows_b = await conn_b.fetch(
+                "SELECT metric_name, median_value, p25_value, p75_value, sample_count FROM benchmark_aggregates WHERE segment_key = $1 ORDER BY metric_name LIMIT 20",
+                seg,
+            )
+            benchmark_metrics = [
+                {"metric_name": r["metric_name"], "median": float(r["median_value"]), "p25": float(r["p25_value"]) if r["p25_value"] is not None else None, "p75": float(r["p75_value"]) if r["p75_value"] is not None else None, "sample_count": r["sample_count"]}
+                for r in rows_b
+            ]
+    if benchmark_metrics and "benchmark" not in so_with_bench:
+        so_with_bench.append("benchmark")
+
     if export_format == "html":
         html = build_board_pack_html(
             label=row["label"],
-            section_order=so,
+            section_order=so_with_bench,
             narrative=nar,
             statements=statements,
             kpis=kpis,
             budget_summary=budget_summary,
             branding=br,
             run_id=run_id,
+            display_currency=display_currency,
+            benchmark_metrics=benchmark_metrics if benchmark_metrics else None,
         )
         if len(html.encode("utf-8")) > MAX_EXPORT_BYTES:
             raise HTTPException(413, "Export exceeds 10MB limit")
@@ -461,13 +534,15 @@ async def export_board_pack(
     if export_format == "pdf":
         html = build_board_pack_html(
             label=row["label"],
-            section_order=so,
+            section_order=so_with_bench,
             narrative=nar,
             statements=statements,
             kpis=kpis,
             budget_summary=budget_summary,
             branding=br,
             run_id=run_id,
+            display_currency=display_currency,
+            benchmark_metrics=benchmark_metrics if benchmark_metrics else None,
         )
         try:
             pdf_bytes = html_to_pdf(html)
@@ -484,12 +559,14 @@ async def export_board_pack(
     try:
         pptx_bytes = build_board_pack_pptx(
             label=row["label"],
-            section_order=so,
+            section_order=so_with_bench,
             narrative=nar,
             statements=statements,
             kpis=kpis,
             budget_summary=budget_summary,
             run_id=run_id,
+            display_currency=display_currency,
+            benchmark_metrics=benchmark_metrics if benchmark_metrics else None,
         )
     except RuntimeError as e:
         raise HTTPException(501, str(e)) from e

@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
+  const token = searchParams.get("token");
   const next = searchParams.get("next") ?? "/baselines";
 
   // Validate `next` is a safe relative path
@@ -12,6 +13,29 @@ export async function GET(request: NextRequest) {
     next && next.startsWith("/") && !next.startsWith("//")
       ? next
       : "/baselines";
+
+  // R11-07: SAML SSO flow — token is a JWT issued by the API
+  if (token) {
+    const tenantId = searchParams.get("tenant_id") ?? "";
+    const response = NextResponse.redirect(new URL(safeNext, origin));
+    response.cookies.set("va-saml-token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 3600,
+      path: "/",
+    });
+    if (tenantId) {
+      response.cookies.set("va-tenant-id", tenantId, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 3600,
+        path: "/",
+      });
+    }
+    return response;
+  }
 
   if (code) {
     const cookieStore = await cookies();

@@ -31,18 +31,22 @@ Generated from `VIRTUAL_ANALYST_BACKLOG.md`. Items marked **— DONE** in the ma
 
 ---
 
-## Post-Launch (v1.1+)
+## Phase 8 — Initial Release (v1.1 features)
 
-- Multi-currency and FX overlays  
-- SSO/SAML (enterprise)  
-- Template marketplace  
-- Connector marketplace and QuickBooks adapter  
-- Cross-team workflow routing (multi-team approval chains)  
-- Workflow analytics dashboard (cycle times, review rates, bottlenecks)  
-- AI-assisted review suggestions (flag unusual assumptions)  
-- Peer comparison (anonymous benchmarking)  
-- Board pack benchmarking (industry median)  
-- Natural language budget queries (e.g. "which department is over budget?")
+**All Phase 8 items complete (VA-P8-01–VA-P8-10).**
+
+| ID | Task | Complexity | Status |
+|----|------|-------------|--------|
+| VA-P8-01 | Multi-currency and FX overlays | L | Done |
+| VA-P8-02 | SSO/SAML (enterprise) | L | Done |
+| VA-P8-03 | Template marketplace | M | Done |
+| VA-P8-04 | Connector marketplace and QuickBooks adapter | L | Done |
+| VA-P8-05 | Cross-team workflow routing (multi-team approval chains) | L | Done |
+| VA-P8-06 | Workflow analytics dashboard (cycle times, bottlenecks) | M | Done |
+| VA-P8-07 | AI-assisted review suggestions | M | Done |
+| VA-P8-08 | Peer comparison (anonymous benchmarking) | L | Done |
+| VA-P8-09 | Board pack benchmarking (industry median) | L | Done |
+| VA-P8-10 | Natural language budget queries | L | Done |
 
 ---
 
@@ -53,5 +57,5 @@ Generated from `VIRTUAL_ANALYST_BACKLOG.md`. Items marked **— DONE** in the ma
 | P5 | 0 |
 | P6 | 0 |
 | P7 | 0 |
-| Post-launch | 10 themes |
+| P8 (initial release) | 0 |
 | **Total (numbered)** | **0** |

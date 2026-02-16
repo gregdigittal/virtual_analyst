@@ -1,8 +1,11 @@
-"""Application dependencies: artifact store, LLM router, billing, etc."""
+"""Application dependencies: artifact store, LLM router, billing, role checks, etc."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+
+from fastapi import Depends, Request
+from fastapi.exceptions import HTTPException
 
 from apps.api.app.core.settings import get_settings
 from apps.api.app.services.llm.router import LLMRouter
@@ -10,6 +13,36 @@ from shared.fm_shared.storage import ArtifactStore
 
 if TYPE_CHECKING:
     from apps.api.app.services.billing import BillingService
+
+# Role hierarchy per AUTH_AND_TENANCY: owner, admin, analyst, investor
+ROLE_OWNER = "owner"
+ROLE_ADMIN = "admin"
+ROLE_ANALYST = "analyst"
+ROLE_INVESTOR = "investor"
+
+# Convenience role sets for require_role()
+ROLES_OWNER_ONLY = (ROLE_OWNER,)
+ROLES_OWNER_OR_ADMIN = (ROLE_OWNER, ROLE_ADMIN)
+ROLES_CAN_WRITE = (ROLE_OWNER, ROLE_ADMIN, ROLE_ANALYST)  # analyst+ (no investor)
+ROLES_ANY = (ROLE_OWNER, ROLE_ADMIN, ROLE_ANALYST, ROLE_INVESTOR)
+
+
+def require_role(*allowed_roles: str):
+    """FastAPI dependency: raise 403 if request.state.role is not in allowed_roles.
+    When SUPABASE_JWT_SECRET is unset (dev), missing role is treated as analyst for backward compat.
+    """
+
+    def _check(request: Request) -> None:
+        role = getattr(request.state, "role", None)
+        if role is None and not get_settings().supabase_jwt_secret:
+            role = ROLE_ANALYST
+        if role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions",
+            )
+
+    return Depends(_check)
 
 _llm_router: LLMRouter | None = None
 _billing_service: Any = None

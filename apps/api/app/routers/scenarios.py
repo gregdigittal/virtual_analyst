@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import EVENT_SCENARIO_CREATED, EVENT_SCENARIO_DELETED, create_audit_event
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_ANY, ROLES_CAN_WRITE
 from shared.fm_shared.errors import StorageError
 from shared.fm_shared.model import ModelConfig, calculate_kpis, generate_statements, run_engine
 from shared.fm_shared.model.schemas import ScenarioOverride
@@ -37,6 +37,7 @@ async def create_scenario(
     body: CreateScenarioBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """Create a scenario for a baseline with overrides (ref, field, value)."""
     baseline_id = body.baseline_id
@@ -109,6 +110,7 @@ async def list_scenarios(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -161,6 +163,7 @@ def _parse_overrides_json(val: Any) -> list[dict]:
 async def get_scenario(
     scenario_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -190,6 +193,7 @@ async def delete_scenario(
     scenario_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -209,6 +213,7 @@ async def compare_scenarios(
     body: dict[str, Any],
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     """Run baseline + each scenario and return side-by-side KPIs (e.g. terminal revenue, FCF)."""
     baseline_id = body.get("baseline_id")

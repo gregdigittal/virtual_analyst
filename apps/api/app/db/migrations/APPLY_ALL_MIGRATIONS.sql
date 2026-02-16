@@ -1,5 +1,5 @@
 -- =============================================================================
--- Virtual Analyst — APPLY ALL MIGRATIONS (0008 through 0035)
+-- Virtual Analyst — APPLY ALL MIGRATIONS (0008 through 0040)
 -- =============================================================================
 -- Run this single script against your database to apply all pending migrations.
 -- Prerequisites: 0001_init.sql and 0002_functions_and_rls.sql must already be applied.
@@ -1424,3 +1424,165 @@ create policy "pack_generation_history_select" on pack_generation_history for se
 create policy "pack_generation_history_insert" on pack_generation_history for insert with check (tenant_id = current_tenant_id());
 create policy "pack_generation_history_update" on pack_generation_history for update using (tenant_id = current_tenant_id());
 create policy "pack_generation_history_delete" on pack_generation_history for delete using (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0036_multi_currency_fx.sql (VA-P8-01)
+-- ############################################################################
+create table if not exists tenant_currency_settings (
+  tenant_id text not null references tenants(id) on delete cascade,
+  base_currency text not null default 'USD',
+  reporting_currency text not null default 'USD',
+  fx_source text not null default 'manual' check (fx_source in ('manual', 'feed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (tenant_id)
+);
+create index if not exists idx_tenant_currency_settings_tenant on tenant_currency_settings(tenant_id);
+
+create table if not exists fx_rates (
+  tenant_id text not null references tenants(id) on delete cascade,
+  from_currency text not null,
+  to_currency text not null,
+  effective_date date not null,
+  rate numeric not null check (rate > 0),
+  created_at timestamptz not null default now(),
+  created_by text references users(id) on delete set null,
+  primary key (tenant_id, from_currency, to_currency, effective_date)
+);
+create index if not exists idx_fx_rates_tenant_date on fx_rates(tenant_id, effective_date);
+
+alter table tenant_currency_settings enable row level security;
+drop policy if exists "tenant_currency_settings_select" on tenant_currency_settings;
+drop policy if exists "tenant_currency_settings_insert" on tenant_currency_settings;
+drop policy if exists "tenant_currency_settings_update" on tenant_currency_settings;
+drop policy if exists "tenant_currency_settings_delete" on tenant_currency_settings;
+create policy "tenant_currency_settings_select" on tenant_currency_settings for select using (tenant_id = current_tenant_id());
+create policy "tenant_currency_settings_insert" on tenant_currency_settings for insert with check (tenant_id = current_tenant_id());
+create policy "tenant_currency_settings_update" on tenant_currency_settings for update using (tenant_id = current_tenant_id());
+create policy "tenant_currency_settings_delete" on tenant_currency_settings for delete using (tenant_id = current_tenant_id());
+
+alter table fx_rates enable row level security;
+drop policy if exists "fx_rates_select" on fx_rates;
+drop policy if exists "fx_rates_insert" on fx_rates;
+drop policy if exists "fx_rates_update" on fx_rates;
+drop policy if exists "fx_rates_delete" on fx_rates;
+create policy "fx_rates_select" on fx_rates for select using (tenant_id = current_tenant_id());
+create policy "fx_rates_insert" on fx_rates for insert with check (tenant_id = current_tenant_id());
+create policy "fx_rates_update" on fx_rates for update using (tenant_id = current_tenant_id());
+create policy "fx_rates_delete" on fx_rates for delete using (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0037_marketplace_templates.sql (VA-P8-03)
+-- ############################################################################
+create table if not exists marketplace_templates (
+  template_id text primary key,
+  name text not null,
+  industry text not null default '',
+  template_type text not null check (template_type in ('budget', 'model')),
+  description text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_marketplace_templates_industry on marketplace_templates(industry);
+create index if not exists idx_marketplace_templates_type on marketplace_templates(template_type);
+insert into marketplace_templates (template_id, name, industry, template_type, description)
+values
+  ('manufacturing', 'Manufacturing', 'manufacturing', 'budget', 'Budget template for manufacturing: headcount, capacity, capex, revenue growth'),
+  ('saas', 'SaaS', 'software', 'budget', 'Budget template for SaaS: ARR/MRR, headcount, infrastructure'),
+  ('services', 'Services', 'services', 'budget', 'Budget template for professional services: billable headcount, utilization'),
+  ('wholesale', 'Wholesale', 'wholesale', 'budget', 'Budget template for wholesale: inventory, margin, seasonality')
+on conflict (template_id) do nothing;
+
+-- ############################################################################
+-- 0038_workflow_events.sql (VA-P8-06)
+-- ############################################################################
+create table if not exists workflow_events (
+  tenant_id text not null references tenants(id) on delete cascade,
+  instance_id text not null,
+  stage_index integer not null,
+  entered_at timestamptz not null,
+  exited_at timestamptz,
+  outcome text check (outcome is null or outcome in ('submitted', 'approved', 'returned', 'completed')),
+  primary key (tenant_id, instance_id, stage_index, entered_at),
+  foreign key (tenant_id, instance_id) references workflow_instances(tenant_id, instance_id) on delete cascade
+);
+create index if not exists idx_workflow_events_tenant_entered on workflow_events(tenant_id, entered_at);
+alter table workflow_events enable row level security;
+drop policy if exists "workflow_events_select" on workflow_events;
+drop policy if exists "workflow_events_insert" on workflow_events;
+drop policy if exists "workflow_events_update" on workflow_events;
+drop policy if exists "workflow_events_delete" on workflow_events;
+create policy "workflow_events_select" on workflow_events for select using (tenant_id = current_tenant_id());
+create policy "workflow_events_insert" on workflow_events for insert with check (tenant_id = current_tenant_id());
+create policy "workflow_events_update" on workflow_events for update using (tenant_id = current_tenant_id());
+create policy "workflow_events_delete" on workflow_events for delete using (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0039_tenant_saml_config.sql (VA-P8-02)
+-- ############################################################################
+create table if not exists tenant_saml_config (
+  tenant_id text not null references tenants(id) on delete cascade,
+  idp_metadata_url text,
+  idp_metadata_xml text,
+  entity_id text not null,
+  acs_url text not null,
+  idp_sso_url text,
+  attribute_mapping_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (tenant_id),
+  constraint chk_saml_config check (idp_metadata_url is not null or idp_metadata_xml is not null or idp_sso_url is not null)
+);
+create index if not exists idx_tenant_saml_config_entity on tenant_saml_config(entity_id);
+alter table tenant_saml_config enable row level security;
+drop policy if exists "tenant_saml_config_select" on tenant_saml_config;
+drop policy if exists "tenant_saml_config_insert" on tenant_saml_config;
+drop policy if exists "tenant_saml_config_update" on tenant_saml_config;
+drop policy if exists "tenant_saml_config_delete" on tenant_saml_config;
+create policy "tenant_saml_config_select" on tenant_saml_config for select using (tenant_id = current_tenant_id());
+create policy "tenant_saml_config_insert" on tenant_saml_config for insert with check (tenant_id = current_tenant_id());
+create policy "tenant_saml_config_update" on tenant_saml_config for update using (tenant_id = current_tenant_id());
+create policy "tenant_saml_config_delete" on tenant_saml_config for delete using (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0040_peer_benchmark.sql (VA-P8-08, VA-P8-09)
+-- ############################################################################
+create table if not exists tenant_benchmark_opt_in (
+  tenant_id text not null references tenants(id) on delete cascade,
+  industry_segment text not null default 'general',
+  size_segment text not null default 'general',
+  opted_in_at timestamptz not null default now(),
+  primary key (tenant_id)
+);
+create table if not exists benchmark_aggregates (
+  id text primary key default ('bag_' || substr(md5(random()::text), 1, 12)),
+  segment_key text not null,
+  metric_name text not null,
+  median_value numeric not null,
+  p25_value numeric,
+  p75_value numeric,
+  sample_count integer not null default 0,
+  computed_at timestamptz not null default now(),
+  unique (segment_key, metric_name)
+);
+create index if not exists idx_benchmark_aggregates_segment on benchmark_aggregates(segment_key, metric_name);
+alter table tenant_benchmark_opt_in enable row level security;
+drop policy if exists "tenant_benchmark_opt_in_select" on tenant_benchmark_opt_in;
+drop policy if exists "tenant_benchmark_opt_in_insert" on tenant_benchmark_opt_in;
+drop policy if exists "tenant_benchmark_opt_in_update" on tenant_benchmark_opt_in;
+drop policy if exists "tenant_benchmark_opt_in_delete" on tenant_benchmark_opt_in;
+create policy "tenant_benchmark_opt_in_select" on tenant_benchmark_opt_in for select using (tenant_id = current_tenant_id());
+create policy "tenant_benchmark_opt_in_insert" on tenant_benchmark_opt_in for insert with check (tenant_id = current_tenant_id());
+create policy "tenant_benchmark_opt_in_update" on tenant_benchmark_opt_in for update using (tenant_id = current_tenant_id());
+create policy "tenant_benchmark_opt_in_delete" on tenant_benchmark_opt_in for delete using (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0041_saml_lookup_function.sql (R11-10)
+-- ############################################################################
+create or replace function lookup_saml_tenant_by_entity_id(p_entity_id text)
+returns text
+language sql security definer stable as $$
+  select tenant_id from tenant_saml_config where entity_id = p_entity_id limit 1;
+$$;
+comment on function lookup_saml_tenant_by_entity_id(text) is 'Used by SAML ACS to resolve tenant from IdP Issuer entity_id; SECURITY DEFINER bypasses RLS';
+
+create unique index if not exists uq_tenant_saml_config_entity_id on tenant_saml_config(entity_id);

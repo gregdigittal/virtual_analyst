@@ -9,14 +9,14 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from apps.api.app.db import ensure_tenant, tenant_conn
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_CAN_WRITE
 from apps.api.app.routers.drafts import _set_by_path
 from shared.fm_shared.errors import StorageError
 from shared.fm_shared.model import run_engine
 from shared.fm_shared.model.schemas import ModelConfig
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/changesets", tags=["changesets"])
+router = APIRouter(prefix="/changesets", tags=["changesets"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 CHANGESET_OVERRIDES_TYPE = "changeset_overrides"
 STATUS_DRAFT = "draft"

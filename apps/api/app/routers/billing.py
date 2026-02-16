@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import ensure_tenant, tenant_conn
-from apps.api.app.deps import get_billing_service
+from apps.api.app.deps import get_billing_service, require_role, ROLES_OWNER_ONLY, ROLES_OWNER_OR_ADMIN
 from apps.api.app.services.billing import BillingService
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -32,6 +32,7 @@ async def list_plans(
 async def get_subscription(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     billing: BillingService = Depends(get_billing_service),
+    _: None = Depends(require_role(*ROLES_OWNER_OR_ADMIN)),
 ) -> dict[str, Any]:
     """Current tenant subscription; ensures default if none."""
     if not x_tenant_id:
@@ -47,6 +48,7 @@ async def create_or_update_subscription(
     body: CreateSubscriptionBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     billing: BillingService = Depends(get_billing_service),
+    _: None = Depends(require_role(*ROLES_OWNER_ONLY)),
 ) -> dict[str, Any]:
     """Create subscription if none, or update to new plan."""
     if not x_tenant_id:
@@ -67,6 +69,7 @@ async def create_or_update_subscription(
 async def cancel_subscription(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     billing: BillingService = Depends(get_billing_service),
+    _: None = Depends(require_role(*ROLES_OWNER_ONLY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -81,6 +84,7 @@ async def get_usage(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     period: str | None = None,
     billing: BillingService = Depends(get_billing_service),
+    _: None = Depends(require_role(*ROLES_OWNER_OR_ADMIN)),
 ) -> dict[str, Any]:
     """Current period usage and costs. period=YYYY-MM optional."""
     if not x_tenant_id:

@@ -11,12 +11,12 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_CAN_WRITE
 from apps.api.app.services.memo_service import MEMO_TYPES, generate_memo_html, html_to_pdf
 from shared.fm_shared.errors import StorageError
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/memos", tags=["memos"])
+router = APIRouter(prefix="/memos", tags=["memos"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 MEMO_ARTIFACT_TYPE = "memo_pack"
 

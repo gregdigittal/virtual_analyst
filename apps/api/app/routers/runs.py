@@ -14,7 +14,7 @@ from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import EVENT_RUN_ACCESSED, EVENT_RUN_CREATED, create_audit_event
 from apps.api.app.db.covenants import check_covenants, list_covenant_definitions
 from apps.api.app.db.notifications import create_notification
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_ANY, ROLES_CAN_WRITE
 from apps.worker.tasks import run_mc_execute
 from apps.worker.celery_app import REDIS_URL
 from shared.fm_shared.errors import EngineError, StorageError
@@ -77,6 +77,7 @@ async def create_run(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -317,6 +318,7 @@ async def list_runs(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     limit: int = Query(50, ge=1, le=100, description="Max 100 to avoid N+1 and large responses"),
     offset: int = Query(0, ge=0),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -348,6 +350,7 @@ async def get_run(
     run_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -398,6 +401,7 @@ async def get_run_statements(
     run_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -415,6 +419,7 @@ async def get_run_kpis(
     run_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> list[dict[str, Any]]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -432,6 +437,7 @@ async def get_run_mc(
     run_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     """Return Monte Carlo percentile results when mc_enabled run has completed."""
     if not x_tenant_id:
@@ -451,6 +457,7 @@ async def get_run_sensitivity(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
     pct: float = Query(0.10, ge=0.01, le=0.50, description="Vary drivers by ±pct (e.g. 0.10 = ±10%)"),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     """One-at-a-time sensitivity: vary each driver by ±pct, return impact on terminal FCF (tornado data)."""
     if not x_tenant_id:
@@ -522,6 +529,7 @@ async def get_run_valuation(
     run_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     """Return DCF + multiples valuation when run had valuation_config."""
     if not x_tenant_id:
@@ -540,6 +548,7 @@ async def export_run_excel(
     run_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> Response:
     """Export run statements and KPIs to Excel (IS, BS, CF, KPIs sheets). VA-P5-01."""
     if not x_tenant_id:

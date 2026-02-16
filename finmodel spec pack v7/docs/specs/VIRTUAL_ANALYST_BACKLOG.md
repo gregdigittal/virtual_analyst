@@ -508,14 +508,66 @@ r### VA-P3-02: Async MC execution (M) — DONE
 
 ---
 
-## Post-Launch Backlog (v1.1+)
-- Multi-currency and FX overlays
-- SSO/SAML
-- Template marketplace
-- Connector marketplace and QuickBooks adapter
-- Cross-team workflow routing (multi-team approval chains)
-- Workflow analytics dashboard (cycle times, review rates, bottleneck detection)
-- AI-assisted review suggestions (flag unusual assumptions for reviewer attention)
-- Peer comparison (anonymous benchmarking of model accuracy across team)
-- Board pack benchmarking (compare pack KPIs against industry median)
-- Natural language budget queries (CFO asks "which department is over budget?" via chat)
+## Phase 8 — Initial Release (v1.1 features)
+
+*Included in initial release. Tasks VA-P8-01–VA-P8-10.*
+
+### VA-P8-01: Multi-currency and FX overlays (L)
+- Support multiple reporting currencies; FX rate configuration per tenant/period
+- Model config or tenant settings: base currency, FX source (manual or feed)
+- Statements and KPIs optionally expressed in selected currency; conversion at configured rates
+- AC: Tenant can set base + reporting currency; run output and board pack support currency toggle; rates auditable
+
+### VA-P8-02: SSO/SAML (enterprise) (L)
+- Enterprise single sign-on: SAML 2.0 IdP integration
+- Config: IdP metadata URL or XML, entity ID, ACS URL, optional attribute mapping (tenant_id, email, name)
+- Auth middleware: validate SAML response, create or link user, set session; fallback to existing Supabase Auth when SAML not configured
+- AC: SAML login flow works; tenant_id/user mapped from attributes; non-SAML tenants unchanged
+
+### VA-P8-03: Template marketplace (M)
+- Curated list of model/budget templates available to tenants (read-only catalog)
+- API: list marketplace templates (industry, type), get template by id; optional “use template” creates baseline or budget from template
+- Admin or config-driven: templates stored in DB or artifact store with metadata (name, industry, description)
+- AC: Tenants can browse and apply marketplace templates; audit log records template use
+
+### VA-P8-04: Connector marketplace and QuickBooks adapter (L)
+- Connector registry: list available connectors (e.g. QuickBooks), connection config schema
+- QuickBooks adapter: OAuth flow, sync chart of accounts and (optionally) actuals into budget_actuals or run inputs
+- API: connect/disconnect connector, trigger sync, sync status/history
+- AC: Tenant can connect QuickBooks (or one connector); sync imports data into VA; errors surfaced and retryable
+
+### VA-P8-05: Cross-team workflow routing (multi-team approval chains) (L)
+- Workflow templates support multi-team stages: assignee_rule or stage config references “team” or “approval chain”
+- Resolution: resolve assignee(s) from team membership and optional reports_to chain across teams
+- API: create instance with template that has cross-team stages; assignments created for correct users
+- AC: Approval chain can span teams; assignees resolved; stage progression works
+
+### VA-P8-06: Workflow analytics dashboard (M)
+- Aggregated metrics: cycle time (created → completed), time per stage, review rate (approved vs returned), bottleneck detection (longest average stage)
+- API: GET /api/v1/workflows/analytics (tenant, optional template_id, date range); return cycle times, stage breakdown, top bottlenecks
+- Optional: store workflow_events (instance_id, stage_index, entered_at, exited_at, outcome) for accurate analytics
+- AC: Analytics endpoint returns cycle times and bottlenecks; data consistent with workflow instances
+
+### VA-P8-07: AI-assisted review suggestions (M)
+- When a review is submitted with “request_changes” or corrections, LLM suggests 1–5 brief “learning points” or improvement hints for the author
+- Reuse or extend review_summary / change_summaries flow; store suggestions in change_summaries or new field
+- task_label: e.g. review_learning_points; prompt: factual, based on corrections only
+- AC: Request-changes review triggers LLM suggestions; author sees suggestions (e.g. in assignment or activity feed)
+
+### VA-P8-08: Peer comparison (anonymous benchmarking) (L)
+- Anonymous benchmark: compare model accuracy or KPI outcomes across participating tenants (opt-in, no PII)
+- Data: aggregate metrics (e.g. variance from benchmark, forecast error) by segment (industry, size) without tenant identity
+- API: opt-in flag per tenant; GET benchmark summary (e.g. “your run vs peer median”); admin or job to compute aggregates
+- AC: Opt-in tenants see peer comparison; no tenant identification; aggregates computed correctly
+
+### VA-P8-09: Board pack benchmarking (industry median) (L)
+- For board pack KPIs, show comparison to industry or segment median (from peer data or external dataset)
+- Board pack export or dashboard: optional “benchmark” section with median + percentile (e.g. “Revenue growth: 12% vs peer median 8%”)
+- Data source: same anonymous peer aggregate as VA-P8-08 or static industry dataset
+- AC: Board pack or dashboard can include benchmark section; median/percentile sourced and labelled
+
+### VA-P8-10: Natural language budget queries (L)
+- CFO (or user) asks a question in natural language, e.g. “Which department is over budget?”
+- API: POST /api/v1/budgets/nl-query or /api/v1/query with { question, budget_id?, tenant context }; LLM + tool use or structured query over budget/dashboard data
+- Backend: assemble relevant facts (dashboard widgets, variance, department ranking), send to LLM with schema; return factual answer and optional source refs
+- AC: Query returns correct answer from tenant data; no hallucination; optional citations to budget/variance

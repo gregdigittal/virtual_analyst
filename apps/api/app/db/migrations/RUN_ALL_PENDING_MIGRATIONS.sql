@@ -1,5 +1,5 @@
 -- =============================================================================
--- Virtual Analyst — Pending migrations (0008 through 0028)
+-- Virtual Analyst — Pending migrations (0008 through 0040)
 -- Run in order against your database. Skip any you have already applied.
 -- Prerequisites: migrations 0001–0002 must already be applied (tenants, users,
 -- model_baselines, runs, etc.).

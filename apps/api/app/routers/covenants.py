@@ -11,8 +11,9 @@ from pydantic import BaseModel, Field
 from apps.api.app.db import tenant_conn
 from apps.api.app.db.audit import create_audit_event
 from apps.api.app.db.covenants import COVENANT_METRIC_REFS, list_covenant_definitions
+from apps.api.app.deps import require_role, ROLES_CAN_WRITE
 
-router = APIRouter(prefix="/covenants", tags=["covenants"])
+router = APIRouter(prefix="/covenants", tags=["covenants"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 OPERATORS = frozenset({"<", ">", "<=", ">="})
 

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile
 
 from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import EVENT_DRAFT_CREATED, create_audit_event
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_CAN_WRITE
 from apps.api.app.routers.drafts import (
     DRAFT_WORKSPACE_TYPE,
     STATUS_ACTIVE,
@@ -20,7 +20,7 @@ from apps.api.app.routers.drafts import (
 )
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/import", tags=["import"])
+router = APIRouter(prefix="/import", tags=["import"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 # Max CSV size 2MB
 MAX_CSV_BYTES = 2 * 1024 * 1024

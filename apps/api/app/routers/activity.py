@@ -8,8 +8,9 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Query
 
 from apps.api.app.db import tenant_conn
+from apps.api.app.deps import require_role, ROLES_ANY
 
-router = APIRouter(prefix="/activity", tags=["activity"])
+router = APIRouter(prefix="/activity", tags=["activity"], dependencies=[require_role(*ROLES_ANY)])
 
 
 @router.get("")

@@ -15,8 +15,9 @@ from apps.api.app.db.audit import (
     AUDIT_EVENT_CATALOG,
     list_audit_events,
 )
+from apps.api.app.deps import require_role, ROLES_OWNER_OR_ADMIN
 
-router = APIRouter(prefix="/audit", tags=["audit"])
+router = APIRouter(prefix="/audit", tags=["audit"], dependencies=[require_role(*ROLES_OWNER_OR_ADMIN)])
 
 
 @router.get("/events/catalog")

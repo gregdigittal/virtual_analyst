@@ -16,11 +16,11 @@ from apps.api.app.db.excel import (
     list_connections as db_list_connections,
     update_connection as db_update_connection,
 )
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_CAN_WRITE
 from shared.fm_shared.errors import StorageError
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/excel", tags=["excel"])
+router = APIRouter(prefix="/excel", tags=["excel"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 
 class CreateExcelConnectionBody(BaseModel):

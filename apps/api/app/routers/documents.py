@@ -11,11 +11,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_CAN_WRITE
 from shared.fm_shared.errors import StorageError
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/documents", tags=["documents"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 DOCUMENT_ARTIFACT_TYPE = "documents"
 ENTITY_TYPES = frozenset({"run", "draft_session", "memo_pack", "baseline", "scenario", "venture"})

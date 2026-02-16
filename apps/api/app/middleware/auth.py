@@ -15,11 +15,15 @@ except ImportError:
 
 logger = structlog.get_logger()
 
-# Paths that do not require or override tenant/user (health, metrics, public docs, cron)
+# Paths that do not require or override tenant/user (health, metrics, public docs, cron, SAML, Stripe webhook, public catalog)
 SKIP_AUTH_PATHS = (
     "/",
     "/api/v1/health",
     "/api/v1/assignments/cron/deadline-reminders",
+    "/api/v1/auth/saml/login",
+    "/api/v1/auth/saml/acs",
+    "/api/v1/billing/webhook",
+    "/api/v1/billing/plans",
     "/metrics",
     "/openapi.json",
     "/docs",
@@ -31,6 +35,9 @@ def _should_skip_auth(path: str) -> bool:
     if path in SKIP_AUTH_PATHS:
         return True
     if path.startswith("/api/v1/health") or path.startswith("/docs") or path.startswith("/redoc"):
+        return True
+    # Only skip auth for SAML login and ACS, NOT config (R11-03)
+    if path in ("/api/v1/auth/saml/login", "/api/v1/auth/saml/acs"):
         return True
     return False
 
@@ -73,7 +80,7 @@ async def auth_middleware(request: Request, call_next):
             token,
             settings.supabase_jwt_secret,
             algorithms=["HS256"],
-            audience="authenticated",
+            audience=["authenticated", "va-saml"],
             options={"verify_exp": True},
         )
     except Exception as e:
@@ -106,5 +113,20 @@ async def auth_middleware(request: Request, call_next):
     headers.append((b"x-tenant-id", tenant_id.encode("utf-8")))
     headers.append((b"x-user-id", user_id.encode("utf-8")))
     request.scope["headers"] = headers
+
+    # Load role from users table for RBAC; fallback to analyst if no row (e.g. dev without sync)
+    try:
+        from apps.api.app.db.connection import tenant_conn
+
+        async with tenant_conn(tenant_id) as conn:
+            row = await conn.fetchrow(
+                "SELECT role FROM users WHERE id = $1 AND tenant_id = $2",
+                user_id,
+                tenant_id,
+            )
+        request.state.role = row["role"] if row else "analyst"
+    except Exception as e:
+        logger.warning("auth_role_lookup_failed", user_id=user_id, error=str(e))
+        request.state.role = "analyst"
 
     return await call_next(request)

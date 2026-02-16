@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import get_artifact_store, get_llm_router
+from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.routers.board_packs import (
     DEFAULT_SECTION_ORDER,
     create_board_pack_impl,
@@ -20,7 +20,7 @@ from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.errors import LLMError, StorageError
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/board-packs/schedules", tags=["board-packs"])
+router = APIRouter(prefix="/board-packs/schedules", tags=["board-packs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 
 class CreateScheduleBody(BaseModel):

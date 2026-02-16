@@ -14,7 +14,7 @@ from apps.api.app.db.audit import (
     EVENT_BASELINE_CREATED,
     create_audit_event,
 )
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_ANY, ROLES_CAN_WRITE
 from shared.fm_shared.errors import StorageError, ValidationError
 from shared.fm_shared.model.schemas import ModelConfig
 from shared.fm_shared.storage import ArtifactStore
@@ -33,6 +33,7 @@ async def create_baseline(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -88,6 +89,7 @@ async def list_baselines(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     limit: int = Query(50, ge=1, le=100, description="Max 100 to avoid N+1 and large responses"),
     offset: int = Query(0, ge=0),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -118,6 +120,7 @@ async def get_baseline(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
+    _: None = Depends(require_role(*ROLES_ANY)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -166,6 +169,7 @@ async def patch_baseline(
     baseline_id: str,
     body: PatchBaselineBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")

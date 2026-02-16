@@ -9,8 +9,9 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
+from apps.api.app.deps import require_role, ROLES_OWNER_OR_ADMIN
 
-router = APIRouter(prefix="/teams", tags=["teams"])
+router = APIRouter(prefix="/teams", tags=["teams"], dependencies=[require_role(*ROLES_OWNER_OR_ADMIN)])
 
 DEFAULT_JOB_FUNCTIONS = [
     ("jf_analyst", "Analyst"),

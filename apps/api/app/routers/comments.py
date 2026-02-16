@@ -11,8 +11,9 @@ from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
 from apps.api.app.db.notifications import create_notification
+from apps.api.app.deps import require_role, ROLES_CAN_WRITE
 
-router = APIRouter(prefix="/comments", tags=["comments"])
+router = APIRouter(prefix="/comments", tags=["comments"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 ENTITY_TYPES = frozenset({"run", "draft_session", "memo_pack", "baseline", "scenario", "venture", "assumption"})
 UUID_PATTERN = re.compile(

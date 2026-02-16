@@ -14,7 +14,7 @@ from apps.api.app.middleware.auth import auth_middleware
 from apps.api.app.middleware.logging import logging_middleware
 from apps.api.app.middleware.metrics import metrics_middleware
 from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
-from apps.api.app.routers import activity, assignments, audit, baselines, billing, board_pack_schedules, board_packs, budgets, changesets, comments, compliance, covenants, documents, drafts, excel, feedback, health, import_csv, integrations, jobs, memos, metrics_summary, notifications, runs, scenarios, teams, ventures, workflows
+from apps.api.app.routers import activity, assignments, audit, auth_saml, baselines, benchmark, billing, board_pack_schedules, board_packs, budgets, changesets, comments, compliance, connectors, covenants, currency, documents, drafts, excel, feedback, health, import_csv, integrations, jobs, marketplace, memos, metrics_summary, notifications, runs, scenarios, teams, ventures, workflows
 from shared.fm_shared.errors import FinModelError, get_http_status
 from shared.fm_shared.logging import configure_logging
 from shared.fm_shared.metrics import metrics_app
@@ -85,6 +85,8 @@ async def finmodel_error_handler(request: Request, exc: FinModelError) -> JSONRe
 
 
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(auth_saml.router, prefix="/api/v1")
+app.include_router(benchmark.router, prefix="/api/v1")
 app.include_router(metrics_summary.router, prefix="/api/v1")
 app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(drafts.router, prefix="/api/v1")
@@ -95,6 +97,7 @@ app.include_router(scenarios.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(ventures.router, prefix="/api/v1")
 app.include_router(integrations.router, prefix="/api/v1")
+app.include_router(connectors.router, prefix="/api/v1")
 app.include_router(billing.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(compliance.router, prefix="/api/v1")
@@ -109,6 +112,8 @@ app.include_router(teams.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(assignments.router, prefix="/api/v1")
 app.include_router(budgets.router, prefix="/api/v1")
+app.include_router(currency.router, prefix="/api/v1")
+app.include_router(marketplace.router, prefix="/api/v1")
 app.include_router(board_packs.router, prefix="/api/v1")
 app.include_router(board_pack_schedules.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")

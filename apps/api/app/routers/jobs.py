@@ -9,10 +9,11 @@ from celery.result import AsyncResult
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from apps.api.app.deps import require_role, ROLES_CAN_WRITE
 from apps.worker.celery_app import celery_app
 from apps.worker.tasks import add
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(prefix="/jobs", tags=["jobs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 TASK_REGISTRY: dict[str, Any] = {"add": add}
 

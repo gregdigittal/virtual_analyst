@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
 from apps.api.app.db.notifications import create_notification
-from apps.api.app.deps import get_llm_router
+from apps.api.app.deps import get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.services.llm.router import LLMRouter
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
@@ -56,6 +56,7 @@ async def create_assignment(
     body: CreateAssignmentBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """Create a task assignment (top-down: assigner assigns to assignee or pool)."""
     if not x_tenant_id:
@@ -117,6 +118,7 @@ async def list_assignments(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     x_user_id: str = Header("", alias="X-User-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """List task assignments. assignee_user_id=me uses X-User-ID."""
     if not x_tenant_id:
@@ -158,6 +160,7 @@ async def list_pool_assignments(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """List assignments with no assignee (pool: anyone can claim)."""
     if not x_tenant_id:
@@ -201,6 +204,7 @@ async def claim_assignment(
     assignment_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """Claim a pool assignment (assignee was null). Atomic UPDATE to avoid race."""
     if not x_tenant_id or not x_user_id:
@@ -252,6 +256,7 @@ async def submit_assignment(
     assignment_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """Submit assignment for review (assignee only)."""
     if not x_tenant_id or not x_user_id:
@@ -303,6 +308,7 @@ async def update_assignment(
     assignment_id: str,
     body: UpdateAssignmentBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """Update assignment (status to in_progress, or other fields)."""
     if not x_tenant_id:
@@ -444,6 +450,7 @@ async def submit_review(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
     llm: LLMRouter = Depends(get_llm_router),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """Submit a review decision (approve / request_changes / reject). VA-P6-05. VA-P6-06: generates LLM learning points when corrections present."""
     if not x_tenant_id or not x_user_id:
@@ -485,8 +492,14 @@ async def submit_review(
             x_tenant_id,
             assignment_id,
         )
+        # VA-P8-07: Create change_summary for request_changes/rejected so author gets LLM learning points
         if body.corrections:
             summary_text = _build_summary_from_corrections(body.corrections)
+        elif body.decision in ("request_changes", "rejected") and body.notes:
+            summary_text = f"Reviewer notes: {body.notes}"
+        else:
+            summary_text = None
+        if summary_text:
             summary_id = f"cs_{uuid.uuid4().hex[:10]}"
             await conn.execute(
                 """INSERT INTO change_summaries (tenant_id, summary_id, review_id, summary_text)
@@ -496,6 +509,8 @@ async def submit_review(
                 review_id,
                 summary_text,
             )
+        else:
+            summary_id = None
         rev_row = await conn.fetchrow(
             """SELECT review_id, assignment_id, reviewer_user_id, decision, notes, corrections_json, created_at
                FROM reviews WHERE tenant_id = $1 AND review_id = $2""",
@@ -527,14 +542,15 @@ async def submit_review(
                     entity_id=assignment_id,
                     user_id=assignee_user_id,
                 )
-    # VA-P6-06: Generate learning points in background (R6-06)
-    if summary_id and summary_text and body.corrections:
+    # VA-P6-06 / VA-P8-07: Generate learning points in background when request_changes or rejected with feedback
+    if summary_id and summary_text:
+        corrections_for_llm = body.corrections if body.corrections else []
         background_tasks.add_task(
             _generate_learning_points,
             x_tenant_id,
             summary_id,
             summary_text,
-            body.corrections,
+            corrections_for_llm,
             llm,
         )
     return {
@@ -554,6 +570,7 @@ async def list_reviews(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
 ) -> dict[str, Any]:
     """List reviews for an assignment. VA-P6-05."""
     if not x_tenant_id:

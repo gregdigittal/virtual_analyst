@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from apps.api.app.db import tenant_conn
 from apps.api.app.db.audit import create_audit_event, list_audit_events
+from apps.api.app.deps import require_role, ROLES_OWNER_OR_ADMIN
 
-router = APIRouter(prefix="/compliance", tags=["compliance"])
+router = APIRouter(prefix="/compliance", tags=["compliance"], dependencies=[require_role(*ROLES_OWNER_OR_ADMIN)])
 
 
 @router.get("/export")

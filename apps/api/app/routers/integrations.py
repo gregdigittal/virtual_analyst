@@ -25,12 +25,12 @@ from apps.api.app.db.integrations import (
     update_connection_status,
     upsert_connection,
 )
-from apps.api.app.deps import get_artifact_store
+from apps.api.app.deps import get_artifact_store, require_role, ROLES_OWNER_OR_ADMIN
 from apps.api.app.core.settings import get_settings
 from apps.api.app.services.integrations import get_adapter
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/integrations", tags=["integrations"])
+router = APIRouter(prefix="/integrations", tags=["integrations"], dependencies=[require_role(*ROLES_OWNER_OR_ADMIN)])
 
 CANONICAL_ARTIFACT_TYPE = "canonical_sync_snapshot_v1"
 
@@ -118,7 +118,10 @@ async def oauth_callback(
         "expires_at": result.expires_at,
     }
     if result.provider_tenant_id:
-        oauth_data["xero_tenant_id"] = result.provider_tenant_id
+        if provider == "xero":
+            oauth_data["xero_tenant_id"] = result.provider_tenant_id
+        else:
+            oauth_data["realm_id"] = result.provider_tenant_id
     async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             await ensure_tenant(conn, x_tenant_id)
@@ -200,7 +203,7 @@ async def trigger_sync(
             access_token=access,
             period_start=period_start,
             period_end=period_end,
-            tenant_id=oauth.get("xero_tenant_id"),
+            tenant_id=oauth.get("xero_tenant_id") or oauth.get("realm_id"),
         )
     except Exception as e:
         async with tenant_conn(x_tenant_id) as conn:

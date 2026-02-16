@@ -11,13 +11,13 @@ from pydantic import BaseModel
 from apps.api.app.data.catalog import get_template
 from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import EVENT_DRAFT_CREATED, create_audit_event
-from apps.api.app.deps import get_artifact_store, get_llm_router
+from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.routers.drafts import DRAFT_WORKSPACE_TYPE, STATUS_ACTIVE, _empty_workspace
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.errors import LLMError, StorageError
 from shared.fm_shared.storage import ArtifactStore
 
-router = APIRouter(prefix="/ventures", tags=["ventures"])
+router = APIRouter(prefix="/ventures", tags=["ventures"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 VENTURE_STATE_TYPE = "venture"
 

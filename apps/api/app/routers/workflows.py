@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
 
-router = APIRouter(prefix="/workflows", tags=["workflows"])
+from apps.api.app.deps import require_role, ROLES_CAN_WRITE
+
+router = APIRouter(prefix="/workflows", tags=["workflows"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 
 @router.get("/templates")
@@ -80,13 +82,61 @@ class CreateInstanceBody(BaseModel):
     entity_id: str = Field(..., min_length=1)
 
 
+async def _resolve_assignee_for_stage(
+    conn: Any,
+    tenant_id: str,
+    stage: dict[str, Any],
+    _entity_type: str,
+    _entity_id: str,
+) -> str | None:
+    """Resolve assignee user_id for a stage (VA-P8-05 cross-team). Supports explicit, team_pool, team (team_id)."""
+    rule = (stage.get("assignee_rule") or "").strip().lower()
+    config = stage.get("assignee_config") or {}
+    if rule == "explicit" and config.get("user_id"):
+        return config["user_id"]
+    if rule == "team" and config.get("team_id"):
+        team_id = config["team_id"]
+        row = await conn.fetchrow(
+            """SELECT user_id FROM team_members
+               WHERE tenant_id = $1 AND team_id = $2
+               ORDER BY CASE WHEN reports_to IS NULL THEN 0 ELSE 1 END, user_id
+               LIMIT 1""",
+            tenant_id,
+            team_id,
+        )
+        if row:
+            return row["user_id"]
+        return None
+    if rule == "team_pool":
+        # R11-08: Use config.team_id when available so the correct team's member is assigned
+        team_id = config.get("team_id")
+        if team_id:
+            row = await conn.fetchrow(
+                """SELECT user_id FROM team_members
+                   WHERE tenant_id = $1 AND team_id = $2
+                   ORDER BY random() LIMIT 1""",
+                tenant_id,
+                team_id,
+            )
+        else:
+            row = await conn.fetchrow(
+                """SELECT user_id FROM team_members
+                   WHERE tenant_id = $1
+                   ORDER BY random() LIMIT 1""",
+                tenant_id,
+            )
+        if row:
+            return row["user_id"]
+    return None
+
+
 @router.post("/instances", status_code=201)
 async def create_instance(
     body: CreateInstanceBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
 ) -> dict[str, Any]:
-    """Create a workflow instance from a template (VA-P6-03)."""
+    """Create a workflow instance from a template (VA-P6-03). VA-P8-05: cross-team stages create first assignment."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     template_id = body.template_id
@@ -95,7 +145,7 @@ async def create_instance(
     instance_id = f"wf_{uuid.uuid4().hex[:14]}"
     async with tenant_conn(x_tenant_id) as conn:
         row = await conn.fetchrow(
-            "SELECT 1 FROM workflow_templates WHERE tenant_id = $1 AND template_id = $2",
+            "SELECT template_id, stages_json FROM workflow_templates WHERE tenant_id = $1 AND template_id = $2",
             x_tenant_id,
             template_id,
         )
@@ -112,6 +162,33 @@ async def create_instance(
             entity_id,
             x_user_id or None,
         )
+        stages = row["stages_json"]
+        if not isinstance(stages, list):
+            stages = json.loads(stages or "[]")
+        assignee_user_id: str | None = None
+        if stages:
+            stage0 = stages[0] if isinstance(stages[0], dict) else {}
+            assignee_user_id = await _resolve_assignee_for_stage(
+                conn,
+                x_tenant_id,
+                stage0,
+                entity_type,
+                entity_id,
+            )
+        if assignee_user_id:
+            assignment_id = f"asn_{uuid.uuid4().hex[:12]}"
+            await conn.execute(
+                """INSERT INTO task_assignments
+                   (tenant_id, assignment_id, workflow_instance_id, entity_type, entity_id, assignee_user_id, assigned_by_user_id, status)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, 'assigned')""",
+                x_tenant_id,
+                assignment_id,
+                instance_id,
+                entity_type,
+                entity_id,
+                assignee_user_id,
+                x_user_id or None,
+            )
     return {
         "instance_id": instance_id,
         "template_id": template_id,
@@ -261,3 +338,101 @@ async def list_instances(
         for r in rows
     ]
     return {"instances": items, "limit": limit, "offset": offset}
+
+
+# --- VA-P8-06: Workflow analytics ---
+
+
+@router.get("/analytics")
+async def get_workflow_analytics(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    template_id: str | None = Query(None),
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+) -> dict[str, Any]:
+    """Workflow analytics (VA-P8-06): cycle time (created → completed), time per stage, review rate, bottlenecks."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    conditions = ["tenant_id = $1"]
+    params: list[Any] = [x_tenant_id]
+    idx = 2
+    if template_id:
+        conditions.append(f"template_id = ${idx}")
+        params.append(template_id)
+        idx += 1
+    if start_date:
+        conditions.append(f"created_at >= ${idx}::date")
+        params.append(start_date)
+        idx += 1
+    if end_date:
+        conditions.append(f"created_at <= ${idx}::date + interval '1 day'")
+        params.append(end_date)
+        idx += 1
+    where = " AND ".join(conditions)
+    async with tenant_conn(x_tenant_id) as conn:
+        rows = await conn.fetch(
+            f"""SELECT instance_id, template_id, status, created_at, updated_at
+                FROM workflow_instances WHERE {where}""",
+            *params,
+        )
+        # Stage-level timing from workflow_events if present
+        ev_conditions = ["we.tenant_id = $1", "we.exited_at IS NOT NULL"]
+        ev_params: list[Any] = [x_tenant_id]
+        ev_idx = 2
+        if template_id:
+            ev_conditions.append("wi.template_id = $" + str(ev_idx))
+            ev_params.append(template_id)
+            ev_idx += 1
+        if start_date:
+            ev_conditions.append("we.entered_at >= $" + str(ev_idx) + "::date")
+            ev_params.append(start_date)
+            ev_idx += 1
+        if end_date:
+            ev_conditions.append("we.entered_at <= $" + str(ev_idx) + "::date + interval '1 day'")
+            ev_params.append(end_date)
+        ev_where = " AND ".join(ev_conditions)
+        stage_rows = await conn.fetch(
+            f"""SELECT we.instance_id, we.stage_index, we.entered_at, we.exited_at, we.outcome
+                FROM workflow_events we
+                JOIN workflow_instances wi ON wi.tenant_id = we.tenant_id AND wi.instance_id = we.instance_id
+                WHERE {ev_where}""",
+            *ev_params,
+        )
+    # Cycle time: completed instances only (created_at -> updated_at)
+    cycle_times: list[float] = []
+    for r in rows:
+        if r["status"] == "completed" and r["created_at"] and r["updated_at"]:
+            delta = (r["updated_at"] - r["created_at"]).total_seconds()
+            cycle_times.append(delta)
+    avg_cycle_seconds = sum(cycle_times) / len(cycle_times) if cycle_times else None
+    # Review rate: of instances that reached submitted, proportion approved vs returned
+    submitted_count = sum(1 for r in rows if r["status"] in ("approved", "returned", "completed"))
+    approved_count = sum(1 for r in rows if r["status"] in ("approved", "completed"))
+    review_rate = (approved_count / submitted_count) if submitted_count else None
+    # Stage breakdown (from workflow_events)
+    stage_durations: dict[int, list[float]] = {}
+    for r in stage_rows:
+        if r["exited_at"] and r["entered_at"]:
+            dur = (r["exited_at"] - r["entered_at"]).total_seconds()
+            stage_durations.setdefault(r["stage_index"], []).append(dur)
+    stage_breakdown = [
+        {"stage_index": i, "avg_seconds": sum(durs) / len(durs), "count": len(durs)}
+        for i, durs in sorted(stage_durations.items())
+    ]
+    # Bottleneck: stage with longest average time
+    bottleneck = None
+    if stage_breakdown:
+        slowest = max(stage_breakdown, key=lambda s: s["avg_seconds"])
+        bottleneck = {"stage_index": slowest["stage_index"], "avg_seconds": slowest["avg_seconds"]}
+    # Count by status
+    count_by_status: dict[str, int] = {}
+    for r in rows:
+        count_by_status[r["status"]] = count_by_status.get(r["status"], 0) + 1
+    return {
+        "cycle_time_seconds": {"avg": avg_cycle_seconds, "sample_count": len(cycle_times)},
+        "review_rate": review_rate,
+        "stage_breakdown": stage_breakdown,
+        "bottleneck": bottleneck,
+        "count_by_status": count_by_status,
+        "total_instances": len(rows),
+    }

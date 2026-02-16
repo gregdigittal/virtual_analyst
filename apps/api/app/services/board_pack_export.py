@@ -52,8 +52,10 @@ def build_board_pack_html(
     budget_summary: str | None,
     branding: dict[str, Any],
     run_id: str = "",
+    display_currency: str | None = None,
+    benchmark_metrics: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Build full HTML document: cover, ToC, sections in order, branding (logo, primary_color, terms_footer)."""
+    """Build full HTML document: cover, ToC, sections in order, branding. Optional display_currency (VA-P8-01), benchmark_metrics (VA-P8-09)."""
     _raw_color = (branding.get("primary_color") or "#2563eb").strip()
     primary_color = _raw_color if re.fullmatch(r"#[0-9a-fA-F]{3,8}", _raw_color) else "#2563eb"
     terms_footer = _html.escape(str(branding.get("terms_footer") or ""))
@@ -74,6 +76,12 @@ def build_board_pack_html(
     section_contents["kpi_dashboard"] = f"<h3>KPI Dashboard</h3>{_format_table(kpis, periods[: len(kpis)]) if kpis else '<p>No KPI data.</p>'}"
     section_contents["scenario_comparison"] = "<h3>Scenario Comparison</h3><p>Scenario comparison data can be included when scenario runs are linked.</p>"
     section_contents["strategic_commentary"] = f"<div class='section-body'><p>{_html.escape(narrative.get('strategic_commentary') or 'No strategic commentary generated.')}</p></div>"
+    if benchmark_metrics:
+        bench_rows = "".join(
+            f"<tr><td>{_html.escape(str(m.get('metric_name', '')))}</td><td>{m.get('median', '')}</td><td>{m.get('sample_count', '')} peers</td></tr>"
+            for m in benchmark_metrics
+        )
+        section_contents["benchmark"] = f"<h3>Industry Benchmark (Peer Median)</h3><table class='pack-table'><thead><tr><th>Metric</th><th>Peer Median</th><th>Sample</th></tr></thead><tbody>{bench_rows}</tbody></table>"
 
     toc_items = []
     body_sections = []
@@ -85,11 +93,13 @@ def build_board_pack_html(
         body_sections.append(f"<section id='sec-{i}' class='pack-section'><h2>{safe_title}</h2>{section_contents[sec_key]}</section>")
 
     logo_img = f"<img src='{_html.escape(logo_url)}' alt='Logo' class='pack-logo'/>" if logo_url else ""
+    currency_note = f"<p class='pack-meta'>Amounts in {_html.escape(display_currency)}</p>" if display_currency else ""
     cover = f"""
     <div class="pack-cover" style="border-top:4px solid {primary_color};">
         {logo_img}
         <h1 class="pack-title">{_html.escape(label)}</h1>
         <p class="pack-meta">Run: {_html.escape(run_id or 'N/A')}</p>
+        {currency_note}
     </div>
     """
     toc = f"<nav class='pack-toc'><h2>Contents</h2><ol>{''.join(toc_items)}</ol></nav>"
@@ -138,8 +148,10 @@ def build_board_pack_pptx(
     kpis: list[dict[str, Any]],
     budget_summary: str | None,
     run_id: str = "",
+    display_currency: str | None = None,
+    benchmark_metrics: list[dict[str, Any]] | None = None,
 ) -> bytes:
-    """Build PPTX: title slide + one slide per section (title + content summary). VA-P7-08."""
+    """Build PPTX: title slide + one slide per section (title + content summary). VA-P7-08; VA-P8-01 display_currency."""
     if Presentation is None:
         raise RuntimeError("PPTX export requires python-pptx; pip install python-pptx")
     prs = Presentation()
@@ -156,7 +168,7 @@ def build_board_pack_pptx(
     p.font.size = Pt(32)
     p.font.bold = True
     run_box = slide.shapes.add_textbox(Inches(0.5), Inches(3.5), Inches(9), Inches(0.5))
-    run_box.text_frame.text = f"Run: {run_id or 'N/A'}"
+    run_box.text_frame.text = f"Run: {run_id or 'N/A'}" + (f"  |  Amounts in {display_currency}" if display_currency else "")
 
     section_contents: dict[str, tuple[str, str]] = {}
     section_contents["executive_summary"] = ("Executive Summary", narrative.get("executive_summary") or "—")
@@ -167,6 +179,9 @@ def build_board_pack_pptx(
     section_contents["kpi_dashboard"] = ("KPI Dashboard", "See appendix for full KPIs." if kpis else "No KPI data.")
     section_contents["scenario_comparison"] = ("Scenario Comparison", "Scenario data when linked.")
     section_contents["strategic_commentary"] = ("Strategic Commentary", narrative.get("strategic_commentary") or "—")
+    if benchmark_metrics:
+        bench_text = "; ".join(f"{m.get('metric_name', '')}: median {m.get('median', '')}" for m in benchmark_metrics[:10])
+        section_contents["benchmark"] = ("Industry Benchmark", bench_text or "No benchmark data.")
 
     for sec_key in section_order:
         if sec_key not in section_contents:
