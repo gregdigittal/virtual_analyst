@@ -63,6 +63,33 @@ async function request<T>(
   return data as T;
 }
 
+/** POST with FormData (e.g. file upload). Do not set Content-Type so browser sets multipart boundary. */
+async function requestForm<T>(
+  path: string,
+  { tenantId, userId, body }: { tenantId: string; userId?: string; body: FormData }
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "X-Tenant-ID": tenantId,
+    ...(userId && { "X-User-ID": userId }),
+    ...(_accessToken && { Authorization: `Bearer ${_accessToken}` }),
+  };
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  if (res.status === 204) return undefined as T;
+  const data = await res.json().catch(() => ({ detail: res.statusText }));
+  if (!res.ok) {
+    throw new ApiError(
+      typeof data.detail === "string" ? data.detail : JSON.stringify(data),
+      res.status,
+      data
+    );
+  }
+  return data as T;
+}
+
 export interface BaselineSummary {
   baseline_id: string;
   baseline_version: string;
@@ -83,6 +110,7 @@ export interface RunSummary {
   baseline_version: string;
   scenario_id: string | null;
   status: string;
+  covenant_breached: boolean;
   created_at: string | null;
 }
 
@@ -92,13 +120,12 @@ export interface RunsResponse {
   offset: number;
 }
 
-export interface RunDetail {
-  run_id: string;
-  baseline_id: string;
-  baseline_version: string;
-  scenario_id: string | null;
-  status: string;
-  created_at: string | null;
+export interface RunDetail extends RunSummary {
+  task_id?: string | null;
+  mc_enabled?: boolean;
+  num_simulations?: number | null;
+  seed?: number | null;
+  mc_progress?: number | null;
 }
 
 export interface StatementsData {
@@ -284,7 +311,7 @@ export const api = {
         body: {
           baseline_id: baselineId,
           ...(opts?.scenarioId && { scenario_id: opts.scenarioId }),
-          ...(opts?.mcEnabled && { mc_enabled: true, num_simulations: opts.numSimulations ?? 1000, seed: opts.seed ?? 42 }),
+          ...(opts?.mcEnabled && { mode: "monte_carlo", num_simulations: opts.numSimulations ?? 1000, seed: opts.seed ?? 42 }),
         },
       }),
     getMc: (tenantId: string, runId: string) =>
@@ -677,6 +704,183 @@ export const api = {
       request<{ summary_id: string; acknowledged: boolean }>(
         `/api/v1/feedback/${encodeURIComponent(summaryId)}/acknowledge`,
         { tenantId, userId, method: "POST" }
+      ),
+  },
+  excelIngestion: {
+    upload: (tenantId: string, userId: string | undefined, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return requestForm<{
+        ingestion_id: string;
+        status: string;
+        sheet_count: number | null;
+        formula_count: number | null;
+        cross_ref_count: number | null;
+        classification: Record<string, unknown>;
+        model_summary: Record<string, unknown>;
+      }>("/api/v1/excel-ingestion/upload", { tenantId, userId, body: form });
+    },
+    get: (tenantId: string, ingestionId: string) =>
+      request<{
+        ingestion_id: string;
+        filename: string;
+        status: string;
+        sheet_count: number | null;
+        formula_count: number | null;
+        cross_ref_count: number | null;
+        classification: Record<string, unknown>;
+        mapping: Record<string, unknown>;
+        unmapped_items: unknown[];
+        questions: unknown[];
+        draft_session_id: string | null;
+        error_message: string | null;
+        created_at: string | null;
+      }>(`/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}`, { tenantId }),
+    analyze: (tenantId: string, ingestionId: string) =>
+      request<{
+        status: string;
+        mapping_summary: Record<string, unknown>;
+        unmapped_count: number;
+        question_count: number;
+        questions: unknown[];
+      }>(`/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}/analyze`, {
+        tenantId,
+        method: "POST",
+      }),
+    answer: (
+      tenantId: string,
+      ingestionId: string,
+      answers: { question_index: number; answer: string }[]
+    ) =>
+      request<{ mapping: Record<string, unknown>; questions: unknown[] }>(
+        `/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}/answer`,
+        { tenantId, method: "POST", body: { answers } }
+      ),
+    createDraft: (tenantId: string, userId: string | undefined, ingestionId: string) =>
+      request<{
+        draft_session_id: string;
+        ingestion_id: string;
+        revenue_streams_count: number;
+        cost_items_count: number;
+        unmapped_count: number;
+      }>(`/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}/create-draft`, {
+        tenantId,
+        userId,
+        method: "POST",
+      }),
+    list: (tenantId: string, limit?: number, offset?: number) => {
+      const params = new URLSearchParams();
+      if (limit != null) params.set("limit", String(limit));
+      if (offset != null) params.set("offset", String(offset));
+      const qs = params.toString();
+      return request<{
+        items: {
+          ingestion_id: string;
+          filename: string;
+          status: string;
+          sheet_count: number | null;
+          draft_session_id: string | null;
+          created_at: string | null;
+        }[];
+      }>(`/api/v1/excel-ingestion${qs ? `?${qs}` : ""}`, { tenantId });
+    },
+    delete: (tenantId: string, ingestionId: string) =>
+      request<{ ok: boolean }>(
+        `/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}`,
+        { tenantId, method: "DELETE" }
+      ),
+  },
+  orgStructures: {
+    list: (tenantId: string, limit?: number, offset?: number, status?: string) => {
+      const params = new URLSearchParams();
+      if (limit != null) params.set("limit", String(limit));
+      if (offset != null) params.set("offset", String(offset));
+      if (status) params.set("status", status);
+      const qs = params.toString();
+      return request<{
+        items: {
+          org_id: string;
+          group_name: string;
+          reporting_currency: string;
+          status: string;
+          entity_count: number;
+          created_at: string | null;
+        }[];
+      }>(`/api/v1/org-structures${qs ? `?${qs}` : ""}`, { tenantId });
+    },
+    create: (tenantId: string, userId: string | undefined, body: { group_name: string; reporting_currency?: string }) =>
+      request<{ org_id: string; group_name: string; reporting_currency: string; status: string }>(
+        "/api/v1/org-structures",
+        { tenantId, userId, method: "POST", body }
+      ),
+    get: (tenantId: string, orgId: string) =>
+      request<{
+        org_id: string;
+        group_name: string;
+        reporting_currency: string;
+        status: string;
+        consolidation_method: string;
+        eliminate_intercompany: boolean;
+        minority_interest_treatment: string;
+        created_at: string | null;
+        entities: unknown[];
+        ownership: unknown[];
+        intercompany: unknown[];
+      }>(`/api/v1/org-structures/${encodeURIComponent(orgId)}`, { tenantId }),
+    update: (tenantId: string, orgId: string, body: Record<string, unknown>) =>
+      request<{ org_id: string; updated?: string[] }>(
+        `/api/v1/org-structures/${encodeURIComponent(orgId)}`,
+        { tenantId, method: "PATCH", body }
+      ),
+    delete: (tenantId: string, orgId: string) =>
+      request<{ ok: boolean }>(`/api/v1/org-structures/${encodeURIComponent(orgId)}`, { tenantId, method: "DELETE" }),
+    validate: (tenantId: string, orgId: string) =>
+      request<{ status: string; checks: unknown[] }>(
+        `/api/v1/org-structures/${encodeURIComponent(orgId)}/validate`,
+        { tenantId, method: "POST" }
+      ),
+    hierarchy: (tenantId: string, orgId: string) =>
+      request<{ org_id: string; roots: unknown[] }>(
+        `/api/v1/org-structures/${encodeURIComponent(orgId)}/hierarchy`,
+        { tenantId }
+      ),
+    runs: (tenantId: string, orgId: string) =>
+      request<{
+        items: {
+          consolidated_run_id: string;
+          status: string;
+          created_at: string | null;
+          completed_at?: string | null;
+          error_message?: string | null;
+        }[];
+      }>(`/api/v1/org-structures/${encodeURIComponent(orgId)}/runs`, { tenantId }),
+    run: (
+      tenantId: string,
+      userId: string | undefined,
+      orgId: string,
+      opts?: {
+        fx_avg_rates?: Record<string, number>;
+        fx_closing_rates?: Record<string, number>;
+        horizon_granularity?: "monthly" | "quarterly" | "annual";
+      }
+    ) =>
+      request<{ consolidated_run_id: string; status: string }>(
+        `/api/v1/org-structures/${encodeURIComponent(orgId)}/run`,
+        { tenantId, userId, method: "POST", body: opts ?? {} }
+      ),
+    getRun: (tenantId: string, orgId: string, runId: string) =>
+      request<{
+        consolidated_run_id: string;
+        status: string;
+        result?: unknown;
+        created_at: string | null;
+        completed_at: string | null;
+        error_message: string | null;
+      }>(`/api/v1/org-structures/${encodeURIComponent(orgId)}/runs/${encodeURIComponent(runId)}`, { tenantId }),
+    getStatements: (tenantId: string, orgId: string, runId: string) =>
+      request<{ income_statement: unknown[]; balance_sheet: unknown[]; cash_flow: unknown[] }>(
+        `/api/v1/org-structures/${encodeURIComponent(orgId)}/runs/${encodeURIComponent(runId)}/statements`,
+        { tenantId }
       ),
   },
 };
