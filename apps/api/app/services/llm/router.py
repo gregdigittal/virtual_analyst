@@ -29,6 +29,12 @@ DEFAULT_POLICY = {
         {"task_label": "budget_reforecast", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.2},
         {"task_label": "board_pack_narrative", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.2},
         {"task_label": "board_pack_narrative", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.2},
+        {"task_label": "excel_sheet_classification", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.1},
+        {"task_label": "excel_sheet_classification", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.1},
+        {"task_label": "excel_model_mapping", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 8192, "temperature": 0.2},
+        {"task_label": "excel_model_mapping", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 8192, "temperature": 0.2},
+        {"task_label": "budget_nl_query", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 512, "temperature": 0.1},
+        {"task_label": "budget_nl_query", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 512, "temperature": 0.1},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }
@@ -107,12 +113,17 @@ class LLMRouter:
         messages: list[dict[str, str]],
         response_schema: dict[str, Any],
         task_label: str,
-        max_tokens: int = 4096,
-        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
     ) -> LLMResponse:
         settings = get_settings()
+        candidates = self.resolve(task_label)
+        rule_max_tokens_first = candidates[0][2] if candidates else 4096
+        rule_temp_first = candidates[0][3] if candidates else 0.2
+        effective_max_tokens = max_tokens if max_tokens is not None else rule_max_tokens_first
+        effective_temp = temperature if temperature is not None else rule_temp_first
         if self._billing:
-            allowed, current, limit = await self._billing.check_llm_limit(tenant_id, estimated_tokens=max_tokens)
+            allowed, current, limit = await self._billing.check_llm_limit(tenant_id, estimated_tokens=effective_max_tokens)
             if not allowed:
                 raise LLMError(
                     "Token quota exceeded",
@@ -120,13 +131,12 @@ class LLMRouter:
                     context={"limit": limit, "current": current, "tenant_id": tenant_id},
                 )
         else:
-            if not check_limit(tenant_id, settings.llm_tokens_monthly_limit):
+            if not await check_limit(tenant_id, settings.llm_tokens_monthly_limit):
                 raise LLMError(
                     "Token quota exceeded",
                     code="ERR_LLM_QUOTA_EXCEEDED",
                     context={"limit": settings.llm_tokens_monthly_limit, "tenant_id": tenant_id},
                 )
-        candidates = self.resolve(task_label)
         last_error: Exception | None = None
         for provider_key, model, rule_max_tokens, rule_temp in candidates:
             if self._circuit.is_open(provider_key):
@@ -134,13 +144,15 @@ class LLMRouter:
             provider = self._get_provider(provider_key, model)
             if provider is None:
                 continue
+            use_max = max_tokens if max_tokens is not None else rule_max_tokens
+            use_temp = temperature if temperature is not None else rule_temp
             try:
                 resp = await provider.complete(
                     messages,
                     response_schema,
                     task_label,
-                    max_tokens=rule_max_tokens,
-                    temperature=rule_temp,
+                    max_tokens=use_max,
+                    temperature=use_temp,
                 )
                 self._circuit.record_success(provider_key)
                 if self._billing:
@@ -159,7 +171,12 @@ class LLMRouter:
                         resp.latency_ms,
                     )
                 else:
-                    add_usage(tenant_id, resp.tokens.total_tokens, resp.cost_estimate_usd)
+                    await add_usage(
+                        tenant_id,
+                        resp.tokens.total_tokens,
+                        resp.cost_estimate_usd,
+                        provider=resp.provider,
+                    )
                 return resp
             except Exception as e:
                 last_error = e

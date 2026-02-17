@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     circuit_breaker_failure_threshold: int = Field(default=5, ge=1, alias="CIRCUIT_BREAKER_FAILURE_THRESHOLD")
     circuit_breaker_recovery_seconds: int = Field(default=60, ge=1, alias="CIRCUIT_BREAKER_RECOVERY_SECONDS")
 
+    agent_sdk_enabled: bool = Field(default=True, alias="AGENT_SDK_ENABLED")
+    agent_sdk_default_model: str = Field(default="sonnet", alias="AGENT_SDK_DEFAULT_MODEL")
+    agent_sdk_max_turns: int = Field(default=15, ge=1, le=50, alias="AGENT_SDK_MAX_TURNS")
+    agent_sdk_max_budget_usd: float = Field(default=0.50, ge=0.01, le=10.0, alias="AGENT_SDK_MAX_BUDGET_USD")
+    agent_excel_ingestion_enabled: bool = Field(default=True, alias="AGENT_EXCEL_INGESTION_ENABLED")
+    agent_draft_chat_enabled: bool = Field(default=True, alias="AGENT_DRAFT_CHAT_ENABLED")
+    agent_budget_nl_query_enabled: bool = Field(default=True, alias="AGENT_BUDGET_NL_QUERY_ENABLED")
+    agent_reforecast_enabled: bool = Field(default=True, alias="AGENT_REFORECAST_ENABLED")
+
     xero_client_id: str | None = Field(default=None, alias="XERO_CLIENT_ID")
     xero_client_secret: str | None = Field(default=None, alias="XERO_CLIENT_SECRET")
     quickbooks_client_id: str | None = Field(default=None, alias="QUICKBOOKS_CLIENT_ID")

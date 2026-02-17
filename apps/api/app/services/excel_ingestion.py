@@ -252,7 +252,12 @@ async def analyze_and_map(
     for sh in sheets_list:
         if sh.get("name") not in financial_core:
             continue
-        candidates = extract_assumption_candidates(SheetInfo(**sh)) if isinstance(sh, dict) else []
+        candidates = []
+        if isinstance(sh, dict):
+            try:
+                candidates = extract_assumption_candidates(SheetInfo(**sh))
+            except (TypeError, ValueError):
+                pass
         context_blocks.append(
             f"## Sheet: {sh.get('name')}\nHeaders: {sh.get('headers')}\nSample rows: {json.dumps(sh.get('sample_rows', [])[:5])}\n"
             f"Formula patterns: {sh.get('formula_patterns', [])[:10]}\nAssumption candidates: {json.dumps(candidates[:15])}"
@@ -378,6 +383,69 @@ async def create_draft_from_mapping(
             event_data={"ingestion_id": ingestion_id, "filename": filename},
         )
     return draft_session_id
+
+
+async def parse_classify_and_map_agent(
+    tenant_id: str,
+    ingestion_id: str,
+    store: "ArtifactStore",
+    agent: Any,
+    conn: "asyncpg.Connection",
+    user_answers: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Agent-powered: parse, classify, and map in a single agent call. Returns {"classification": ..., "mapping": ...}."""
+    from apps.api.app.services.agent.excel_agent import run_excel_ingestion_agent
+
+    await conn.execute(
+        "UPDATE excel_ingestion_sessions SET status = 'parsing' WHERE tenant_id = $1 AND ingestion_id = $2",
+        tenant_id,
+        ingestion_id,
+    )
+    raw = store.load(tenant_id, EXCEL_UPLOAD_TYPE, ingestion_id)
+    file_bytes = base64.b64decode(raw["content_base64"])
+    filename = raw.get("filename", "upload.xlsx")
+    parse_result = parse_workbook(file_bytes, filename=filename)
+    parse_dict = _parse_result_to_dict(parse_result)
+    store.save(tenant_id, EXCEL_PARSE_TYPE, ingestion_id, parse_dict)
+    heuristic = classify_sheets(parse_result)
+
+    try:
+        combined = await run_excel_ingestion_agent(
+            tenant_id=tenant_id,
+            agent=agent,
+            parse_result_dict=parse_dict,
+            heuristic_classifications=heuristic,
+            user_answers=user_answers,
+        )
+    except Exception as e:
+        await conn.execute(
+            "UPDATE excel_ingestion_sessions SET status = 'failed', error_message = $3 WHERE tenant_id = $1 AND ingestion_id = $2",
+            tenant_id,
+            ingestion_id,
+            str(e),
+        )
+        raise
+
+    classification = combined.get("classification", {})
+    classification["heuristic"] = heuristic
+    mapping = combined.get("mapping", {})
+    unmapped = mapping.get("unmapped_items", [])
+
+    await conn.execute(
+        """UPDATE excel_ingestion_sessions SET status = 'analyzed', sheet_count = $3, formula_count = $4, cross_ref_count = $5,
+           classification_json = $6::jsonb, mapping_json = $7::jsonb, unmapped_items_json = $8::jsonb, updated_at = now()
+           WHERE tenant_id = $1 AND ingestion_id = $2""",
+        tenant_id,
+        ingestion_id,
+        parse_result.sheet_count,
+        parse_result.total_formulas,
+        parse_result.total_cross_refs,
+        json.dumps(classification),
+        json.dumps(mapping),
+        json.dumps(unmapped),
+    )
+    store.save(tenant_id, EXCEL_CLASSIFICATION_TYPE, ingestion_id, classification)
+    return {"classification": classification, "mapping": mapping}
 
 
 def _parse_result_to_dict(pr: ExcelParseResult) -> dict[str, Any]:

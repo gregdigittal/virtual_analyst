@@ -20,7 +20,10 @@ from apps.api.app.db.budgets import (
     get_budget,
     get_version_line_item_totals,
 )
-from apps.api.app.deps import get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.core.settings import get_settings
+from apps.api.app.deps import get_agent_service, get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.services.agent.budget_agent import run_budget_nl_query_agent
+from apps.api.app.services.agent.reforecast_agent import run_reforecast_agent
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.errors import LLMError
 
@@ -550,7 +553,23 @@ async def natural_language_budget_query(
                 f"Budget '{label}' (id={bid}): total_budget={total_budget:,.0f}, total_actual={total_actual:,.0f}, "
                 f"utilisation_pct={utilisation_pct}%; departments (actuals): {dept_str or 'none'}"
             )
+        budget_ids_list = [r["budget_id"] for r in rows]
         context_text = "\n".join(context_parts) if context_parts else "No budget data available."
+    agent = get_agent_service()
+    if agent and get_settings().agent_budget_nl_query_enabled:
+        try:
+            content = await run_budget_nl_query_agent(
+                x_tenant_id, agent, body.question, budget_ids=budget_ids_list if budget_ids_list else None
+            )
+        except LLMError as e:
+            raise HTTPException(
+                429 if e.code == "ERR_LLM_QUOTA_EXCEEDED" else 503,
+                detail=e.message,
+            ) from e
+        return {
+            "answer": content.get("answer", "No answer generated."),
+            "citations": content.get("citations") or [],
+        }
     prompt = (
         "Answer the user's question using ONLY the following budget data. "
         "Do not invent or assume any numbers. If the answer cannot be determined from the data, say so clearly. "
@@ -1466,29 +1485,41 @@ async def reforecast_budget(
                         a for a in amts
                         if a["period_ordinal"] not in periods_with_actuals
                     ]
-            prompt = (
-                "You are a financial analyst. Given YTD actuals and original budget amounts for remaining periods, "
-                "propose revised forecast amounts for remaining periods only. Output JSON with 'revisions' array: "
-                "each item has account_ref, amounts (array of {period_ordinal, amount}), optional confidence (0-1), optional variance_note. "
-                "Do not fabricate; base revisions on the data provided.\n\nYTD actuals:\n"
-                + json.dumps(ytd_actuals[:50], indent=2)
-                + "\n\nRemaining periods by account (original):\n"
-                + json.dumps(remaining_by_account, indent=2)
-            )
-            messages = [{"role": "user", "content": prompt}]
-            try:
-                response = await llm.complete_with_routing(
-                    x_tenant_id,
-                    [{"role": "system", "content": "Output only valid JSON matching the required schema."}, *messages],
-                    BUDGET_REFORECAST_SCHEMA,
-                    "budget_reforecast",
+            agent = get_agent_service()
+            if agent and get_settings().agent_reforecast_enabled:
+                try:
+                    content = await run_reforecast_agent(
+                        x_tenant_id, agent, budget_id, ytd_actuals, remaining_by_account,
+                    )
+                except LLMError as e:
+                    raise HTTPException(
+                        429 if e.code == "ERR_LLM_QUOTA_EXCEEDED" else 503,
+                        detail=e.message,
+                    ) from e
+            else:
+                prompt = (
+                    "You are a financial analyst. Given YTD actuals and original budget amounts for remaining periods, "
+                    "propose revised forecast amounts for remaining periods only. Output JSON with 'revisions' array: "
+                    "each item has account_ref, amounts (array of {period_ordinal, amount}), optional confidence (0-1), optional variance_note. "
+                    "Do not fabricate; base revisions on the data provided.\n\nYTD actuals:\n"
+                    + json.dumps(ytd_actuals[:50], indent=2)
+                    + "\n\nRemaining periods by account (original):\n"
+                    + json.dumps(remaining_by_account, indent=2)
                 )
-            except LLMError as e:
-                raise HTTPException(
-                    503 if e.code == "ERR_LLM_ALL_PROVIDERS_FAILED" else 429,
-                    detail=e.message,
-                ) from e
-            content = response.content or {}
+                messages = [{"role": "user", "content": prompt}]
+                try:
+                    response = await llm.complete_with_routing(
+                        x_tenant_id,
+                        [{"role": "system", "content": "Output only valid JSON matching the required schema."}, *messages],
+                        BUDGET_REFORECAST_SCHEMA,
+                        "budget_reforecast",
+                    )
+                except LLMError as e:
+                    raise HTTPException(
+                        503 if e.code == "ERR_LLM_ALL_PROVIDERS_FAILED" else 429,
+                        detail=e.message,
+                    ) from e
+                content = response.content or {}
             revisions = content.get("revisions") or []
             for li in line_rows:
                 new_li_id = _line_item_id()

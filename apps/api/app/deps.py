@@ -12,6 +12,7 @@ from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.storage import ArtifactStore
 
 if TYPE_CHECKING:
+    from apps.api.app.services.agent.service import AgentService
     from apps.api.app.services.billing import BillingService
 
 # Role hierarchy per AUTH_AND_TENANCY: owner, admin, analyst, investor
@@ -101,3 +102,33 @@ def get_artifact_store() -> ArtifactStore:
 def reset_artifact_store() -> None:
     global _artifact_store
     _artifact_store = None
+
+
+# Hybrid LLM architecture:
+# - get_llm_router() → single-turn structured output (review_summary, board_pack_narrative, template_init)
+# - get_agent_service() → multi-step agent tasks (Excel ingestion, draft chat, budget NL query, reforecast)
+# Feature flags in Settings control which tasks use agents. Both paths share the same metering.
+
+_agent_service: "AgentService | None" = None
+
+
+def get_agent_service() -> "AgentService | None":
+    """Return AgentService if Agent SDK is enabled, else None."""
+    global _agent_service
+    settings = get_settings()
+    if not settings.agent_sdk_enabled:
+        return None
+    if _agent_service is None:
+        if not settings.anthropic_api_key:
+            return None
+        from apps.api.app.services.agent.service import AgentService
+        _agent_service = AgentService(
+            api_key=settings.anthropic_api_key,
+            billing=get_billing_service(),
+        )
+    return _agent_service
+
+
+def reset_agent_service() -> None:
+    global _agent_service
+    _agent_service = None

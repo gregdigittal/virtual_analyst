@@ -19,7 +19,9 @@ from apps.api.app.db.audit import (
     EVENT_DRAFT_UPDATED,
     create_audit_event,
 )
-from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.core.settings import get_settings
+from apps.api.app.deps import get_agent_service, get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.services.agent.draft_agent import run_draft_chat_agent
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.errors import LLMError, StorageError
 from shared.fm_shared.model.graph import CalcGraph, GraphCycleError
@@ -566,25 +568,37 @@ async def draft_chat(
                 if e.code == "ERR_STOR_NOT_FOUND":
                     raise HTTPException(404, "Draft workspace not found") from e
                 raise
-            system_text = _build_draft_assumptions_prompt(workspace)
-            chat_history = workspace.get("chat_history") or []
-            last_10 = chat_history[-10:] if len(chat_history) > 10 else chat_history
-            messages = [{"role": "system", "content": system_text}]
-            for entry in last_10:
-                messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
-            messages.append({"role": "user", "content": body.message})
-            try:
-                response = await llm.complete_with_routing(
-                    x_tenant_id,
-                    messages,
-                    PROPOSAL_RESPONSE_SCHEMA,
-                    "draft_assumptions",
-                )
-            except LLMError as e:
-                if e.code == "ERR_LLM_QUOTA_EXCEEDED":
-                    raise HTTPException(429, e.message) from e
-                raise HTTPException(503, e.message) from e
-            content = response.content
+            agent = get_agent_service()
+            settings = get_settings()
+            if agent and settings.agent_draft_chat_enabled:
+                try:
+                    content = await run_draft_chat_agent(
+                        x_tenant_id, agent, workspace, body.message,
+                    )
+                except LLMError as e:
+                    if e.code == "ERR_LLM_QUOTA_EXCEEDED":
+                        raise HTTPException(429, e.message) from e
+                    raise HTTPException(503, e.message) from e
+            else:
+                system_text = _build_draft_assumptions_prompt(workspace)
+                chat_history = workspace.get("chat_history") or []
+                last_10 = chat_history[-10:] if len(chat_history) > 10 else chat_history
+                messages = [{"role": "system", "content": system_text}]
+                for entry in last_10:
+                    messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
+                messages.append({"role": "user", "content": body.message})
+                try:
+                    response = await llm.complete_with_routing(
+                        x_tenant_id,
+                        messages,
+                        PROPOSAL_RESPONSE_SCHEMA,
+                        "draft_assumptions",
+                    )
+                except LLMError as e:
+                    if e.code == "ERR_LLM_QUOTA_EXCEEDED":
+                        raise HTTPException(429, e.message) from e
+                    raise HTTPException(503, e.message) from e
+                content = response.content
             proposals_in = content.get("proposals") or []
             valid = []
             for p in proposals_in:
