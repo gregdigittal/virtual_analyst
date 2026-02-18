@@ -32,7 +32,7 @@ async def list_plans(
 async def get_subscription(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     billing: BillingService = Depends(get_billing_service),
-    _: None = Depends(require_role(*ROLES_OWNER_OR_ADMIN)),
+    _: None = require_role(*ROLES_OWNER_OR_ADMIN),
 ) -> dict[str, Any]:
     """Current tenant subscription; ensures default if none."""
     if not x_tenant_id:
@@ -48,7 +48,7 @@ async def create_or_update_subscription(
     body: CreateSubscriptionBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     billing: BillingService = Depends(get_billing_service),
-    _: None = Depends(require_role(*ROLES_OWNER_ONLY)),
+    _: None = require_role(*ROLES_OWNER_ONLY),
 ) -> dict[str, Any]:
     """Create subscription if none, or update to new plan."""
     if not x_tenant_id:
@@ -65,18 +65,17 @@ async def create_or_update_subscription(
         raise HTTPException(400, str(e)) from e
 
 
-@router.delete("/subscription")
+@router.delete("/subscription", status_code=204)
 async def cancel_subscription(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     billing: BillingService = Depends(get_billing_service),
-    _: None = Depends(require_role(*ROLES_OWNER_ONLY)),
-) -> dict[str, Any]:
+    _: None = require_role(*ROLES_OWNER_ONLY),
+) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     cancelled = await billing.cancel_subscription(x_tenant_id)
     if not cancelled:
         raise HTTPException(404, "No active subscription")
-    return {"status": "cancelled"}
 
 
 @router.get("/usage")
@@ -84,7 +83,7 @@ async def get_usage(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     period: str | None = None,
     billing: BillingService = Depends(get_billing_service),
-    _: None = Depends(require_role(*ROLES_OWNER_OR_ADMIN)),
+    _: None = require_role(*ROLES_OWNER_OR_ADMIN),
 ) -> dict[str, Any]:
     """Current period usage and costs. period=YYYY-MM optional."""
     if not x_tenant_id:
@@ -126,6 +125,7 @@ async def stripe_webhook(
         status = sub.get("status")
         status_map = {"active": "active", "past_due": "past_due", "canceled": "cancelled", "trialing": "trialing"}
         our_status = status_map.get(status, "active")
+        # Cross-tenant lookup: get_tenant_by_stripe_subscription_id queries by subscription id; RLS not applied for this lookup.
         async with tenant_conn("") as conn:
             row = await get_tenant_by_stripe_subscription_id(conn, sid)
         if row:
@@ -136,6 +136,7 @@ async def stripe_webhook(
     elif event.type == "subscription.deleted":
         sub = event.data.object
         sid = sub.get("id")
+        # Cross-tenant lookup: resolve tenant from subscription id (see subscription.updated above).
         async with tenant_conn("") as conn:
             row = await get_tenant_by_stripe_subscription_id(conn, sid)
         if row:

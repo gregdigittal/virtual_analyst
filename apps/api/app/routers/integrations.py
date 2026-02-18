@@ -96,6 +96,7 @@ async def initiate_connection(
 async def oauth_callback(
     code: str = Query(..., description="Authorization code from provider"),
     state: str = Query(..., description="State (tenant_id)"),
+    realmId: str | None = Query(None, description="QuickBooks realmId (from callback URL query)"),
 ) -> Any:
     """Exchange code for tokens, store connection, redirect to app. No auth header (browser redirect)."""
     settings = get_settings()
@@ -122,6 +123,8 @@ async def oauth_callback(
             oauth_data["xero_tenant_id"] = result.provider_tenant_id
         else:
             oauth_data["realm_id"] = result.provider_tenant_id
+    elif provider == "quickbooks" and realmId:
+        oauth_data["realm_id"] = realmId
     async with tenant_conn(x_tenant_id) as conn:
         async with conn.transaction():
             await ensure_tenant(conn, x_tenant_id)
@@ -274,15 +277,14 @@ async def list_snapshots_route(
     return {"snapshots": items}
 
 
-@router.delete("/connections/{connection_id}")
+@router.delete("/connections/{connection_id}", status_code=204)
 async def disconnect_connection(
     connection_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         deleted = await delete_connection(conn, x_tenant_id, connection_id)
     if not deleted:
         raise HTTPException(404, "Connection not found")
-    return {"status": "disconnected"}

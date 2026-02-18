@@ -60,7 +60,7 @@ def build_board_pack_html(
     primary_color = _raw_color if re.fullmatch(r"#[0-9a-fA-F]{3,8}", _raw_color) else "#2563eb"
     terms_footer = _html.escape(str(branding.get("terms_footer") or ""))
     _raw_logo = branding.get("logo_url") or ""
-    logo_url = _raw_logo if _raw_logo.startswith(("https://", "http://")) else ""
+    logo_url = _raw_logo if _raw_logo.startswith("https://") else ""
 
     is_list = statements.get("income_statement") or []
     bs_list = statements.get("balance_sheet") or []

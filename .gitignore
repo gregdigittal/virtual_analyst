@@ -6,6 +6,7 @@ __pycache__/
 env/
 venv/
 .venv/
+.venv*/
 *.egg-info/
 dist/
 build/
@@ -29,6 +30,10 @@ out/
 *.swp
 *.swo
 
+# Review/prompt artifacts
+CURSOR_PROMPT_*.md
+CLAUDE_AGENT_SDK_ASSESSMENT.md
+
 # OS
 .DS_Store
 Thumbs.db
@@ -43,3 +48,4 @@ htmlcov/
 *.pem
 *.key
 credentials.json
+*.xlsx

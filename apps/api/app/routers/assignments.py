@@ -13,6 +13,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
+from apps.api.app.db.connection import get_pool
 from apps.api.app.db.notifications import create_notification
 from apps.api.app.deps import get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.services.llm.router import LLMRouter
@@ -56,7 +57,7 @@ async def create_assignment(
     body: CreateAssignmentBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """Create a task assignment (top-down: assigner assigns to assignee or pool)."""
     if not x_tenant_id:
@@ -118,7 +119,7 @@ async def list_assignments(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     x_user_id: str = Header("", alias="X-User-ID"),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """List task assignments. assignee_user_id=me uses X-User-ID."""
     if not x_tenant_id:
@@ -160,7 +161,7 @@ async def list_pool_assignments(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """List assignments with no assignee (pool: anyone can claim)."""
     if not x_tenant_id:
@@ -204,7 +205,7 @@ async def claim_assignment(
     assignment_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """Claim a pool assignment (assignee was null). Atomic UPDATE to avoid race."""
     if not x_tenant_id or not x_user_id:
@@ -256,7 +257,7 @@ async def submit_assignment(
     assignment_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """Submit assignment for review (assignee only)."""
     if not x_tenant_id or not x_user_id:
@@ -308,7 +309,7 @@ async def update_assignment(
     assignment_id: str,
     body: UpdateAssignmentBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """Update assignment (status to in_progress, or other fields)."""
     if not x_tenant_id:
@@ -450,7 +451,7 @@ async def submit_review(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
     llm: LLMRouter = Depends(get_llm_router),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """Submit a review decision (approve / request_changes / reject). VA-P6-05. VA-P6-06: generates LLM learning points when corrections present."""
     if not x_tenant_id or not x_user_id:
@@ -570,7 +571,7 @@ async def list_reviews(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _: None = Depends(require_role(*ROLES_CAN_WRITE)),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """List reviews for an assignment. VA-P6-05."""
     if not x_tenant_id:
@@ -626,78 +627,84 @@ async def cron_deadline_reminders(
 
     now_ts = datetime.now(UTC)
     created = 0
-    conn = await asyncpg.connect(settings.database_url)
-    try:
-        tenant_rows = await conn.fetch("SELECT id FROM tenants")
-        for trow in tenant_rows:
-            tenant_id = trow["id"]
-            try:
-                async with tenant_conn(tenant_id) as tconn:
-                    for window_name, type_, delta_start, delta_end in [
-                        ("24h", "deadline_approaching_24h", timedelta(hours=23), timedelta(hours=25)),
-                        ("4h", "deadline_approaching_4h", timedelta(hours=3), timedelta(hours=5)),
-                    ]:
-                        start = now_ts + delta_start
-                        end = now_ts + delta_end
-                        rows = await tconn.fetch(
-                            """SELECT ta.assignment_id, ta.entity_type, ta.entity_id, ta.assignee_user_id
-                               FROM task_assignments ta
-                               WHERE ta.tenant_id = $1 AND ta.deadline IS NOT NULL AND ta.assignee_user_id IS NOT NULL
-                                 AND ta.status IN ('draft', 'assigned', 'in_progress', 'submitted')
-                                 AND ta.deadline > $2 AND ta.deadline <= $3
-                                 AND NOT EXISTS (
-                                   SELECT 1 FROM notifications n
-                                   WHERE n.tenant_id = $1 AND n.type = $4
-                                     AND n.entity_type = 'assignment' AND n.entity_id = ta.assignment_id
-                                     AND n.created_at > now() - interval '48 hours'
-                                 )""",
-                            tenant_id,
-                            start,
-                            end,
-                            type_,
-                        )
-                        for r in rows:
-                            await create_notification(
-                                tconn,
-                                tenant_id,
-                                type_,
-                                f"Deadline in {window_name}",
-                                body=f"Assignment {r['entity_type']} — {r['entity_id']} is due in {window_name}.",
-                                entity_type="assignment",
-                                entity_id=r["assignment_id"],
-                                user_id=r["assignee_user_id"],
-                            )
-                            created += 1
-                    overdue_rows = await tconn.fetch(
+    pool = get_pool()
+    if pool:
+        async with pool.acquire() as conn:
+            tenant_rows = await conn.fetch("SELECT id FROM tenants")
+    else:
+        conn = await asyncpg.connect(settings.database_url)
+        try:
+            tenant_rows = await conn.fetch("SELECT id FROM tenants")
+        finally:
+            await conn.close()
+
+    for trow in tenant_rows:
+        tenant_id = trow["id"]
+        try:
+            async with tenant_conn(tenant_id) as tconn:
+                for window_name, type_, delta_start, delta_end in [
+                    ("24h", "deadline_approaching_24h", timedelta(hours=23), timedelta(hours=25)),
+                    ("4h", "deadline_approaching_4h", timedelta(hours=3), timedelta(hours=5)),
+                ]:
+                    start = now_ts + delta_start
+                    end = now_ts + delta_end
+                    rows = await tconn.fetch(
                         """SELECT ta.assignment_id, ta.entity_type, ta.entity_id, ta.assignee_user_id
                            FROM task_assignments ta
                            WHERE ta.tenant_id = $1 AND ta.deadline IS NOT NULL AND ta.assignee_user_id IS NOT NULL
                              AND ta.status IN ('draft', 'assigned', 'in_progress', 'submitted')
-                             AND ta.deadline < $2
+                             AND ta.deadline > $2 AND ta.deadline <= $3
                              AND NOT EXISTS (
                                SELECT 1 FROM notifications n
-                               WHERE n.tenant_id = $1 AND n.type = 'deadline_overdue'
+                               WHERE n.tenant_id = $1 AND n.type = $4
                                  AND n.entity_type = 'assignment' AND n.entity_id = ta.assignment_id
-                                 AND n.created_at > now() - interval '7 days'
+                                 AND n.created_at > now() - interval '48 hours'
                              )""",
                         tenant_id,
-                        now_ts,
+                        start,
+                        end,
+                        type_,
                     )
-                    for r in overdue_rows:
+                    for r in rows:
                         await create_notification(
                             tconn,
                             tenant_id,
-                            "deadline_overdue",
-                            "Deadline passed",
-                            body=f"Assignment {r['entity_type']} — {r['entity_id']} is overdue.",
+                            type_,
+                            f"Deadline in {window_name}",
+                            body=f"Assignment {r['entity_type']} — {r['entity_id']} is due in {window_name}.",
                             entity_type="assignment",
                             entity_id=r["assignment_id"],
                             user_id=r["assignee_user_id"],
                         )
                         created += 1
-            except Exception as e:
-                logger.error("cron_deadline_tenant_error", tenant_id=tenant_id, error=str(e))
-                continue
-    finally:
-        await conn.close()
+                overdue_rows = await tconn.fetch(
+                    """SELECT ta.assignment_id, ta.entity_type, ta.entity_id, ta.assignee_user_id
+                       FROM task_assignments ta
+                       WHERE ta.tenant_id = $1 AND ta.deadline IS NOT NULL AND ta.assignee_user_id IS NOT NULL
+                         AND ta.status IN ('draft', 'assigned', 'in_progress', 'submitted')
+                         AND ta.deadline < $2
+                         AND NOT EXISTS (
+                           SELECT 1 FROM notifications n
+                           WHERE n.tenant_id = $1 AND n.type = 'deadline_overdue'
+                             AND n.entity_type = 'assignment' AND n.entity_id = ta.assignment_id
+                             AND n.created_at > now() - interval '7 days'
+                         )""",
+                    tenant_id,
+                    now_ts,
+                )
+                for r in overdue_rows:
+                    await create_notification(
+                        tconn,
+                        tenant_id,
+                        "deadline_overdue",
+                        "Deadline passed",
+                        body=f"Assignment {r['entity_type']} — {r['entity_id']} is overdue.",
+                        entity_type="assignment",
+                        entity_id=r["assignment_id"],
+                        user_id=r["assignee_user_id"],
+                    )
+                    created += 1
+        except Exception as e:
+            logger.error("cron_deadline_tenant_error", tenant_id=tenant_id, error=str(e))
+            continue
     return {"created": created}

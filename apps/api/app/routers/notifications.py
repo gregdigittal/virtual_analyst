@@ -1,4 +1,8 @@
-"""In-app notifications: list and mark read."""
+"""In-app notifications: list and mark read.
+
+Notification IDs are text (migration 0027 converts from uuid to text). Ensure 0027 is applied
+so path param notification_id matches the column type and asyncpg does not raise DataTypeMismatchError.
+"""
 
 from __future__ import annotations
 
@@ -76,11 +80,6 @@ async def mark_notification_read(
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
-        await conn.execute(
-            """UPDATE notifications SET read_at = now() WHERE id = $1 AND tenant_id = $2""",
-            notification_id,
-            x_tenant_id,
-        )
         row = await conn.fetchrow(
             "SELECT id, user_id, read_at FROM notifications WHERE id = $1 AND tenant_id = $2",
             notification_id,
@@ -90,7 +89,13 @@ async def mark_notification_read(
             raise HTTPException(404, "Notification not found")
         if row["user_id"] and row["user_id"] != x_user_id:
             raise HTTPException(403, "Cannot mark another user's notification as read")
+        updated = await conn.fetchrow(
+            """UPDATE notifications SET read_at = now() WHERE id = $1 AND tenant_id = $2
+               RETURNING id, read_at""",
+            notification_id,
+            x_tenant_id,
+        )
         return {
-            "id": notification_id,
-            "read_at": row["read_at"].isoformat() if row["read_at"] else None,
+            "id": updated["id"],
+            "read_at": updated["read_at"].isoformat() if updated and updated["read_at"] else None,
         }

@@ -579,11 +579,11 @@ async def export_board_pack(
     )
 
 
-@router.delete("/{pack_id}")
+@router.delete("/{pack_id}", status_code=204)
 async def delete_board_pack(
     pack_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     """Delete a board pack."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -595,4 +595,3 @@ async def delete_board_pack(
         )
     if result == "DELETE 0":
         raise HTTPException(404, "Board pack not found")
-    return {"pack_id": pack_id, "deleted": True}

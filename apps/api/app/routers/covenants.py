@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -94,11 +94,11 @@ async def create_covenant(
     }
 
 
-@router.delete("/{covenant_id}")
+@router.delete("/{covenant_id}", status_code=204)
 async def delete_covenant(
     covenant_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Literal["ok"]]:
+) -> None:
     """Delete a covenant definition."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -119,4 +119,3 @@ async def delete_covenant(
                 "covenant_definition",
                 covenant_id,
             )
-    return {"ok": "ok"}

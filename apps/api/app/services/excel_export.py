@@ -68,4 +68,5 @@ def build_run_excel(
 
     buf = io.BytesIO()
     wb.save(buf)
+    wb.close()
     return buf.getvalue()

@@ -10,15 +10,41 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from apps.api.app.deps import require_role, ROLES_CAN_WRITE
-from apps.worker.celery_app import celery_app
+from apps.worker.celery_app import REDIS_URL, celery_app
 from apps.worker.tasks import add
 
 router = APIRouter(prefix="/jobs", tags=["jobs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 TASK_REGISTRY: dict[str, Any] = {"add": add}
 
-# Track task-to-tenant mapping for authorization
-_task_tenant_map: dict[str, str] = {}
+JOB_TENANT_KEY_PREFIX = "job:tenant:"
+JOB_TENANT_TTL_SEC = 7 * 86400  # 7 days
+
+
+def _get_redis():
+    import redis
+    return redis.Redis.from_url(REDIS_URL)
+
+
+def _task_tenant_set(task_id: str, tenant_id: str) -> None:
+    """Store task_id -> tenant_id in Redis for authorization (survives restarts)."""
+    try:
+        r = _get_redis()
+        key = f"{JOB_TENANT_KEY_PREFIX}{task_id}"
+        r.setex(key, JOB_TENANT_TTL_SEC, tenant_id)
+    except Exception:
+        pass
+
+
+def _task_tenant_get(task_id: str) -> str | None:
+    """Return tenant_id for task_id from Redis, or None if not found."""
+    try:
+        r = _get_redis()
+        key = f"{JOB_TENANT_KEY_PREFIX}{task_id}"
+        raw = r.get(key)
+        return raw.decode("utf-8") if raw else None
+    except Exception:
+        return None
 
 
 class EnqueueBody(BaseModel):
@@ -61,7 +87,7 @@ async def enqueue_job(
     try:
         merged_kwargs = {**(body.kwargs or {}), "_tenant_id": x_tenant_id}
         result = task_cls.apply_async(args=body.args, kwargs=merged_kwargs)
-        _task_tenant_map[result.id] = x_tenant_id
+        _task_tenant_set(result.id, x_tenant_id)
         return {"task_id": result.id}
     except Exception as e:
         raise HTTPException(500, str(e)) from e
@@ -75,8 +101,10 @@ async def get_job_status(
     """Return task state (PENDING, STARTED, SUCCESS, FAILURE, RETRY) and result or error."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    owner = _task_tenant_map.get(task_id)
-    if owner and owner != x_tenant_id:
+    owner = _task_tenant_get(task_id)
+    if owner is None:
+        raise HTTPException(404, "Task not found")
+    if owner != x_tenant_id:
         raise HTTPException(403, "Not authorized to view this task")
     try:
         return await asyncio.to_thread(_get_task_status, task_id)

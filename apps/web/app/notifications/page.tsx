@@ -13,19 +13,24 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
       const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.id) return;
+      const tid =
+        (user.app_metadata?.tenant_id as string) ??
+        (user.user_metadata?.tenant_id as string) ??
+        user.id;
       setTenantId(tid);
+      setUserId(user.id);
       try {
-        const res = await api.notifications.list(tid, false, 50, 0);
+        const res = await api.notifications.list(tid, user.id, false, 50, 0);
         if (!cancelled) {
           setItems(res.items);
           setUnreadCount(res.unread_count);
@@ -42,9 +47,9 @@ export default function NotificationsPage() {
   }, []);
 
   async function markRead(id: string) {
-    if (!tenantId) return;
+    if (!tenantId || !userId) return;
     try {
-      await api.notifications.markRead(tenantId, id);
+      await api.notifications.markRead(tenantId, userId, id);
       setItems((prev) =>
         prev.map((n) =>
           n.id === id ? { ...n, read_at: new Date().toISOString() } : n

@@ -388,7 +388,21 @@ async def update_member(
                     WHERE tenant_id = $1 AND team_id = $2 AND user_id = $3""",
                 *params,
             )
-    return await list_members(team_id, x_tenant_id)
+        row = await conn.fetchrow(
+            """SELECT user_id, job_function_id, reports_to, created_at
+               FROM team_members WHERE tenant_id = $1 AND team_id = $2 AND user_id = $3""",
+            x_tenant_id,
+            team_id,
+            user_id,
+        )
+    if not row:
+        raise HTTPException(404, "Member not found")
+    return {
+        "user_id": row["user_id"],
+        "job_function_id": row["job_function_id"],
+        "reports_to": row["reports_to"],
+        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+    }
 
 
 @router.delete("/{team_id}/members/{user_id}", status_code=204)

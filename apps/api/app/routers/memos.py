@@ -196,11 +196,11 @@ async def download_memo(
     )
 
 
-@router.delete("/{memo_id}")
+@router.delete("/{memo_id}", status_code=204)
 async def delete_memo(
     memo_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     """Delete a memo pack."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -212,4 +212,3 @@ async def delete_memo(
         )
     if result == "DELETE 0":
         raise HTTPException(404, "Memo not found")
-    return {"memo_id": memo_id, "deleted": True}

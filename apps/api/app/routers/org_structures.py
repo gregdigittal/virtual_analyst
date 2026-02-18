@@ -136,6 +136,18 @@ def _parse_fx_dict(raw: dict[str, float]) -> dict[tuple[str, str], float]:
     return out
 
 
+# Allowlisted column names for dynamic UPDATE (M-13: avoid injection from model_dump)
+_ORG_STRUCTURES_UPDATE_COLUMNS = frozenset(
+    {"group_name", "reporting_currency", "status", "consolidation_method", "eliminate_intercompany", "minority_interest_treatment"}
+)
+_ORG_ENTITIES_UPDATE_COLUMNS = frozenset(
+    {"name", "entity_type", "currency", "country_iso", "tax_jurisdiction", "tax_rate", "withholding_tax_rate", "is_root", "baseline_id", "status"}
+)
+_ORG_INTERCOMPANY_UPDATE_COLUMNS = frozenset(
+    {"description", "driver_ref", "amount_or_rate", "frequency", "withholding_tax_applicable"}
+)
+
+
 # ---------- Org structure CRUD ----------
 
 
@@ -307,7 +319,8 @@ async def update_org_structure(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    updates = body.model_dump(exclude_unset=True)
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if k in _ORG_STRUCTURES_UPDATE_COLUMNS}
     if not updates:
         return {"org_id": org_id}
     set_clause = ", ".join(f"{k} = ${i+3}" for i, k in enumerate(updates))
@@ -320,18 +333,17 @@ async def update_org_structure(
     return {"org_id": org_id, "updated": list(updates.keys())}
 
 
-@router.delete("/{org_id}")
+@router.delete("/{org_id}", status_code=204)
 async def delete_org_structure(
     org_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         r = await conn.execute("DELETE FROM org_structures WHERE tenant_id = $1 AND org_id = $2", x_tenant_id, org_id)
     if r == "DELETE 0":
         raise HTTPException(404, "Org structure not found")
-    return {"ok": True}
 
 
 # ---------- Entity CRUD ----------
@@ -413,7 +425,8 @@ async def update_entity(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    updates = body.model_dump(exclude_unset=True)
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if k in _ORG_ENTITIES_UPDATE_COLUMNS}
     if not updates:
         return {"entity_id": entity_id}
     set_clause = ", ".join(f"{k} = ${i+4}" for i, k in enumerate(updates))
@@ -428,12 +441,12 @@ async def update_entity(
     return {"entity_id": entity_id, "updated": list(updates.keys())}
 
 
-@router.delete("/{org_id}/entities/{entity_id}")
+@router.delete("/{org_id}/entities/{entity_id}", status_code=204)
 async def delete_entity(
     org_id: str,
     entity_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
@@ -445,7 +458,6 @@ async def delete_entity(
         )
     if r == "DELETE 0":
         raise HTTPException(404, "Entity not found")
-    return {"ok": True}
 
 
 # ---------- Ownership ----------
@@ -521,13 +533,13 @@ async def list_ownership(
     }
 
 
-@router.delete("/{org_id}/ownership/{parent_id}/{child_id}")
+@router.delete("/{org_id}/ownership/{parent_id}/{child_id}", status_code=204)
 async def delete_ownership(
     org_id: str,
     parent_id: str,
     child_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
@@ -540,7 +552,6 @@ async def delete_ownership(
         )
     if r == "DELETE 0":
         raise HTTPException(404, "Ownership link not found")
-    return {"ok": True}
 
 
 # ---------- Intercompany ----------
@@ -618,7 +629,8 @@ async def update_intercompany(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
-    updates = body.model_dump(exclude_unset=True)
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if k in _ORG_INTERCOMPANY_UPDATE_COLUMNS}
     if not updates:
         return {"link_id": link_id}
     set_clause = ", ".join(f"{k} = ${i+4}" for i, k in enumerate(updates))
@@ -633,12 +645,12 @@ async def update_intercompany(
     return {"link_id": link_id, "updated": list(updates.keys())}
 
 
-@router.delete("/{org_id}/intercompany/{link_id}")
+@router.delete("/{org_id}/intercompany/{link_id}", status_code=204)
 async def delete_intercompany(
     org_id: str,
     link_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
@@ -650,7 +662,6 @@ async def delete_intercompany(
         )
     if r == "DELETE 0":
         raise HTTPException(404, "Intercompany link not found")
-    return {"ok": True}
 
 
 # ---------- Hierarchy (nested tree) ----------

@@ -1,6 +1,7 @@
 "use client";
 
 import { VAButton, VAInput } from "@/components/ui";
+import { getAppBaseUrl } from "@/lib/app-url";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import Link from "next/link";
@@ -23,8 +24,8 @@ function SignUpForm() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const redirectTo = `${origin}/auth/callback${next && next !== "/baselines" ? `?next=${encodeURIComponent(next)}` : ""}`;
+      const baseUrl = getAppBaseUrl();
+      const redirectTo = `${baseUrl}/auth/callback${next && next !== "/baselines" ? `?next=${encodeURIComponent(next)}` : ""}`;
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: provider === "azure" ? "azure" : "google",
         options: { redirectTo },
@@ -58,7 +59,7 @@ function SignUpForm() {
       const { data, error: err } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}` },
+        options: { emailRedirectTo: `${getAppBaseUrl()}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}` },
       });
 
       if (err) {

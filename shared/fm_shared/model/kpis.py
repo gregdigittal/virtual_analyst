@@ -28,19 +28,24 @@ def calculate_kpis(statements: Statements) -> list[dict[str, Any]]:
         net_margin_pct = (ni / rev * 100) if rev else 0.0
 
         rev_prev = is_list[t - 1]["revenue"] if t > 0 else rev
-        revenue_growth_pct = ((rev - rev_prev) / rev_prev * 100) if rev_prev else 0.0
+        revenue_growth_pct: float | None = (
+            None if t == 0 else (((rev - rev_prev) / rev_prev * 100) if rev_prev else 0.0)
+        )
 
         ca = bs_list[t]["total_current_assets"]
-        cl = bs_list[t]["total_liabilities"]
-        current_ratio = (ca / cl) if cl else 0.0
+        # Use current liabilities (e.g. total_current_liabilities or accounts_payable), not total_liabilities
+        cl_current = bs_list[t].get("total_current_liabilities") or bs_list[t].get("accounts_payable") or 0.0
+        current_ratio = (ca / cl_current) if cl_current else 0.0
 
+        # Debt not yet modeled; debt_equity and dscr are N/A (None) until total_debt/principal exist
         total_debt = 0.0
         total_equity = bs_list[t]["total_equity"]
-        debt_equity = (total_debt / total_equity) if total_equity else 0.0
+        debt_equity = (total_debt / total_equity) if (total_equity and total_debt) else None
 
         interest = is_list[t]["interest_expense"]
         principal = 0.0
-        dscr = (ebitda / (interest + principal)) if (interest + principal) else 0.0
+        debt_service = interest + principal
+        dscr = (ebitda / debt_service) if debt_service else None
 
         roe = (ni / total_equity * 100) if total_equity else 0.0
 
@@ -65,10 +70,10 @@ def calculate_kpis(statements: Statements) -> list[dict[str, Any]]:
                 "gross_margin_pct": round(gross_margin_pct, 2),
                 "ebitda_margin_pct": round(ebitda_margin_pct, 2),
                 "net_margin_pct": round(net_margin_pct, 2),
-                "revenue_growth_pct": round(revenue_growth_pct, 2),
+                "revenue_growth_pct": round(revenue_growth_pct, 2) if revenue_growth_pct is not None else None,
                 "current_ratio": round(current_ratio, 2),
-                "debt_equity": round(debt_equity, 2),
-                "dscr": round(dscr, 2),
+                "debt_equity": round(debt_equity, 2) if debt_equity is not None else None,
+                "dscr": round(dscr, 2) if dscr is not None else None,
                 "roe": round(roe, 2),
                 "fcf": round(fcf, 2),
                 "cash_conversion_cycle": round(ccc, 2),

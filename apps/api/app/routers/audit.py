@@ -112,7 +112,6 @@ async def export_events(
             headers={"Content-Disposition": 'attachment; filename="audit_export.csv"'},
         )
 
-    import json
     body = json.dumps({"events": events}).encode("utf-8")
     return StreamingResponse(
         iter([body]),

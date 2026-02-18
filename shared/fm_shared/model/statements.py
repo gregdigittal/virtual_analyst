@@ -133,8 +133,9 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
     ar_days, ap_days, inv_days = (
         zip(*wc_days) if wc_days else ([0] * horizon, [0] * horizon, [0] * horizon)
     )
-    rev_30 = [revenue[t] / 30.0 if t < horizon else 0.0 for t in range(horizon)]
-    cogs_30 = [cogs[t] / 30.0 if t < horizon else 0.0 for t in range(horizon)]
+    days_per_period = 30.0 if getattr(config.metadata, "resolution", "monthly") == "monthly" else 365.0
+    rev_30 = [revenue[t] / days_per_period if t < horizon else 0.0 for t in range(horizon)]
+    cogs_30 = [cogs[t] / days_per_period if t < horizon else 0.0 for t in range(horizon)]
 
     ar = [rev_30[t] * ar_days[t] for t in range(horizon)]
     ap = [cogs_30[t] * ap_days[t] for t in range(horizon)]

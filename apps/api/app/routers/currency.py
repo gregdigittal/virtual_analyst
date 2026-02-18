@@ -188,13 +188,13 @@ async def add_fx_rate(
     }
 
 
-@router.delete("/rates/{from_currency}/{to_currency}/{effective_date}")
+@router.delete("/rates/{from_currency}/{to_currency}/{effective_date}", status_code=204)
 async def delete_fx_rate(
     from_currency: str,
     to_currency: str,
     effective_date: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     """Delete a single FX rate."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -213,7 +213,6 @@ async def delete_fx_rate(
         )
     if n == "DELETE 0":
         raise HTTPException(404, "FX rate not found")
-    return {"ok": True}
 
 
 # --- Conversion helper (for run output / board pack) ---

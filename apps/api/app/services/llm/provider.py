@@ -47,7 +47,8 @@ class LLMResponse:
 
 
 def _ensure_additional_properties_false(schema: dict[str, Any]) -> dict[str, Any]:
-    """Recursively set additionalProperties: false on object schemas for provider compatibility."""
+    """Recursively set additionalProperties: false on object schemas for provider compatibility.
+    Recurses into properties, items, schema, anyOf, oneOf, and allOf."""
     if not isinstance(schema, dict):
         return schema
     out = dict(schema)
@@ -63,6 +64,10 @@ def _ensure_additional_properties_false(schema: dict[str, Any]) -> dict[str, Any
             out[key] = _ensure_additional_properties_false(val)
         elif isinstance(val, list):
             out[key] = [_ensure_additional_properties_false(i) for i in val]
+    for key in ("anyOf", "oneOf", "allOf"):
+        if key not in out or not isinstance(out[key], list):
+            continue
+        out[key] = [_ensure_additional_properties_false(i) for i in out[key] if isinstance(i, dict)]
     return out
 
 
@@ -152,7 +157,10 @@ class AnthropicProvider(LLMProvider):
             if hasattr(block, "text"):
                 text += block.text
         raw_text = text or ""
-        content = json.loads(raw_text) if raw_text else {}
+        try:
+            content = json.loads(raw_text) if raw_text else {}
+        except json.JSONDecodeError:
+            content = {}
         if response_schema is not None:
             import jsonschema
             try:
@@ -160,11 +168,14 @@ class AnthropicProvider(LLMProvider):
             except jsonschema.ValidationError as ve:
                 raise ValueError(f"LLM response does not match schema: {ve.message}") from ve
         usage = response.usage
-        tokens = TokenUsage(
-            prompt_tokens=usage.input_tokens,
-            completion_tokens=usage.output_tokens,
-            total_tokens=usage.input_tokens + usage.output_tokens,
-        )
+        if usage is not None:
+            tokens = TokenUsage(
+                prompt_tokens=usage.input_tokens,
+                completion_tokens=usage.output_tokens,
+                total_tokens=usage.input_tokens + usage.output_tokens,
+            )
+        else:
+            tokens = TokenUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
         cost = _estimate_cost_usd(
             self.provider_name, self._model, tokens.prompt_tokens, tokens.completion_tokens
         )
@@ -226,7 +237,10 @@ class OpenAIProvider(LLMProvider):
         latency_ms = int((time.perf_counter() - start) * 1000)
         choice = response.choices[0] if response.choices else None
         raw_text = (choice.message.content or "") if choice else ""
-        content = json.loads(raw_text) if raw_text else {}
+        try:
+            content = json.loads(raw_text) if raw_text else {}
+        except json.JSONDecodeError:
+            content = {}
         if response_schema is not None:
             import jsonschema
             try:
@@ -234,11 +248,14 @@ class OpenAIProvider(LLMProvider):
             except jsonschema.ValidationError as ve:
                 raise ValueError(f"LLM response does not match schema: {ve.message}") from ve
         usage = response.usage
-        tokens = TokenUsage(
-            prompt_tokens=usage.prompt_tokens,
-            completion_tokens=usage.completion_tokens,
-            total_tokens=usage.total_tokens,
-        )
+        if usage is not None:
+            tokens = TokenUsage(
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
+                total_tokens=usage.total_tokens,
+            )
+        else:
+            tokens = TokenUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
         cost = _estimate_cost_usd(
             self.provider_name, self._model, tokens.prompt_tokens, tokens.completion_tokens
         )

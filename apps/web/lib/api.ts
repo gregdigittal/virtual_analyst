@@ -283,7 +283,7 @@ export const api = {
     list: (tenantId: string) =>
       request<BaselinesResponse>("/api/v1/baselines", { tenantId }),
     get: (tenantId: string, baselineId: string) =>
-      request<{ model_config: unknown }>(
+      request<{ model_config: unknown } & Record<string, unknown>>(
         `/api/v1/baselines/${encodeURIComponent(baselineId)}`,
         { tenantId }
       ),
@@ -305,7 +305,7 @@ export const api = {
       baselineId: string,
       opts?: { scenarioId?: string; mcEnabled?: boolean; numSimulations?: number; seed?: number }
     ) =>
-      request<{ run_id: string; status: string; task_id?: string }>("/api/v1/runs", {
+      request<{ run_id: string; status: string; task_id?: string } & Record<string, unknown>>("/api/v1/runs", {
         tenantId,
         method: "POST",
         body: {
@@ -325,10 +325,9 @@ export const api = {
         { tenantId }
       ),
     getSensitivity: (tenantId: string, runId: string, pct?: number) =>
-      request<{ base_fcf: number; pct: number; drivers: { ref: string; impact_low: number; impact_high: number }[] }>(
-        `/api/v1/runs/${encodeURIComponent(runId)}/sensitivity?pct=${pct ?? 0.1}`,
-        { tenantId }
-      ),
+      request<
+        { base_fcf: number; pct: number; drivers: { ref: string; impact_low: number; impact_high: number }[] } & Record<string, unknown>
+      >(`/api/v1/runs/${encodeURIComponent(runId)}/sensitivity?pct=${pct ?? 0.1}`, { tenantId }),
     getStatements: (tenantId: string, runId: string) =>
       request<StatementsData>(
         `/api/v1/runs/${encodeURIComponent(runId)}/statements`,
@@ -388,19 +387,25 @@ export const api = {
       ),
   },
   notifications: {
-    list: (tenantId: string, unreadOnly?: boolean, limit?: number, offset?: number) =>
+    list: (
+      tenantId: string,
+      userId: string | undefined,
+      unreadOnly?: boolean,
+      limit?: number,
+      offset?: number
+    ) =>
       request<NotificationsResponse>(
         `/api/v1/notifications?${new URLSearchParams({
           ...(unreadOnly && { unread_only: "true" }),
           ...(limit != null && { limit: String(limit) }),
           ...(offset != null && { offset: String(offset) }),
         }).toString()}`,
-        { tenantId }
+        { tenantId, userId }
       ),
-    markRead: (tenantId: string, notificationId: string) =>
+    markRead: (tenantId: string, userId: string, notificationId: string) =>
       request<{ id: string; read_at: string | null }>(
         `/api/v1/notifications/${encodeURIComponent(notificationId)}`,
-        { tenantId, method: "PATCH" }
+        { tenantId, userId, method: "PATCH" }
       ),
   },
   scenarios: {

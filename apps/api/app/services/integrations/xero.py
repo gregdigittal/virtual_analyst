@@ -92,7 +92,7 @@ class XeroAdapter(ERPAdapter):
             provider_tenant_id=tenant_id or None,
         )
 
-    async def refresh_token(self, refresh_token: str) -> str:
+    async def refresh_token(self, refresh_token: str) -> tuple[str, str]:
         token_basic = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()

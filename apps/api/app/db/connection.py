@@ -54,6 +54,11 @@ async def close_pool() -> None:
         _pool = None
 
 
+def get_pool() -> asyncpg.Pool | None:
+    """Return the connection pool (None if not yet initialized). Call init_pool() at app startup."""
+    return _pool
+
+
 async def get_conn() -> asyncpg.Connection:
     """Return a connection from the pool, or a new connection if pool not initialized."""
     if _pool is not None:

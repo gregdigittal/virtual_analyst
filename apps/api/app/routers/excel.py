@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
@@ -94,8 +94,8 @@ async def create_excel_connection(
 @router.get("/connections")
 async def list_excel_connections(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List Excel connections for the tenant."""
     if not x_tenant_id:
@@ -147,11 +147,11 @@ async def update_excel_connection(
     return {"excel_connection_id": excel_connection_id, "updated": True}
 
 
-@router.delete("/connections/{excel_connection_id}")
+@router.delete("/connections/{excel_connection_id}", status_code=204)
 async def delete_excel_connection(
     excel_connection_id: str,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     """Delete an Excel connection."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
@@ -159,7 +159,6 @@ async def delete_excel_connection(
         ok = await db_delete_connection(conn, x_tenant_id, excel_connection_id)
     if not ok:
         raise HTTPException(404, "Excel connection not found")
-    return {"excel_connection_id": excel_connection_id, "deleted": True}
 
 
 @router.post("/connections/{excel_connection_id}/pull")

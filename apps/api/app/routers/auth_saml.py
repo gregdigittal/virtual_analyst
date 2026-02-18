@@ -17,9 +17,16 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 import structlog
 
+try:
+    from signxml import XMLVerifier
+    from signxml.exceptions import InvalidSignature
+except ImportError:
+    XMLVerifier = None  # type: ignore[misc, assignment]
+    InvalidSignature = Exception  # type: ignore[misc, assignment]
+
 from apps.api.app.core.settings import get_settings
 from apps.api.app.db import ensure_tenant, tenant_conn
-from apps.api.app.db.connection import get_conn
+from apps.api.app.db.connection import get_pool
 from apps.api.app.deps import require_role, ROLES_OWNER_OR_ADMIN
 
 logger = structlog.get_logger()
@@ -36,6 +43,7 @@ class SamlConfigBody(BaseModel):
     entity_id: str = Field(..., min_length=1)
     acs_url: str = Field(..., min_length=1)
     idp_sso_url: str | None = None
+    idp_certificate: str | None = Field(None, description="PEM-formatted X.509 cert from IdP for signature verification")
     attribute_mapping: dict[str, str] = Field(default_factory=dict, description="IdP attribute name -> tenant_id | email | name")
 
 
@@ -44,18 +52,14 @@ async def saml_login(
     tenant_id: str = Query(..., alias="tenant"),
 ) -> RedirectResponse:
     """Redirect user to IdP for SAML login (VA-P8-02). Client calls with ?tenant=."""
-    conn = await get_conn()
-    try:
-        await conn.execute("SET app.tenant_id = $1", tenant_id)
+    async with tenant_conn(tenant_id) as conn:
         row = await conn.fetchrow(
             "SELECT idp_sso_url, entity_id, acs_url FROM tenant_saml_config WHERE tenant_id = $1",
             tenant_id,
         )
-    finally:
-        await conn.close()
     if not row or not row["idp_sso_url"]:
         raise HTTPException(404, "SAML not configured for this tenant")
-    # Build minimal AuthnRequest (SAML 2.0)
+    # Build minimal AuthnRequest (SAML 2.0); AssertionConsumerServiceURL per spec
     acs_url = row["acs_url"]
     entity_id = row["entity_id"]
     req_id = f"_{uuid.uuid4().hex}"
@@ -79,69 +83,84 @@ async def saml_login(
 async def saml_acs(
     request: Request,
 ) -> RedirectResponse:
-    """SAML ACS: IdP POSTs SAMLResponse here. Parse, create/link user, issue JWT, redirect (VA-P8-02)."""
+    """SAML ACS: IdP POSTs SAMLResponse here. Parse, verify signature, create/link user, issue JWT, redirect (VA-P8-02)."""
     form = await request.form()
     saml_response_b64 = form.get("SAMLResponse")
-    relay_state = form.get("RelayState", "").strip()
     if not saml_response_b64:
         raise HTTPException(400, "Missing SAMLResponse")
-    tenant_id = relay_state or None
     try:
         raw = base64.b64decode(saml_response_b64)
         root = ET.fromstring(raw.decode("utf-8") if isinstance(raw, bytes) else raw)
     except Exception as e:
         raise HTTPException(400, f"Invalid SAML response: {e}") from e
-    # R11-01: Reject unsigned SAML in production until IdP signature verification is implemented
-    # TODO(VA-P8-02): Integrate signxml or python3-saml to verify the IdP's XML signature
-    # against the certificate from tenant_saml_config.
-    settings = get_settings()
-    if settings.environment not in ("development", "test"):
-        raise HTTPException(
-            501,
-            "SAML signature verification not yet implemented; "
-            "SSO is disabled in production until IdP signature validation is added.",
-        )
-    logger.warning("saml_acs_no_signature_verification", tenant_id=relay_state or "unknown")
-    # Extract NameID and attributes from first Assertion
-    assertion = root.find(".//saml:Assertion", NS) or root.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}Assertion")
-    if assertion is None:
-        raise HTTPException(400, "No Assertion in SAML response")
-    name_id_el = assertion.find(".//saml:NameID", NS) or assertion.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}NameID")
-    name_id = name_id_el.text if name_id_el is not None and name_id_el.text else None
-    attrs: dict[str, str] = {}
-    for attr in assertion.findall(".//saml:Attribute", NS) or assertion.findall(".//{urn:oasis:names:tc:SAML:2.0:assertion}Attribute"):
-        name = attr.get("Name")
-        val_el = attr.find(".//saml:AttributeValue", NS) or attr.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}AttributeValue")
-        if name and val_el is not None and val_el.text:
-            attrs[name] = val_el.text
-    if not name_id and not attrs:
-        raise HTTPException(400, "No NameID or attributes in Assertion")
-    # Resolve tenant_id from config (if not in RelayState) via entity_id in response (R11-10: security-definer)
-    conn = await get_conn()
+
+    # FIX-C02: tenant_id ONLY from verified entity_id lookup — never from RelayState or attributes
+    issuer = root.find(".//saml:Issuer", NS) or root.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}Issuer")
+    entity_id_val = issuer.text if issuer is not None and issuer.text else None
+    if not entity_id_val:
+        raise HTTPException(400, "SAML response has no Issuer (entity_id)")
+    # Cross-tenant lookup: resolve tenant from entity_id (no RLS context yet)
+    pool = get_pool()
+    if pool is None:
+        raise HTTPException(503, "Database pool not available")
+    conn = await pool.acquire()
     try:
-        if not tenant_id:
-            issuer = root.find(".//saml:Issuer", NS) or root.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}Issuer")
-            entity_id_val = issuer.text if issuer is not None and issuer.text else None
-            if entity_id_val:
-                resolved = await conn.fetchval(
-                    "SELECT lookup_saml_tenant_by_entity_id($1)",
-                    entity_id_val,
-                )
-                if resolved:
-                    tenant_id = resolved
-        if not tenant_id:
-            raise HTTPException(400, "Could not determine tenant (set RelayState or configure entity_id)")
-        await conn.execute("SET app.tenant_id = $1", tenant_id)
+        tenant_id = await conn.fetchval(
+            "SELECT lookup_saml_tenant_by_entity_id($1)",
+            entity_id_val,
+        )
+    finally:
+        await pool.release(conn)
+    if not tenant_id:
+        raise HTTPException(400, "SAML response could not be mapped to a tenant")
+
+    # Use tenant-scoped connection for config, verification, and user upsert
+    async with tenant_conn(tenant_id) as conn:
         await ensure_tenant(conn, tenant_id)
         cfg = await conn.fetchrow(
-            "SELECT attribute_mapping_json FROM tenant_saml_config WHERE tenant_id = $1",
+            "SELECT idp_certificate, attribute_mapping_json FROM tenant_saml_config WHERE tenant_id = $1",
             tenant_id,
         )
+        if not cfg:
+            raise HTTPException(400, "SAML config not found for tenant")
+        idp_certificate_val = cfg["idp_certificate"] if cfg else None
+        idp_certificate: str | None = (idp_certificate_val or "").strip() or None
+        settings = get_settings()
+        if settings.environment not in ("development", "test"):
+            if not idp_certificate:
+                raise HTTPException(400, "SAML IdP certificate not configured for signature verification")
+            if XMLVerifier is None:
+                raise HTTPException(503, "SAML signature verification not available (signxml not installed)")
+            try:
+                XMLVerifier().verify(raw, x509_cert=idp_certificate)
+            except InvalidSignature as e:
+                logger.warning("saml_acs_signature_invalid", tenant_id=tenant_id, error=str(e))
+                raise HTTPException(400, "Invalid SAML response signature") from e
+        elif idp_certificate and XMLVerifier is not None:
+            try:
+                XMLVerifier().verify(raw, x509_cert=idp_certificate)
+            except InvalidSignature:
+                logger.warning("saml_acs_signature_invalid_dev", tenant_id=tenant_id)
+
         mapping = (cfg["attribute_mapping_json"] or {}) if cfg else {}
-        tenant_from_attr = mapping.get("tenant_id")
         email_attr = mapping.get("email", "email")
         name_attr = mapping.get("name", "name")
-        tenant_id = attrs.get(tenant_from_attr, tenant_id) if tenant_from_attr else tenant_id
+
+        # Extract NameID and attributes from first Assertion (after verification)
+        assertion = root.find(".//saml:Assertion", NS) or root.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}Assertion")
+        if assertion is None:
+            raise HTTPException(400, "No Assertion in SAML response")
+        name_id_el = assertion.find(".//saml:NameID", NS) or assertion.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}NameID")
+        name_id = name_id_el.text if name_id_el is not None and name_id_el.text else None
+        attrs = {}
+        for attr in assertion.findall(".//saml:Attribute", NS) or assertion.findall(".//{urn:oasis:names:tc:SAML:2.0:assertion}Attribute"):
+            name = attr.get("Name")
+            val_el = attr.find(".//saml:AttributeValue", NS) or attr.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}AttributeValue")
+            if name and val_el is not None and val_el.text:
+                attrs[name] = val_el.text
+        if not name_id and not attrs:
+            raise HTTPException(400, "No NameID or attributes in Assertion")
+
         email = attrs.get(email_attr) or name_id
         name = attrs.get(name_attr) or ""
         # R11-02: Derive SAML-scoped user ID; never use attacker-controlled value as PK or overwrite tenant_id
@@ -158,8 +177,7 @@ async def saml_acs(
             tenant_id,
             email,
         )
-    finally:
-        await conn.close()
+
     settings = get_settings()
     if not settings.supabase_jwt_secret:
         raise HTTPException(503, "SAML requires SUPABASE_JWT_SECRET for issuing tokens")
@@ -189,14 +207,14 @@ async def saml_acs(
 @router.get("/config")
 async def get_saml_config(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    _: None = Depends(require_role(*ROLES_OWNER_OR_ADMIN)),
+    _: None = require_role(*ROLES_OWNER_OR_ADMIN),
 ) -> dict[str, Any]:
     """Get SAML config for current tenant (if configured)."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         row = await conn.fetchrow(
-            "SELECT entity_id, acs_url, idp_sso_url, attribute_mapping_json FROM tenant_saml_config WHERE tenant_id = $1",
+            "SELECT entity_id, acs_url, idp_sso_url, idp_certificate, attribute_mapping_json FROM tenant_saml_config WHERE tenant_id = $1",
             x_tenant_id,
         )
     if not row:
@@ -206,6 +224,7 @@ async def get_saml_config(
         "entity_id": row["entity_id"],
         "acs_url": row["acs_url"],
         "idp_sso_url": row["idp_sso_url"],
+        "idp_certificate_configured": bool((row["idp_certificate"] or "").strip()),
         "attribute_mapping": row["attribute_mapping_json"] or {},
     }
 
@@ -214,7 +233,7 @@ async def get_saml_config(
 async def put_saml_config(
     body: SamlConfigBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    _: None = Depends(require_role(*ROLES_OWNER_OR_ADMIN)),
+    _: None = require_role(*ROLES_OWNER_OR_ADMIN),
 ) -> dict[str, Any]:
     """Create or update SAML config for tenant (VA-P8-02)."""
     if not x_tenant_id:
@@ -223,12 +242,13 @@ async def put_saml_config(
         raise HTTPException(400, "Provide idp_metadata_url, idp_metadata_xml, or idp_sso_url")
     async with tenant_conn(x_tenant_id) as conn:
         await conn.execute(
-            """INSERT INTO tenant_saml_config (tenant_id, idp_metadata_url, idp_metadata_xml, entity_id, acs_url, idp_sso_url, attribute_mapping_json, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())
+            """INSERT INTO tenant_saml_config (tenant_id, idp_metadata_url, idp_metadata_xml, entity_id, acs_url, idp_sso_url, idp_certificate, attribute_mapping_json, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())
                ON CONFLICT (tenant_id) DO UPDATE SET
                  idp_metadata_url = COALESCE(EXCLUDED.idp_metadata_url, tenant_saml_config.idp_metadata_url),
                  idp_metadata_xml = COALESCE(EXCLUDED.idp_metadata_xml, tenant_saml_config.idp_metadata_xml),
                  entity_id = EXCLUDED.entity_id, acs_url = EXCLUDED.acs_url, idp_sso_url = COALESCE(EXCLUDED.idp_sso_url, tenant_saml_config.idp_sso_url),
+                 idp_certificate = COALESCE(NULLIF(TRIM(EXCLUDED.idp_certificate), ''), tenant_saml_config.idp_certificate),
                  attribute_mapping_json = EXCLUDED.attribute_mapping_json, updated_at = now()""",
             x_tenant_id,
             body.idp_metadata_url,
@@ -236,6 +256,7 @@ async def put_saml_config(
             body.entity_id,
             body.acs_url,
             body.idp_sso_url,
+            (body.idp_certificate or "").strip() or None,
             json.dumps(body.attribute_mapping),
         )
     return {"ok": True}

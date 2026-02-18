@@ -60,16 +60,15 @@ async def set_benchmark_opt_in(
     return {"ok": True, "industry_segment": body.industry_segment, "size_segment": body.size_segment}
 
 
-@router.delete("/opt-in")
+@router.delete("/opt-in", status_code=204)
 async def delete_benchmark_opt_in(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-) -> dict[str, Any]:
+) -> None:
     """Opt out of peer benchmarking."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         await conn.execute("DELETE FROM tenant_benchmark_opt_in WHERE tenant_id = $1", x_tenant_id)
-    return {"ok": True}
 
 
 @router.get("/summary")

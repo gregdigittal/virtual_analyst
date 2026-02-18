@@ -1,5 +1,5 @@
 -- =============================================================================
--- Virtual Analyst — APPLY ALL MIGRATIONS (0008 through 0040)
+-- Virtual Analyst — APPLY ALL MIGRATIONS (0008 through 0046)
 -- =============================================================================
 -- Run this single script against your database to apply all pending migrations.
 -- Prerequisites: 0001_init.sql and 0002_functions_and_rls.sql must already be applied.
@@ -1586,3 +1586,243 @@ $$;
 comment on function lookup_saml_tenant_by_entity_id(text) is 'Used by SAML ACS to resolve tenant from IdP Issuer entity_id; SECURITY DEFINER bypasses RLS';
 
 create unique index if not exists uq_tenant_saml_config_entity_id on tenant_saml_config(entity_id);
+
+-- ############################################################################
+-- 0042_saml_idp_certificate.sql (FIX-C01)
+-- ############################################################################
+alter table tenant_saml_config
+  add column if not exists idp_certificate text;
+comment on column tenant_saml_config.idp_certificate is 'PEM-formatted X.509 certificate from IdP metadata; required for production SAML signature verification';
+
+-- ############################################################################
+-- 0043_llm_usage_log.sql (FIX-C03)
+-- ############################################################################
+create table if not exists llm_usage_log (
+    id bigint generated always as identity primary key,
+    tenant_id text not null references tenants(id) on delete cascade,
+    provider text not null default 'unknown',
+    tokens_total int not null default 0,
+    calls int not null default 1,
+    estimated_usd numeric(12, 6) not null default 0,
+    period text not null default to_char(now(), 'YYYY-MM'),
+    created_at timestamptz not null default now()
+);
+create index if not exists idx_llm_usage_log_tenant_period on llm_usage_log(tenant_id, period);
+comment on table llm_usage_log is 'One row per LLM call for usage metering; aggregated by get_usage()';
+alter table llm_usage_log enable row level security;
+create policy llm_usage_log_select on llm_usage_log for select using (tenant_id = current_setting('app.tenant_id', true));
+create policy llm_usage_log_insert on llm_usage_log for insert with check (tenant_id = current_setting('app.tenant_id', true));
+
+-- ############################################################################
+-- 0044_excel_ingestion_sessions.sql (VA-P9-01: Excel Model Ingestion)
+-- ############################################################################
+CREATE TABLE IF NOT EXISTS excel_ingestion_sessions (
+    tenant_id text NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    ingestion_id text NOT NULL,
+    filename text NOT NULL,
+    file_size_bytes bigint NOT NULL,
+    status text NOT NULL DEFAULT 'uploaded'
+        CHECK (status IN ('uploaded', 'parsing', 'parsed', 'analyzing', 'analyzed', 'mapping', 'draft_created', 'failed')),
+    sheet_count integer,
+    formula_count integer,
+    cross_ref_count integer,
+    classification_json jsonb DEFAULT '{}'::jsonb,
+    mapping_json jsonb DEFAULT '{}'::jsonb,
+    unmapped_items_json jsonb DEFAULT '[]'::jsonb,
+    draft_session_id text,
+    error_message text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    created_by text REFERENCES users(id) ON DELETE SET NULL,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, ingestion_id)
+);
+CREATE INDEX IF NOT EXISTS idx_excel_ingestion_tenant_status ON excel_ingestion_sessions(tenant_id, status);
+ALTER TABLE excel_ingestion_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "excel_ingestion_sessions_select" ON excel_ingestion_sessions;
+DROP POLICY IF EXISTS "excel_ingestion_sessions_insert" ON excel_ingestion_sessions;
+DROP POLICY IF EXISTS "excel_ingestion_sessions_update" ON excel_ingestion_sessions;
+DROP POLICY IF EXISTS "excel_ingestion_sessions_delete" ON excel_ingestion_sessions;
+CREATE POLICY "excel_ingestion_sessions_select" ON excel_ingestion_sessions FOR SELECT USING (tenant_id = current_tenant_id());
+CREATE POLICY "excel_ingestion_sessions_insert" ON excel_ingestion_sessions FOR INSERT WITH CHECK (tenant_id = current_tenant_id());
+CREATE POLICY "excel_ingestion_sessions_update" ON excel_ingestion_sessions FOR UPDATE USING (tenant_id = current_tenant_id());
+CREATE POLICY "excel_ingestion_sessions_delete" ON excel_ingestion_sessions FOR DELETE USING (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0045_org_structures.sql (VA-P9-02: Organization Hierarchy & Consolidation)
+-- ############################################################################
+CREATE TABLE IF NOT EXISTS org_structures (
+    tenant_id text NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    org_id text NOT NULL,
+    group_name text NOT NULL,
+    reporting_currency text NOT NULL DEFAULT 'USD',
+    status text NOT NULL DEFAULT 'draft'
+        CHECK (status IN ('draft', 'active', 'archived')),
+    consolidation_method text NOT NULL DEFAULT 'full'
+        CHECK (consolidation_method IN ('full', 'proportional', 'equity_method')),
+    eliminate_intercompany boolean NOT NULL DEFAULT true,
+    minority_interest_treatment text NOT NULL DEFAULT 'proportional'
+        CHECK (minority_interest_treatment IN ('proportional', 'full_goodwill')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    created_by text REFERENCES users(id) ON DELETE SET NULL,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, org_id)
+);
+CREATE INDEX IF NOT EXISTS idx_org_structures_tenant_status ON org_structures(tenant_id, status);
+CREATE TABLE IF NOT EXISTS org_entities (
+    tenant_id text NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    org_id text NOT NULL,
+    entity_id text NOT NULL,
+    name text NOT NULL,
+    entity_type text NOT NULL
+        CHECK (entity_type IN ('holding', 'operating', 'spv', 'jv', 'associate', 'branch')),
+    currency text NOT NULL DEFAULT 'USD',
+    country_iso text NOT NULL DEFAULT 'US',
+    tax_jurisdiction text,
+    tax_rate numeric CHECK (tax_rate IS NULL OR (tax_rate >= 0 AND tax_rate <= 1)),
+    withholding_tax_rate numeric DEFAULT 0
+        CHECK (withholding_tax_rate >= 0 AND withholding_tax_rate <= 1),
+    is_root boolean NOT NULL DEFAULT false,
+    baseline_id text,
+    status text NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'dormant', 'disposed')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, org_id, entity_id),
+    FOREIGN KEY (tenant_id, org_id)
+        REFERENCES org_structures(tenant_id, org_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_org_entities_org ON org_entities(tenant_id, org_id);
+CREATE INDEX IF NOT EXISTS idx_org_entities_baseline ON org_entities(tenant_id, baseline_id)
+    WHERE baseline_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS org_ownership_links (
+    tenant_id text NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    org_id text NOT NULL,
+    parent_entity_id text NOT NULL,
+    child_entity_id text NOT NULL,
+    ownership_pct numeric NOT NULL CHECK (ownership_pct > 0 AND ownership_pct <= 100),
+    voting_pct numeric CHECK (voting_pct IS NULL OR (voting_pct >= 0 AND voting_pct <= 100)),
+    consolidation_method text NOT NULL DEFAULT 'full'
+        CHECK (consolidation_method IN ('full', 'proportional', 'equity_method', 'not_consolidated')),
+    effective_date date,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, org_id, parent_entity_id, child_entity_id),
+    FOREIGN KEY (tenant_id, org_id, parent_entity_id)
+        REFERENCES org_entities(tenant_id, org_id, entity_id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id, org_id, child_entity_id)
+        REFERENCES org_entities(tenant_id, org_id, entity_id) ON DELETE CASCADE,
+    CHECK (parent_entity_id != child_entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_org_ownership_parent ON org_ownership_links(tenant_id, org_id, parent_entity_id);
+CREATE INDEX IF NOT EXISTS idx_org_ownership_child ON org_ownership_links(tenant_id, org_id, child_entity_id);
+CREATE TABLE IF NOT EXISTS org_intercompany_links (
+    tenant_id text NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    org_id text NOT NULL,
+    link_id text NOT NULL,
+    from_entity_id text NOT NULL,
+    to_entity_id text NOT NULL,
+    link_type text NOT NULL
+        CHECK (link_type IN ('management_fee', 'royalty', 'loan', 'trade', 'dividend')),
+    description text,
+    driver_ref text,
+    amount_or_rate numeric,
+    frequency text DEFAULT 'monthly'
+        CHECK (frequency IN ('monthly', 'quarterly', 'annual', 'one_time')),
+    withholding_tax_applicable boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, org_id, link_id),
+    FOREIGN KEY (tenant_id, org_id, from_entity_id)
+        REFERENCES org_entities(tenant_id, org_id, entity_id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id, org_id, to_entity_id)
+        REFERENCES org_entities(tenant_id, org_id, entity_id) ON DELETE CASCADE,
+    CHECK (from_entity_id != to_entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_org_intercompany_org ON org_intercompany_links(tenant_id, org_id);
+CREATE TABLE IF NOT EXISTS consolidated_runs (
+    tenant_id text NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    consolidated_run_id text NOT NULL,
+    org_id text NOT NULL,
+    status text NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+    entity_run_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+    consolidation_adjustments_json jsonb DEFAULT '{}'::jsonb,
+    fx_rates_used_json jsonb DEFAULT '{}'::jsonb,
+    error_message text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    created_by text REFERENCES users(id) ON DELETE SET NULL,
+    completed_at timestamptz,
+    PRIMARY KEY (tenant_id, consolidated_run_id),
+    FOREIGN KEY (tenant_id, org_id)
+        REFERENCES org_structures(tenant_id, org_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_consolidated_runs_org ON consolidated_runs(tenant_id, org_id);
+ALTER TABLE org_structures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE org_entities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE org_ownership_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE org_intercompany_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consolidated_runs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "org_structures_select" ON org_structures;
+DROP POLICY IF EXISTS "org_structures_insert" ON org_structures;
+DROP POLICY IF EXISTS "org_structures_update" ON org_structures;
+DROP POLICY IF EXISTS "org_structures_delete" ON org_structures;
+CREATE POLICY "org_structures_select" ON org_structures FOR SELECT USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_structures_insert" ON org_structures FOR INSERT WITH CHECK (tenant_id = current_tenant_id());
+CREATE POLICY "org_structures_update" ON org_structures FOR UPDATE USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_structures_delete" ON org_structures FOR DELETE USING (tenant_id = current_tenant_id());
+DROP POLICY IF EXISTS "org_entities_select" ON org_entities;
+DROP POLICY IF EXISTS "org_entities_insert" ON org_entities;
+DROP POLICY IF EXISTS "org_entities_update" ON org_entities;
+DROP POLICY IF EXISTS "org_entities_delete" ON org_entities;
+CREATE POLICY "org_entities_select" ON org_entities FOR SELECT USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_entities_insert" ON org_entities FOR INSERT WITH CHECK (tenant_id = current_tenant_id());
+CREATE POLICY "org_entities_update" ON org_entities FOR UPDATE USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_entities_delete" ON org_entities FOR DELETE USING (tenant_id = current_tenant_id());
+DROP POLICY IF EXISTS "org_ownership_links_select" ON org_ownership_links;
+DROP POLICY IF EXISTS "org_ownership_links_insert" ON org_ownership_links;
+DROP POLICY IF EXISTS "org_ownership_links_update" ON org_ownership_links;
+DROP POLICY IF EXISTS "org_ownership_links_delete" ON org_ownership_links;
+CREATE POLICY "org_ownership_links_select" ON org_ownership_links FOR SELECT USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_ownership_links_insert" ON org_ownership_links FOR INSERT WITH CHECK (tenant_id = current_tenant_id());
+CREATE POLICY "org_ownership_links_update" ON org_ownership_links FOR UPDATE USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_ownership_links_delete" ON org_ownership_links FOR DELETE USING (tenant_id = current_tenant_id());
+DROP POLICY IF EXISTS "org_intercompany_links_select" ON org_intercompany_links;
+DROP POLICY IF EXISTS "org_intercompany_links_insert" ON org_intercompany_links;
+DROP POLICY IF EXISTS "org_intercompany_links_update" ON org_intercompany_links;
+DROP POLICY IF EXISTS "org_intercompany_links_delete" ON org_intercompany_links;
+CREATE POLICY "org_intercompany_links_select" ON org_intercompany_links FOR SELECT USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_intercompany_links_insert" ON org_intercompany_links FOR INSERT WITH CHECK (tenant_id = current_tenant_id());
+CREATE POLICY "org_intercompany_links_update" ON org_intercompany_links FOR UPDATE USING (tenant_id = current_tenant_id());
+CREATE POLICY "org_intercompany_links_delete" ON org_intercompany_links FOR DELETE USING (tenant_id = current_tenant_id());
+DROP POLICY IF EXISTS "consolidated_runs_select" ON consolidated_runs;
+DROP POLICY IF EXISTS "consolidated_runs_insert" ON consolidated_runs;
+DROP POLICY IF EXISTS "consolidated_runs_update" ON consolidated_runs;
+DROP POLICY IF EXISTS "consolidated_runs_delete" ON consolidated_runs;
+CREATE POLICY "consolidated_runs_select" ON consolidated_runs FOR SELECT USING (tenant_id = current_tenant_id());
+CREATE POLICY "consolidated_runs_insert" ON consolidated_runs FOR INSERT WITH CHECK (tenant_id = current_tenant_id());
+CREATE POLICY "consolidated_runs_update" ON consolidated_runs FOR UPDATE USING (tenant_id = current_tenant_id());
+CREATE POLICY "consolidated_runs_delete" ON consolidated_runs FOR DELETE USING (tenant_id = current_tenant_id());
+
+-- ############################################################################
+-- 0046_fix_llm_usage_log_rls.sql — Use current_tenant_id() for RLS (Round 12 H-03)
+-- ############################################################################
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'llm_usage_log') THEN
+    DROP POLICY IF EXISTS llm_usage_log_select ON llm_usage_log;
+    DROP POLICY IF EXISTS llm_usage_log_insert ON llm_usage_log;
+    CREATE POLICY "llm_usage_log_select" ON llm_usage_log
+      FOR SELECT USING (tenant_id = current_tenant_id());
+    CREATE POLICY "llm_usage_log_insert" ON llm_usage_log
+      FOR INSERT WITH CHECK (tenant_id = current_tenant_id());
+  END IF;
+END $$;
+
+-- ############################################################################
+-- 0047_order_by_indexes.sql — Covering indexes for list ORDER BY created_at DESC
+-- ############################################################################
+CREATE INDEX IF NOT EXISTS idx_excel_ingestion_tenant_created
+    ON excel_ingestion_sessions(tenant_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_consolidated_runs_org_created
+    ON consolidated_runs(tenant_id, org_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_org_structures_tenant_created
+    ON org_structures(tenant_id, created_at DESC);
