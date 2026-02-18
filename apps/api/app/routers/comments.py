@@ -107,7 +107,7 @@ async def list_comments(
     entity_type: str = Query(..., description="Entity type"),
     entity_id: str = Query(..., description="Entity ID"),
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List comments for an entity (flat list; parent_comment_id indicates threading)."""
@@ -117,6 +117,13 @@ async def list_comments(
         raise HTTPException(400, f"entity_type must be one of: {sorted(ENTITY_TYPES)}")
 
     async with tenant_conn(x_tenant_id) as conn:
+        total = await conn.fetchval(
+            """SELECT count(*) FROM comments
+               WHERE tenant_id = $1 AND entity_type = $2 AND entity_id = $3""",
+            x_tenant_id,
+            entity_type,
+            entity_id,
+        )
         rows = await conn.fetch(
             """SELECT comment_id, entity_type, entity_id, parent_comment_id, body, created_at, created_by
                FROM comments
@@ -130,20 +137,19 @@ async def list_comments(
             offset,
         )
 
-    return {
-        "comments": [
-            {
-                "comment_id": r["comment_id"],
-                "entity_type": r["entity_type"],
-                "entity_id": r["entity_id"],
-                "parent_comment_id": r["parent_comment_id"],
-                "body": r["body"],
-                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-                "created_by": r["created_by"],
-            }
-            for r in rows
-        ],
-    }
+    items = [
+        {
+            "comment_id": r["comment_id"],
+            "entity_type": r["entity_type"],
+            "entity_id": r["entity_id"],
+            "parent_comment_id": r["parent_comment_id"],
+            "body": r["body"],
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "created_by": r["created_by"],
+        }
+        for r in rows
+    ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.delete("/{comment_id}", status_code=204)

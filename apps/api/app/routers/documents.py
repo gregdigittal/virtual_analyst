@@ -97,7 +97,7 @@ async def list_documents(
     entity_type: str = Query(..., description="Entity type"),
     entity_id: str = Query(..., description="Entity ID"),
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List document attachments for an entity."""
@@ -107,6 +107,13 @@ async def list_documents(
         raise HTTPException(400, f"entity_type must be one of: {sorted(ENTITY_TYPES)}")
 
     async with tenant_conn(x_tenant_id) as conn:
+        total = await conn.fetchval(
+            """SELECT count(*) FROM document_attachments
+               WHERE tenant_id = $1 AND entity_type = $2 AND entity_id = $3""",
+            x_tenant_id,
+            entity_type,
+            entity_id,
+        )
         rows = await conn.fetch(
             """SELECT document_id, entity_type, entity_id, filename, content_type, file_size, created_at, created_by
                FROM document_attachments
@@ -120,21 +127,20 @@ async def list_documents(
             offset,
         )
 
-    return {
-        "documents": [
-            {
-                "document_id": r["document_id"],
-                "entity_type": r["entity_type"],
-                "entity_id": r["entity_id"],
-                "filename": r["filename"],
-                "content_type": r["content_type"],
-                "file_size": r.get("file_size"),
-                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-                "created_by": r["created_by"],
-            }
-            for r in rows
-        ],
-    }
+    items = [
+        {
+            "document_id": r["document_id"],
+            "entity_type": r["entity_type"],
+            "entity_id": r["entity_id"],
+            "filename": r["filename"],
+            "content_type": r["content_type"],
+            "file_size": r.get("file_size"),
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "created_by": r["created_by"],
+        }
+        for r in rows
+    ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{document_id}")

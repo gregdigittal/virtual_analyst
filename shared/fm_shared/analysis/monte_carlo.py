@@ -29,6 +29,9 @@ class MCResult:
     summary: dict = field(default_factory=dict)
 
 
+MAX_SIMULATIONS = 10_000
+
+
 def run_monte_carlo(
     config: ModelConfig,
     num_simulations: int,
@@ -42,6 +45,8 @@ def run_monte_carlo(
     Returns percentiles (P5..P95) per metric per period and optional summary.
     progress_callback(sims_done, total) is called periodically for async progress reporting.
     """
+    if num_simulations > MAX_SIMULATIONS:
+        raise ValueError(f"num_simulations must be <= {MAX_SIMULATIONS}")
     rng = np.random.default_rng(seed)
     horizon = config.metadata.horizon_months
 

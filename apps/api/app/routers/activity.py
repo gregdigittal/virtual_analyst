@@ -21,6 +21,7 @@ async def get_activity_feed(
     resource_id: str | None = Query(None, description="Filter by resource ID"),
     since: str | None = Query(None, description="ISO datetime; only activity after this time"),
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """Return recent activity: audit events and comments, merged and sorted by time (newest first)."""
     if not x_tenant_id:
@@ -52,14 +53,19 @@ async def get_activity_feed(
             params_audit.append(since)
             idx += 1
         where_audit = " AND ".join(conditions_audit)
-        # Fetch 2x limit from each source to reduce gaps after merge + truncate
-        params_audit.append(limit * 2)
 
+        audit_count = await conn.fetchval(
+            f'SELECT count(*) FROM audit_log WHERE {where_audit}',
+            *params_audit,
+        )
+
+        fetch_limit = limit + offset
+        params_audit_fetch = list(params_audit) + [fetch_limit]
         audit_rows = await conn.fetch(
             f"""SELECT audit_event_id, user_id, event_type, event_category, "timestamp", resource_type, resource_id, event_data
                FROM audit_log WHERE {where_audit}
                ORDER BY "timestamp" DESC LIMIT ${idx}""",
-            *params_audit,
+            *params_audit_fetch,
         )
 
         conditions_cmt = ["tenant_id = $1"]
@@ -82,14 +88,21 @@ async def get_activity_feed(
             params_cmt.append(since)
             idx += 1
         where_cmt = " AND ".join(conditions_cmt)
-        params_cmt.append(limit * 2)
 
+        comment_count = await conn.fetchval(
+            f'SELECT count(*) FROM comments WHERE {where_cmt}',
+            *params_cmt,
+        )
+
+        params_cmt_fetch = list(params_cmt) + [fetch_limit]
         comment_rows = await conn.fetch(
             f"""SELECT comment_id, entity_type, entity_id, body, created_at, created_by
                FROM comments WHERE {where_cmt}
                ORDER BY created_at DESC LIMIT ${idx}""",
-            *params_cmt,
+            *params_cmt_fetch,
         )
+
+    total = audit_count + comment_count
 
     audit_items = [
         {
@@ -124,6 +137,6 @@ async def get_activity_feed(
         audit_items + comment_items,
         key=lambda x: x["timestamp"] or "",
         reverse=True,
-    )[:limit]
+    )[offset:offset + limit]
 
-    return {"activity": merged, "limit": limit}
+    return {"items": merged, "total": total, "limit": limit, "offset": offset}

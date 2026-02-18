@@ -26,6 +26,10 @@ class StatementImbalanceError(EngineError):
         super().__init__(message, code="ERR_ENG_STATEMENTS", context=details or {}, **kwargs)
 
 
+_REVENUE_KEYWORDS = ("revenue", "sales", "income_from_operations")
+_COGS_KEYWORDS = ("cogs", "cost_of_goods", "cost_of_sales", "direct_cost")
+
+
 def _revenue_and_cogs_from_timeseries(
     time_series: dict[str, list[float]],
     blueprint_nodes: list,
@@ -37,14 +41,21 @@ def _revenue_and_cogs_from_timeseries(
         if node.get("type") != "output":
             continue
         nid = node["node_id"]
-        label = (node.get("label") or "").lower()
         if nid not in time_series:
             continue
         series = time_series[nid]
-        if "revenue" in label or "revenue" in nid.lower():
+        classification = (node.get("classification") or node.get("statement_line") or "").lower()
+        if not classification:
+            label = (node.get("label") or "").lower()
+            nid_lower = nid.lower()
+            if any(k in label for k in _REVENUE_KEYWORDS) or any(k in nid_lower for k in _REVENUE_KEYWORDS):
+                classification = "revenue"
+            elif any(k in label for k in _COGS_KEYWORDS) or any(k in nid_lower for k in _COGS_KEYWORDS):
+                classification = "cogs"
+        if classification == "revenue":
             for t in range(horizon):
                 revenue[t] += series[t]
-        elif "cogs" in label or "cost" in label or "variable" in label or "material" in label:
+        elif classification == "cogs":
             for t in range(horizon):
                 cogs[t] += series[t]
     return revenue, cogs

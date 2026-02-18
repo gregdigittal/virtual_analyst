@@ -40,6 +40,7 @@ dependencies = [
     "python-pptx>=0.6.23",
     "signxml>=4.0.0",
     "lxml>=5.0.0",
+    "defusedxml>=0.7.1",
 ]
 
 [project.optional-dependencies]

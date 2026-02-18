@@ -82,6 +82,8 @@ class Settings(BaseSettings):
     )
     """Fernet key for encrypting OAuth tokens at rest. Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"""
 
+    metrics_secret: str | None = Field(default=None, alias="METRICS_SECRET")
+
     stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
     stripe_price_id_professional: str | None = Field(default=None, alias="STRIPE_PRICE_ID_PROFESSIONAL")
@@ -90,12 +92,23 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_production_secrets(self) -> "Settings":
         if self.environment not in ("development", "test"):
+            if not self.supabase_jwt_secret:
+                raise ValueError(
+                    "SUPABASE_JWT_SECRET is required in production. "
+                    "Set ENVIRONMENT=development to disable auth."
+                )
             if self.oauth_state_secret == "change-me-in-production":
                 import warnings
                 warnings.warn("OAUTH_STATE_SECRET is still default — change it for production!", stacklevel=2)
             if not self.oauth_encryption_key:
                 import warnings
                 warnings.warn("OAUTH_ENCRYPTION_KEY is empty — OAuth tokens will NOT be encrypted!", stacklevel=2)
+            cors_origins = self.cors_allowed_origins_list()
+            for origin in cors_origins:
+                if not origin.startswith("https://"):
+                    raise ValueError(
+                        f"CORS origin must use HTTPS in production: {origin}"
+                    )
         if self.pool_min_size > self.pool_max_size:
             raise ValueError(f"DB_POOL_MIN_SIZE ({self.pool_min_size}) > DB_POOL_MAX_SIZE ({self.pool_max_size})")
         return self

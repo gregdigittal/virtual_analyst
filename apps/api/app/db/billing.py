@@ -189,7 +189,7 @@ async def get_usage_meter(
 ) -> dict[str, Any]:
     p = period or _current_period()
     row = await conn.fetchrow(
-        "SELECT usage_json, costs_json, updated_at FROM usage_meters WHERE tenant_id = $1 AND period = $2",
+        "SELECT usage_json, costs_json, updated_at FROM usage_meters WHERE tenant_id = $1 AND period = $2 FOR UPDATE",
         tenant_id,
         p,
     )

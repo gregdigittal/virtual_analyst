@@ -94,15 +94,19 @@ async def create_excel_connection(
 @router.get("/connections")
 async def list_excel_connections(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List Excel connections for the tenant."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM excel_connections WHERE tenant_id = $1",
+            x_tenant_id,
+        )
         items = await db_list_connections(conn, x_tenant_id, limit=limit, offset=offset)
-    return {"items": items, "limit": limit, "offset": offset}
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/connections/{excel_connection_id}")

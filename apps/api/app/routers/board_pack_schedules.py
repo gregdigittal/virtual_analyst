@@ -6,7 +6,7 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
@@ -82,15 +82,23 @@ async def create_schedule(
 @router.get("")
 async def list_schedules(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List pack schedules for the tenant."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM pack_schedules WHERE tenant_id = $1",
+            x_tenant_id,
+        )
         rows = await conn.fetch(
             """SELECT schedule_id, label, run_id, budget_id, section_order, cron_expr, next_run_at, distribution_emails, enabled, created_at
-               FROM pack_schedules WHERE tenant_id = $1 ORDER BY created_at DESC""",
+               FROM pack_schedules WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
             x_tenant_id,
+            limit,
+            offset,
         )
     items = []
     for r in rows:
@@ -109,33 +117,45 @@ async def list_schedules(
             "enabled": r["enabled"],
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
         })
-    return {"items": items}
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/history")
 async def list_pack_history(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     schedule_id: str | None = None,
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List pack generation history (VA-P7-09)."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         if schedule_id:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM pack_generation_history WHERE tenant_id = $1 AND schedule_id = $2",
+                x_tenant_id,
+                schedule_id,
+            )
             rows = await conn.fetch(
                 """SELECT history_id, schedule_id, pack_id, label, run_id, generated_at, distributed_at, status, error_message
-                   FROM pack_generation_history WHERE tenant_id = $1 AND schedule_id = $2 ORDER BY generated_at DESC LIMIT $3""",
+                   FROM pack_generation_history WHERE tenant_id = $1 AND schedule_id = $2 ORDER BY generated_at DESC LIMIT $3 OFFSET $4""",
                 x_tenant_id,
                 schedule_id,
                 limit,
+                offset,
             )
         else:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM pack_generation_history WHERE tenant_id = $1",
+                x_tenant_id,
+            )
             rows = await conn.fetch(
                 """SELECT history_id, schedule_id, pack_id, label, run_id, generated_at, distributed_at, status, error_message
-                   FROM pack_generation_history WHERE tenant_id = $1 ORDER BY generated_at DESC LIMIT $2""",
+                   FROM pack_generation_history WHERE tenant_id = $1 ORDER BY generated_at DESC LIMIT $2 OFFSET $3""",
                 x_tenant_id,
                 limit,
+                offset,
             )
     items = []
     for r in rows:
@@ -150,7 +170,7 @@ async def list_pack_history(
             "status": r["status"],
             "error_message": r["error_message"],
         })
-    return {"items": items}
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.post("/{schedule_id}/run-now", status_code=201)

@@ -10,6 +10,8 @@ from urllib.parse import urlencode
 import httpx
 
 from apps.api.app.core.settings import get_settings
+
+INTEGRATION_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 from apps.api.app.services.integrations.base import (
     ConnectionResult,
     DiscoveryResult,
@@ -43,7 +45,7 @@ class QuickBooksAdapter(ERPAdapter):
 
     async def exchange_code(self, code: str, redirect_uri: str) -> ConnectionResult:
         basic = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
             r = await client.post(
                 QB_TOKEN,
                 headers={
@@ -73,7 +75,7 @@ class QuickBooksAdapter(ERPAdapter):
 
     async def refresh_token(self, refresh_token: str) -> tuple[str, str]:
         basic = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
             r = await client.post(
                 QB_TOKEN,
                 headers={
@@ -90,7 +92,7 @@ class QuickBooksAdapter(ERPAdapter):
         realm = tenant_id or ""
         if not realm:
             return DiscoveryResult(chart_of_accounts=[], periods_available=[], features={})
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
             r = await client.get(
                 f"{QB_API}/company/{realm}/query",
                 params={"query": "SELECT * FROM Account MAXRESULTS 1000"},
@@ -119,7 +121,7 @@ class QuickBooksAdapter(ERPAdapter):
         if not realm:
             return SyncResult(records_synced=0, canonical_snapshot=canonical, errors=["No realm_id"])
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
                 r = await client.get(
                     f"{QB_API}/company/{realm}/reports/ProfitAndLoss",
                     params={"start_date": str(period_start), "end_date": str(period_end)},

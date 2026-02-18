@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import time
+from typing import Any
+
+import structlog
+
+logger = structlog.get_logger()
 
 
 class CircuitBreaker:
@@ -37,3 +42,31 @@ class CircuitBreaker:
     def record_success(self, provider_key: str) -> None:
         self._state[provider_key] = "closed"
         self._failure_count[provider_key] = 0
+
+
+class RedisCircuitBreaker:
+    """Redis-backed circuit breaker for shared state across workers."""
+
+    def __init__(
+        self,
+        redis_client: Any,
+        failure_threshold: int = 5,
+        recovery_timeout_sec: int = 60,
+    ) -> None:
+        self._redis = redis_client
+        self._threshold = failure_threshold
+        self._ttl = recovery_timeout_sec
+
+    async def is_open(self, provider_key: str) -> bool:
+        failures = await self._redis.get(f"cb:{provider_key}:failures")
+        return failures is not None and int(failures) >= self._threshold
+
+    async def record_failure(self, provider_key: str) -> None:
+        key = f"cb:{provider_key}:failures"
+        pipe = self._redis.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, self._ttl)
+        await pipe.execute()
+
+    async def record_success(self, provider_key: str) -> None:
+        await self._redis.delete(f"cb:{provider_key}:failures")

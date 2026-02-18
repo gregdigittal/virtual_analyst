@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.data.budget_catalog import get_budget_template
@@ -31,8 +31,8 @@ async def list_marketplace_templates(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     industry: str | None = None,
     template_type: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List marketplace templates (VA-P8-03). Optional filter by industry or template_type (budget, model)."""
     if not x_tenant_id:
@@ -48,17 +48,22 @@ async def list_marketplace_templates(
         conditions.append(f"template_type = ${idx}")
         params.append(template_type)
         idx += 1
-    params.extend([limit, offset])
-    limit_ph, offset_ph = idx, idx + 1
+    where_clause = " AND ".join(conditions)
     async with tenant_conn(x_tenant_id) as conn:
-        rows = await conn.fetch(
-            f"""SELECT template_id, name, industry, template_type, description, created_at
-                FROM marketplace_templates WHERE {" AND ".join(conditions)}
-                ORDER BY name
-                LIMIT ${limit_ph} OFFSET ${offset_ph}""",
+        total = await conn.fetchval(
+            f"SELECT count(*) FROM marketplace_templates WHERE {where_clause}",
             *params,
         )
-    templates = [
+        params_fetch = list(params) + [limit, offset]
+        limit_ph, offset_ph = idx, idx + 1
+        rows = await conn.fetch(
+            f"""SELECT template_id, name, industry, template_type, description, created_at
+                FROM marketplace_templates WHERE {where_clause}
+                ORDER BY name
+                LIMIT ${limit_ph} OFFSET ${offset_ph}""",
+            *params_fetch,
+        )
+    items = [
         {
             "template_id": r["template_id"],
             "name": r["name"],
@@ -69,7 +74,7 @@ async def list_marketplace_templates(
         }
         for r in rows
     ]
-    return {"templates": templates, "limit": limit, "offset": offset}
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/templates/{template_id}")

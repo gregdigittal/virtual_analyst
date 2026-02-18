@@ -145,13 +145,36 @@ async def oauth_callback(
 @router.get("/connections")
 async def list_connections_route(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         await ensure_tenant(conn, x_tenant_id)
-        items = await list_connections(conn, x_tenant_id)
-    return {"connections": items}
+        total = await conn.fetchval(
+            "SELECT count(*) FROM integration_connections WHERE tenant_id = $1",
+            x_tenant_id,
+        )
+        rows = await conn.fetch(
+            """SELECT connection_id, provider, status, org_name, last_sync_at, created_at
+               FROM integration_connections WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
+            x_tenant_id,
+            limit,
+            offset,
+        )
+        items = [
+            {
+                "connection_id": r["connection_id"],
+                "provider": r["provider"],
+                "status": r["status"],
+                "org_name": r["org_name"],
+                "last_sync_at": r["last_sync_at"].isoformat() if r["last_sync_at"] else None,
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/connections/{connection_id}")

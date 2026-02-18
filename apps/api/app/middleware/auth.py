@@ -24,7 +24,6 @@ SKIP_AUTH_PATHS = (
     "/api/v1/auth/saml/acs",
     "/api/v1/billing/webhook",
     "/api/v1/billing/plans",
-    "/metrics",
     "/openapi.json",
     "/docs",
     "/redoc",
@@ -99,13 +98,18 @@ async def auth_middleware(request: Request, call_next):
 
     app_meta = payload.get("app_metadata") or {}
     user_meta = payload.get("user_metadata") or {}
-    tenant_id = (
-        app_meta.get("tenant_id")
-        or user_meta.get("tenant_id")
-        or user_id
-    )
+    settings = get_settings()
+    tenant_id = app_meta.get("tenant_id") or user_meta.get("tenant_id")
+    if not tenant_id:
+        if settings.environment in ("development", "test"):
+            tenant_id = user_id
+        else:
+            return JSONResponse(status_code=403, content={"error": "No tenant_id in token"})
     if not isinstance(tenant_id, str):
-        tenant_id = user_id
+        if settings.environment in ("development", "test"):
+            tenant_id = str(tenant_id) if tenant_id else user_id
+        else:
+            return JSONResponse(status_code=403, content={"error": "Invalid tenant_id type in token"})
 
     # Overwrite request scope headers so downstream Header() deps see verified values
     headers = list(request.scope.get("headers") or [])
@@ -113,8 +117,14 @@ async def auth_middleware(request: Request, call_next):
     headers.append((b"x-tenant-id", tenant_id.encode("utf-8")))
     headers.append((b"x-user-id", user_id.encode("utf-8")))
     request.scope["headers"] = headers
+    request.state.tenant_id = tenant_id
 
-    # Load role from users table for RBAC; fallback to analyst if no row (e.g. dev without sync)
+    structlog.contextvars.bind_contextvars(
+        tenant_id=tenant_id,
+        user_id=user_id,
+    )
+
+    # Load role from users table for RBAC; fallback to investor if no row (e.g. dev without sync)
     try:
         from apps.api.app.db.connection import tenant_conn
 
@@ -124,9 +134,9 @@ async def auth_middleware(request: Request, call_next):
                 user_id,
                 tenant_id,
             )
-        request.state.role = row["role"] if row else "analyst"
+        request.state.role = row["role"] if row else "investor"
     except Exception as e:
         logger.warning("auth_role_lookup_failed", user_id=user_id, error=str(e))
-        request.state.role = "analyst"
+        request.state.role = "investor"
 
     return await call_next(request)

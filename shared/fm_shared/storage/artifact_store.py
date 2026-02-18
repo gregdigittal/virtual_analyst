@@ -5,6 +5,7 @@ Backend: Supabase Storage (bucket 'artifacts', path tenant_id/artifact_type/id.j
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re as _re
@@ -96,3 +97,15 @@ class ArtifactStore:
                 _log.warning("artifact_delete_failed", extra={"path": path, "error": str(exc)})
         else:
             self._memory.pop(path, None)
+
+    async def async_save(self, tenant_id: str, artifact_type: str, artifact_id: str, data: dict[str, Any]) -> str:
+        return await asyncio.to_thread(self.save, tenant_id, artifact_type, artifact_id, data)
+
+    async def async_load(self, tenant_id: str, artifact_type: str, artifact_id: str) -> dict[str, Any]:
+        return await asyncio.to_thread(self.load, tenant_id, artifact_type, artifact_id)
+
+    async def async_list_ids(self, tenant_id: str, artifact_type: str) -> list[str]:
+        return await asyncio.to_thread(self.list_ids, tenant_id, artifact_type)
+
+    async def async_delete(self, tenant_id: str, artifact_type: str, artifact_id: str) -> None:
+        await asyncio.to_thread(self.delete, tenant_id, artifact_type, artifact_id)

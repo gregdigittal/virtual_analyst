@@ -108,7 +108,7 @@ def _overrides_to_json(overrides: list[Any]) -> str:
 async def list_scenarios(
     baseline_id: str | None = Query(None, description="Filter by baseline"),
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _: None = require_role(*ROLES_ANY),
 ) -> dict[str, Any]:
@@ -116,6 +116,11 @@ async def list_scenarios(
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         if baseline_id:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM scenarios WHERE tenant_id = $1 AND baseline_id = $2",
+                x_tenant_id,
+                baseline_id,
+            )
             rows = await conn.fetch(
                 """SELECT scenario_id, baseline_id, baseline_version, label, description, overrides_json, created_at
                    FROM scenarios WHERE tenant_id = $1 AND baseline_id = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4""",
@@ -125,6 +130,10 @@ async def list_scenarios(
                 offset,
             )
         else:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM scenarios WHERE tenant_id = $1",
+                x_tenant_id,
+            )
             rows = await conn.fetch(
                 """SELECT scenario_id, baseline_id, baseline_version, label, description, overrides_json, created_at
                    FROM scenarios WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
@@ -144,7 +153,7 @@ async def list_scenarios(
             }
             for r in rows
         ]
-    return {"items": items, "limit": limit, "offset": offset}
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 def _parse_overrides_json(val: Any) -> list[dict]:

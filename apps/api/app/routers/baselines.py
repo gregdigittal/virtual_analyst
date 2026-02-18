@@ -87,13 +87,17 @@ async def create_baseline(
 @router.get("")
 async def list_baselines(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
-    limit: int = Query(50, ge=1, le=100, description="Max 100 to avoid N+1 and large responses"),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _: None = require_role(*ROLES_ANY),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM model_baselines WHERE tenant_id = $1",
+            x_tenant_id,
+        )
         rows = await conn.fetch(
             """SELECT baseline_id, baseline_version, status, storage_path, is_active, created_at
                FROM model_baselines WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
@@ -111,7 +115,7 @@ async def list_baselines(
             }
             for r in rows
         ]
-        return {"items": items, "limit": limit, "offset": offset}
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{baseline_id}")

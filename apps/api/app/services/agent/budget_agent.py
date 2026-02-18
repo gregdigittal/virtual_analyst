@@ -59,6 +59,28 @@ QUERY_PLAN_SCHEMA = {
     },
 }
 
+TOOL_PARAM_WHITELIST: dict[str, set[str]] = {
+    "query_budget_summary": {"budget_id"},
+    "query_budget_line_items": {"budget_id", "account_ref", "limit"},
+    "query_budget_actuals": {"budget_id", "account_ref"},
+    "query_department_breakdown": {"budget_id"},
+    "calculate_variance": {"budget_id", "account_ref"},
+}
+
+MAX_TOOL_LIMIT = 500
+
+
+def _sanitize_tool_args(tool_name: str, args: dict) -> dict:
+    allowed = TOOL_PARAM_WHITELIST.get(tool_name, set())
+    sanitized = {k: v for k, v in args.items() if k in allowed}
+    if "limit" in sanitized:
+        try:
+            sanitized["limit"] = min(int(sanitized["limit"]), MAX_TOOL_LIMIT)
+        except (ValueError, TypeError):
+            sanitized["limit"] = MAX_TOOL_LIMIT
+    return sanitized
+
+
 TOOL_DESCRIPTIONS = """Available tools:
 - query_budget_summary(budget_id?: string) — list all budgets or get a specific budget's metadata and total
 - query_budget_line_items(budget_id: string, account_ref?: string, limit?: int) — get line items with per-period amounts
@@ -105,7 +127,7 @@ async def run_budget_nl_query_agent(
     query_results: list[dict[str, Any]] = []
     for q in queries[:5]:
         tool_name = q.get("tool", "")
-        args = q.get("args", {})
+        args = _sanitize_tool_args(tool_name, q.get("args", {}))
         fn = tool_dispatch.get(tool_name)
         if fn:
             try:

@@ -310,13 +310,18 @@ async def create_draft(
 async def list_drafts(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     status: Literal["active", "ready_to_commit", "committed", "abandoned"] | None = None,
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         if status:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM draft_sessions WHERE tenant_id = $1 AND status = $2",
+                x_tenant_id,
+                status,
+            )
             rows = await conn.fetch(
                 """SELECT draft_session_id, parent_baseline_id, parent_baseline_version, status, created_at
                    FROM draft_sessions WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4""",
@@ -326,6 +331,10 @@ async def list_drafts(
                 offset,
             )
         else:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM draft_sessions WHERE tenant_id = $1",
+                x_tenant_id,
+            )
             rows = await conn.fetch(
                 """SELECT draft_session_id, parent_baseline_id, parent_baseline_version, status, created_at
                    FROM draft_sessions WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
@@ -343,7 +352,7 @@ async def list_drafts(
             }
             for r in rows
         ]
-        return {"items": items, "limit": limit, "offset": offset}
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{draft_session_id}")

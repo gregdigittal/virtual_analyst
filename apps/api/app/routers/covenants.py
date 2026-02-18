@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
@@ -36,13 +36,36 @@ async def list_metric_refs() -> dict[str, Any]:
 @router.get("")
 async def list_covenants(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List all covenant definitions for the tenant."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
-        items = await list_covenant_definitions(conn, x_tenant_id)
-    return {"items": items}
+        total = await conn.fetchval(
+            "SELECT count(*) FROM covenant_definitions WHERE tenant_id = $1",
+            x_tenant_id,
+        )
+        rows = await conn.fetch(
+            """SELECT covenant_id, label, metric_ref, operator, threshold_value, created_at
+               FROM covenant_definitions WHERE tenant_id = $1 ORDER BY created_at LIMIT $2 OFFSET $3""",
+            x_tenant_id,
+            limit,
+            offset,
+        )
+        items = [
+            {
+                "covenant_id": r["covenant_id"],
+                "label": r["label"],
+                "metric_ref": r["metric_ref"],
+                "operator": r["operator"],
+                "threshold_value": float(r["threshold_value"]),
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.post("", status_code=201)

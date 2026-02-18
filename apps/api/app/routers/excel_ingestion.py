@@ -259,6 +259,10 @@ async def list_ingestions(
             limit,
             offset,
         )
+        total = await conn.fetchval(
+            "SELECT count(*) FROM excel_ingestion_sessions WHERE tenant_id = $1",
+            x_tenant_id,
+        )
     return {
         "items": [
             {
@@ -271,6 +275,9 @@ async def list_ingestions(
             }
             for r in rows
         ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
     }
 
 

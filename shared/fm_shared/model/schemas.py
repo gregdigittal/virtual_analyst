@@ -158,6 +158,7 @@ class BlueprintNode(BaseModel):
     type: Literal["driver", "formula", "output"] = Field(...)
     label: str = Field(...)
     ref: str | None = Field(None, description="Driver ref for driver nodes")
+    classification: str | None = Field(None, description="Statement line: revenue, cogs, opex, capex")
 
 
 class BlueprintEdge(BaseModel):

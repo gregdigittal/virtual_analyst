@@ -7,7 +7,7 @@ import hashlib
 import json
 import uuid
 import zlib
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import quote
@@ -142,6 +142,32 @@ async def saml_acs(
             except InvalidSignature:
                 logger.warning("saml_acs_signature_invalid_dev", tenant_id=tenant_id)
 
+        conditions = root.find(".//{urn:oasis:names:tc:SAML:2.0:assertion}Conditions")
+        if conditions is not None:
+            not_before = conditions.get("NotBefore")
+            not_on_or_after = conditions.get("NotOnOrAfter")
+            now = datetime.now(UTC)
+            skew = timedelta(minutes=5)
+            if not_before:
+                nb = datetime.fromisoformat(not_before.replace("Z", "+00:00"))
+                if now < nb - skew:
+                    raise HTTPException(400, "SAML assertion not yet valid (NotBefore)")
+            if not_on_or_after:
+                noa = datetime.fromisoformat(not_on_or_after.replace("Z", "+00:00"))
+                if now > noa + skew:
+                    raise HTTPException(400, "SAML assertion expired (NotOnOrAfter)")
+
+        audience_el = root.find(
+            ".//{urn:oasis:names:tc:SAML:2.0:assertion}AudienceRestriction/"
+            "{urn:oasis:names:tc:SAML:2.0:assertion}Audience"
+        )
+        if audience_el is not None and audience_el.text:
+            # entity_id is the SP entity ID configured for this tenant
+            expected_audience = cfg["entity_id"] if cfg else None
+            if expected_audience and audience_el.text != expected_audience:
+                logger.warning("saml_audience_mismatch", expected=expected_audience, got=audience_el.text)
+                raise HTTPException(400, "SAML audience mismatch")
+
         mapping = (cfg["attribute_mapping_json"] or {}) if cfg else {}
         email_attr = mapping.get("email", "email")
         name_attr = mapping.get("name", "name")
@@ -200,7 +226,18 @@ async def saml_acs(
         algorithm="HS256",
     )
     frontend_url = getattr(settings, "integration_callback_base_url", "http://localhost:3000")
-    return RedirectResponse(url=f"{frontend_url}/auth/callback?token={token}&tenant_id={tenant_id}", status_code=302)
+    response = RedirectResponse(url=f"{frontend_url}/auth/callback?tenant_id={tenant_id}", status_code=302)
+    is_secure = settings.environment not in ("development", "test")
+    response.set_cookie(
+        key="va-saml-token",
+        value=token,
+        max_age=60,
+        httponly=True,
+        secure=is_secure,
+        samesite="lax",
+        path="/auth/callback",
+    )
+    return response
 
 
 # Config API (admin): get/put SAML config for tenant (requires auth)

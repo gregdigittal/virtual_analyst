@@ -34,6 +34,11 @@ async def lifespan(app: FastAPI):
             error=str(e),
             msg="DB unreachable at startup; connections will use direct connect",
         )
+    try:
+        from signxml import XMLVerifier  # noqa: F401
+    except ImportError:
+        if settings.environment not in ("development", "test"):
+            logger.error("signxml not installed — SAML signature verification unavailable in production")
     yield
     await close_pool()
 
@@ -53,6 +58,20 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Request-ID"],
 )
 
+MAX_BODY_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+async def limit_body_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        return JSONResponse(
+            status_code=413,
+            content={"error": "Request body too large", "max_bytes": MAX_BODY_SIZE},
+        )
+    return await call_next(request)
+
+
+app.middleware("http")(limit_body_size)
 app.middleware("http")(metrics_middleware)
 app.middleware("http")(security_headers_middleware)
 app.middleware("http")(auth_middleware)
@@ -119,7 +138,16 @@ app.include_router(marketplace.router, prefix="/api/v1")
 app.include_router(board_packs.router, prefix="/api/v1")
 app.include_router(board_pack_schedules.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
-app.mount("/metrics", metrics_app)
+@app.get("/metrics")
+async def metrics_endpoint(request: Request):
+    ms = settings.metrics_secret
+    if ms:
+        token = request.query_params.get("token", "")
+        if token != ms:
+            return JSONResponse(status_code=401, content={"error": "Invalid metrics token"})
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    from starlette.responses import Response
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/")

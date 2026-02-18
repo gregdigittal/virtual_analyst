@@ -7,8 +7,15 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 
+def get_rate_limit_key(request: Request) -> str:
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if tenant_id:
+        return f"tenant:{tenant_id}"
+    return get_remote_address(request)
+
+
 def init_rate_limiting(app: FastAPI, default_limit: str) -> Limiter:
-    limiter = Limiter(key_func=get_remote_address, default_limits=[default_limit])
+    limiter = Limiter(key_func=get_rate_limit_key, default_limits=[default_limit])
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
@@ -26,6 +33,9 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'none'; "
         "frame-ancestors 'none';"
+    )
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), payment=()"
     )
 
     return response

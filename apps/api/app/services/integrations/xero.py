@@ -11,6 +11,8 @@ from urllib.parse import urlencode
 import httpx
 
 from apps.api.app.core.settings import get_settings
+
+INTEGRATION_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 from apps.api.app.services.integrations.base import (
     ConnectionResult,
     DiscoveryResult,
@@ -46,7 +48,7 @@ class XeroAdapter(ERPAdapter):
         token_basic = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
             r = await client.post(
                 XERO_TOKEN,
                 headers={
@@ -96,7 +98,7 @@ class XeroAdapter(ERPAdapter):
         token_basic = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
             r = await client.post(
                 XERO_TOKEN,
                 headers={
@@ -111,7 +113,7 @@ class XeroAdapter(ERPAdapter):
 
     async def discover(self, access_token: str, tenant_id: str | None = None) -> DiscoveryResult:
         xero_tenant = tenant_id
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
             r = await client.get(
                 f"{XERO_API}/Accounts",
                 headers={
@@ -149,7 +151,7 @@ class XeroAdapter(ERPAdapter):
             "pl": [],
             "balance_sheet": [],
         }
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=INTEGRATION_TIMEOUT) as client:
             headers = {"Authorization": f"Bearer {access_token}", "Xero-tenant-id": xero_tenant or ""}
             date_param = f"date={period_end or date.today()}" if (period_end or period_start) else ""
             try:

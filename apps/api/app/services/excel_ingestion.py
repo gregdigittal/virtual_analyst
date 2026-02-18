@@ -147,7 +147,16 @@ async def start_ingestion(
     if len(file_bytes) > MAX_FILE_BYTES:
         raise ValueError(f"File exceeds {MAX_FILE_BYTES // (1024*1024)}MB limit")
     ingestion_id = f"xi_{uuid.uuid4().hex[:12]}"
-    store.save(tenant_id, EXCEL_UPLOAD_TYPE, ingestion_id, {"filename": filename, "content_base64": base64.b64encode(file_bytes).decode()})
+    file_path = f"{tenant_id}/excel-uploads/{ingestion_id}/{filename}"
+    if store._client:
+        bucket = store._client.storage.from_("excel-uploads")
+        bucket.upload(file_path, file_bytes, file_options={
+            "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "upsert": "true",
+        })
+    else:
+        store._memory[f"excel:{file_path}"] = file_bytes
+    store.save(tenant_id, EXCEL_UPLOAD_TYPE, ingestion_id, {"filename": filename, "file_storage_path": file_path})
     await conn.execute(
         """INSERT INTO excel_ingestion_sessions (tenant_id, ingestion_id, filename, file_size_bytes, status, created_by)
            VALUES ($1, $2, $3, $4, 'uploaded', $5)""",
@@ -174,7 +183,15 @@ async def parse_and_classify(
         ingestion_id,
     )
     raw = store.load(tenant_id, EXCEL_UPLOAD_TYPE, ingestion_id)
-    file_bytes = base64.b64decode(raw["content_base64"])
+    if "file_storage_path" in raw and store._client:
+        bucket = store._client.storage.from_("excel-uploads")
+        file_bytes = bucket.download(raw["file_storage_path"])
+    elif "content_base64" in raw:
+        file_bytes = base64.b64decode(raw["content_base64"])
+    elif "file_storage_path" in raw and not store._client:
+        file_bytes = store._memory.get(f"excel:{raw['file_storage_path']}", b"")
+    else:
+        raise StorageError("No file content in upload artifact", code="ERR_STOR_NOT_FOUND")
     filename = raw.get("filename", "upload.xlsx")
     parse_result = parse_workbook(file_bytes, filename=filename)
     store.save(tenant_id, EXCEL_PARSE_TYPE, ingestion_id, _parse_result_to_dict(parse_result))
@@ -402,7 +419,15 @@ async def parse_classify_and_map_agent(
         ingestion_id,
     )
     raw = store.load(tenant_id, EXCEL_UPLOAD_TYPE, ingestion_id)
-    file_bytes = base64.b64decode(raw["content_base64"])
+    if "file_storage_path" in raw and store._client:
+        bucket = store._client.storage.from_("excel-uploads")
+        file_bytes = bucket.download(raw["file_storage_path"])
+    elif "content_base64" in raw:
+        file_bytes = base64.b64decode(raw["content_base64"])
+    elif "file_storage_path" in raw and not store._client:
+        file_bytes = store._memory.get(f"excel:{raw['file_storage_path']}", b"")
+    else:
+        raise StorageError("No file content in upload artifact", code="ERR_STOR_NOT_FOUND")
     filename = raw.get("filename", "upload.xlsx")
     parse_result = parse_workbook(file_bytes, filename=filename)
     parse_dict = _parse_result_to_dict(parse_result)

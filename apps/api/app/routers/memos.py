@@ -102,6 +102,11 @@ async def list_memos(
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
         if memo_type:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM memo_packs WHERE tenant_id = $1 AND memo_type = $2",
+                x_tenant_id,
+                memo_type,
+            )
             rows = await conn.fetch(
                 """SELECT memo_id, memo_type, title, source_json, status, created_at
                    FROM memo_packs WHERE tenant_id = $1 AND memo_type = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4""",
@@ -111,6 +116,10 @@ async def list_memos(
                 offset,
             )
         else:
+            total = await conn.fetchval(
+                "SELECT count(*) FROM memo_packs WHERE tenant_id = $1",
+                x_tenant_id,
+            )
             rows = await conn.fetch(
                 """SELECT memo_id, memo_type, title, source_json, status, created_at
                    FROM memo_packs WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
@@ -129,7 +138,7 @@ async def list_memos(
         }
         for r in rows
     ]
-    return {"items": items, "limit": limit, "offset": offset}
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{memo_id}")

@@ -48,7 +48,7 @@ class FinModelError(Exception):
         super().__init__(self.message)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d = {
             "code": self.code,
             "message": self.message,
             "details": self.details,
@@ -57,6 +57,9 @@ class FinModelError(Exception):
             "timestamp": self.timestamp.isoformat(),
             "retry_after": self.retry_after,
         }
+        if self.context:
+            d["context"] = self.context
+        return d
 
 
 class ValidationError(FinModelError):
@@ -99,6 +102,30 @@ class LLMError(FinModelError):
         )
 
 
+class IntegrationError(FinModelError):
+    """Raised by ERP/OAuth integrations."""
+
+    def __init__(self, message: str, **kwargs: Any) -> None:
+        super().__init__(
+            code=kwargs.pop("code", "ERR_INT_OPERATION_FAILED"),
+            message=message,
+            category=ErrorCategory.INTEGRATION,
+            **kwargs,
+        )
+
+
+class AuthError(FinModelError):
+    """Raised by authentication/authorization failures."""
+
+    def __init__(self, message: str, **kwargs: Any) -> None:
+        super().__init__(
+            code=kwargs.pop("code", "ERR_AUTH_UNAUTHORIZED"),
+            message=message,
+            category=ErrorCategory.AUTH,
+            **kwargs,
+        )
+
+
 def get_http_status(error_code: str) -> int:
     if error_code.startswith("ERR_VAL_"):
         return 422
@@ -108,6 +135,8 @@ def get_http_status(error_code: str) -> int:
         return 404
     if error_code.startswith("ERR_STOR_ALREADY_EXISTS"):
         return 409
+    if error_code.startswith("ERR_INT_"):
+        return 502
     if error_code.startswith("ERR_LLM_RATE_LIMIT") or error_code.startswith("ERR_LLM_QUOTA"):
         return 429
     if error_code.endswith("TIMEOUT"):

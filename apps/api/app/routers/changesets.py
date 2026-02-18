@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
 
 from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.deps import get_artifact_store, require_role, ROLES_CAN_WRITE
@@ -40,17 +41,22 @@ def _apply_overrides(config_dict: dict[str, Any], overrides: list[dict[str, Any]
 
 
 @router.post("", status_code=201)
+class CreateChangesetBody(BaseModel):
+    baseline_id: str = Field(..., min_length=1)
+    base_version: str = Field(..., min_length=1)
+    overrides: list[dict[str, Any]] = Field(default_factory=list)
+    label: str = Field("", max_length=200)
+
+
 async def create_changeset(
-    body: dict[str, Any],
+    body: CreateChangesetBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
-    baseline_id = body.get("baseline_id")
-    baseline_version = body.get("base_version") or body.get("baseline_version")
-    overrides = body.get("overrides") or []
-    if not baseline_id or not baseline_version:
-        raise HTTPException(400, "baseline_id and base_version required")
+    baseline_id = body.baseline_id
+    baseline_version = body.base_version
+    overrides = body.overrides
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     changeset_id = f"cs_{uuid.uuid4().hex[:12]}"

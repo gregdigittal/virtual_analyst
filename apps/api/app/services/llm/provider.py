@@ -16,6 +16,19 @@ from tenacity import (
     wait_exponential,
 )
 
+_RETRYABLE: list[type] = [TimeoutError, ConnectionError, httpx.HTTPStatusError]
+try:
+    import anthropic as _anthropic_mod
+    _RETRYABLE.extend([_anthropic_mod.RateLimitError, _anthropic_mod.InternalServerError, _anthropic_mod.APIConnectionError])
+except ImportError:
+    pass
+try:
+    import openai as _openai_mod
+    _RETRYABLE.extend([_openai_mod.RateLimitError, _openai_mod.InternalServerError, _openai_mod.APIConnectionError])
+except ImportError:
+    pass
+RETRYABLE_EXCEPTIONS = tuple(_RETRYABLE)
+
 
 class Message(TypedDict):
     """Single chat message."""
@@ -119,7 +132,7 @@ class AnthropicProvider(LLMProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=60),
-        retry=retry_if_exception_type((TimeoutError, ConnectionError, httpx.HTTPStatusError)),
+        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
     )
     async def complete(
         self,
@@ -206,7 +219,7 @@ class OpenAIProvider(LLMProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=60),
-        retry=retry_if_exception_type((TimeoutError, ConnectionError, httpx.HTTPStatusError)),
+        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
     )
     async def complete(
         self,
