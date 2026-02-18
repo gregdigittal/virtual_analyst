@@ -1,13 +1,14 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
 import {
   api,
   type AuditEvent,
   type AuditCatalogResponse,
 } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 export default function AuditLogPage() {
@@ -199,7 +200,7 @@ export default function AuditLogPage() {
         )}
 
         {loading ? (
-          <p className="text-va-text2">Loading audit events…</p>
+          <VASpinner label="Loading audit events…" />
         ) : events.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No events match the selected filters.
@@ -219,9 +220,7 @@ export default function AuditLogPage() {
                 {events.map((ev) => (
                   <tr key={ev.audit_event_id} className="border-b border-va-border/50">
                     <td className="px-3 py-2 text-xs text-va-text2">
-                      {ev.timestamp
-                        ? new Date(ev.timestamp).toLocaleString()
-                        : "—"}
+                      {formatDateTime(ev.timestamp)}
                     </td>
                     <td className="px-3 py-2">{ev.event_type}</td>
                     <td className="px-3 py-2 text-va-text2">

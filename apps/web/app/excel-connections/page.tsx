@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import {
   api,
   type ExcelConnection,
@@ -183,10 +183,10 @@ export default function ExcelConnectionsPage() {
         </VACard>
 
         {loading ? (
-          <p className="mt-4 text-va-text2">Loading connections…</p>
+          <VASpinner label="Loading connections…" className="mt-4" />
         ) : connections.length === 0 ? (
           <VACard className="mt-4 p-6 text-center text-va-text2">
-            No Excel connections yet.
+            No Excel connections yet. Create a connection to sync data between your models and Excel.
           </VACard>
         ) : (
           <div className="mt-4 space-y-4">

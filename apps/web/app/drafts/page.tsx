@@ -1,9 +1,10 @@
 "use client";
 
 import { api, type DraftSummary } from "@/lib/api";
-import { VAButton, VACard, StatePill } from "@/components/ui";
+import { VAButton, VACard, VASpinner, StatePill } from "@/components/ui";
 import { Nav } from "@/components/nav";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -89,7 +90,7 @@ export default function DraftsPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading drafts…</p>
+          <VASpinner label="Loading drafts…" />
         ) : items.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No drafts yet. Create a draft to build a model with chat and
@@ -119,7 +120,7 @@ export default function DraftsPage() {
                     </div>
                     {d.created_at && (
                       <p className="mt-1 text-sm text-va-text2">
-                        Created {new Date(d.created_at).toLocaleString()}
+                        Created {formatDateTime(d.created_at)}
                       </p>
                     )}
                   </Link>

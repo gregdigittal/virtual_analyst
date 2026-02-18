@@ -2,7 +2,7 @@
 
 import { api, type AssignmentItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton, VAInput } from "@/components/ui";
+import { VACard, VAButton, VAInput, VASpinner } from "@/components/ui";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -111,7 +111,7 @@ export default function ReviewPage() {
 
   if (!tenantId && !loading) return null;
   if (loading && !assignment) {
-    return <p className="text-va-text2">Loading…</p>;
+    return <VASpinner label="Loading…" />;
   }
   if (!assignment) {
     return (

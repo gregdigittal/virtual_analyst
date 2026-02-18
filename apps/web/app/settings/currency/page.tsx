@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import {
   api,
   type CurrencySettings,
@@ -167,7 +167,7 @@ export default function CurrencySettingsPage() {
         )}
 
         {loading ? (
-          <p className="text-va-text2">Loading currency settings…</p>
+          <VASpinner label="Loading currency settings…" />
         ) : settings ? (
           <div className="space-y-8">
             <VACard className="p-5">

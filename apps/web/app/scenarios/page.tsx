@@ -1,7 +1,7 @@
 "use client";
 
 import { api, type BaselineSummary, type ScenarioItem } from "@/lib/api";
-import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import { useEffect, useState } from "react";
@@ -85,7 +85,7 @@ export default function ScenariosPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading scenarios…</p>
+          <VASpinner label="Loading scenarios…" />
         ) : (
           <div className="space-y-8">
             <section>

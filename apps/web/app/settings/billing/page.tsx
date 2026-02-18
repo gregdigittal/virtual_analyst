@@ -1,9 +1,10 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VASpinner, useToast } from "@/components/ui";
 import { api, type BillingPlan, type BillingSubscription, type BillingUsageResponse } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { formatDate } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 
 function UsageMeter({
@@ -135,7 +136,7 @@ export default function BillingSettingsPage() {
         )}
 
         {loading ? (
-          <p className="text-va-text2">Loading billing…</p>
+          <VASpinner label="Loading billing…" />
         ) : (
           <div className="space-y-8">
             <section className="grid gap-4 md:grid-cols-3">
@@ -219,17 +220,9 @@ export default function BillingSettingsPage() {
                     <div>Status: {subscription.status}</div>
                     <div>
                       Current period:{" "}
-                      {subscription.current_period_start
-                        ? new Date(
-                            String(subscription.current_period_start)
-                          ).toLocaleDateString()
-                        : "—"}{" "}
+                      {formatDate(subscription.current_period_start as string)}{" "}
                       →{" "}
-                      {subscription.current_period_end
-                        ? new Date(
-                            String(subscription.current_period_end)
-                          ).toLocaleDateString()
-                        : "—"}
+                      {formatDate(subscription.current_period_end as string)}
                     </div>
                     <VAButton
                       variant="danger"

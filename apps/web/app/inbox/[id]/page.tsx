@@ -2,7 +2,8 @@
 
 import { api, type AssignmentItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton } from "@/components/ui";
+import { VACard, VAButton, VASpinner } from "@/components/ui";
+import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -84,7 +85,7 @@ export default function AssignmentDetailPage() {
 
   if (!tenantId && !loading) return null;
   if (loading && !assignment) {
-    return <p className="text-va-text2">Loading assignment…</p>;
+    return <VASpinner label="Loading assignment…" />;
   }
   if (!assignment) {
     return (
@@ -142,7 +143,7 @@ export default function AssignmentDetailPage() {
             <div>
               <dt className="text-va-text2">Deadline</dt>
               <dd className="text-va-text">
-                {new Date(assignment.deadline).toLocaleString()}
+                {formatDateTime(assignment.deadline)}
               </dd>
             </div>
           )}

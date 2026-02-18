@@ -14,6 +14,7 @@ import {
   VACard,
   VAConfirmDialog,
   VAInput,
+  VASpinner,
   useToast,
 } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -306,7 +307,7 @@ export default function DraftWorkspacePage() {
         </div>
       )}
       {loading ? (
-        <p className="px-4 text-va-text2">Loading…</p>
+        <VASpinner label="Loading…" className="px-4" />
       ) : !detail ? (
         <p className="px-4 text-va-text2">Draft not found.</p>
       ) : (

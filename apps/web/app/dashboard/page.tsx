@@ -1,6 +1,6 @@
 "use client";
 
-import { VAButton, VACard } from "@/components/ui";
+import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { Nav } from "@/components/nav";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           </div>
         )}
         {loading && !summary ? (
-          <p className="text-va-text2">Loading…</p>
+          <VASpinner label="Loading…" />
         ) : summary ? (
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-3">
@@ -137,7 +137,11 @@ export default function DashboardPage() {
               </VACard>
             )}
           </div>
-        ) : null}
+        ) : (
+          <VACard className="p-6 text-center text-va-text2">
+            No dashboard data yet. Run an analysis to see metrics here.
+          </VACard>
+        )}
       </main>
     </div>
   );

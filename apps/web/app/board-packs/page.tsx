@@ -1,8 +1,9 @@
 "use client";
 
 import { api, type BoardPackSummary } from "@/lib/api";
-import { VACard } from "@/components/ui";
+import { VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -60,7 +61,7 @@ export default function BoardPacksPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading board packs…</p>
+          <VASpinner label="Loading board packs…" />
         ) : items.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No board packs yet. Create one from the pack detail page (link a run and optionally a budget).
@@ -95,7 +96,7 @@ export default function BoardPacksPage() {
                   </p>
                   {p.created_at && (
                     <p className="mt-0.5 text-xs text-va-text2">
-                      {new Date(p.created_at).toLocaleString()}
+                      {formatDateTime(p.created_at)}
                     </p>
                   )}
                 </Link>

@@ -1,8 +1,9 @@
 "use client";
 
 import { api, type BaselineSummary } from "@/lib/api";
-import { VACard } from "@/components/ui";
+import { VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -57,7 +58,7 @@ export default function BaselinesPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading baselines…</p>
+          <VASpinner label="Loading baselines…" />
         ) : items.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No baselines yet. Create one via the API (POST /api/v1/baselines
@@ -81,7 +82,7 @@ export default function BaselinesPage() {
                   </div>
                   {b.created_at && (
                     <p className="mt-1 text-sm text-va-text2">
-                      Created {new Date(b.created_at).toLocaleString()}
+                      Created {formatDateTime(b.created_at)}
                     </p>
                   )}
                 </Link>

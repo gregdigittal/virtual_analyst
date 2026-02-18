@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import {
   api,
   type CovenantDefinition,
@@ -164,10 +164,10 @@ export default function CovenantsPage() {
         </VACard>
 
         {loading ? (
-          <p className="mt-4 text-va-text2">Loading covenants…</p>
+          <VASpinner label="Loading covenants…" className="mt-4" />
         ) : items.length === 0 ? (
           <VACard className="mt-4 p-6 text-center text-va-text2">
-            No covenants defined yet.
+            No covenants defined yet. Use the form above to create your first covenant threshold.
           </VACard>
         ) : (
           <div className="mt-4 overflow-x-auto rounded-va-lg border border-va-border">

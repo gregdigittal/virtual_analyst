@@ -2,8 +2,9 @@
 
 import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard } from "@/components/ui";
+import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -161,7 +162,7 @@ export default function OrgStructuresPage() {
           </VACard>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading…</p>
+          <VASpinner label="Loading…" />
         ) : items.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No group structures yet. Click &quot;Create New&quot; to add one.
@@ -184,7 +185,7 @@ export default function OrgStructuresPage() {
                   </div>
                   {o.created_at && (
                     <p className="mt-1 text-sm text-va-text2">
-                      Created {new Date(o.created_at).toLocaleString()}
+                      Created {formatDateTime(o.created_at)}
                     </p>
                   )}
                 </Link>

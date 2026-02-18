@@ -1,7 +1,7 @@
 "use client";
 
 import { api, type BoardPackDetail } from "@/lib/api";
-import { VACard } from "@/components/ui";
+import { VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -109,7 +109,7 @@ export default function BoardPackDetailPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading…</p>
+          <VASpinner label="Loading…" />
         ) : pack ? (
           <>
             <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">

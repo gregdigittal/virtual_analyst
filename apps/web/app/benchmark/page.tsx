@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, VAInput, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASpinner, useToast } from "@/components/ui";
 import { api, type BenchmarkSummary, type BenchmarkOptIn } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -103,7 +103,7 @@ export default function BenchmarkPage() {
         )}
 
         {loading ? (
-          <p className="text-va-text2">Loading benchmark data…</p>
+          <VASpinner label="Loading benchmark data…" />
         ) : optIn?.opted_in ? (
           <div className="space-y-6">
             <VACard className="p-5">

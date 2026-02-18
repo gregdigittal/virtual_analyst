@@ -1,8 +1,9 @@
 "use client";
 
 import { api, type NotificationItem } from "@/lib/api";
-import { VAButton, VACard } from "@/components/ui";
+import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -84,7 +85,7 @@ export default function NotificationsPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading…</p>
+          <VASpinner label="Loading…" />
         ) : items.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No notifications yet. Notifications are created when a draft is
@@ -121,7 +122,7 @@ export default function NotificationsPage() {
                     )}
                     {n.created_at && (
                       <p className="mt-1 text-xs text-va-text2">
-                        {new Date(n.created_at).toLocaleString()}
+                        {formatDateTime(n.created_at)}
                       </p>
                     )}
                   </div>

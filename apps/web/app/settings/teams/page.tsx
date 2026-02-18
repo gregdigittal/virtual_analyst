@@ -2,7 +2,8 @@
 
 import { api, type TeamSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton, VAInput, useToast } from "@/components/ui";
+import { VACard, VAButton, VAInput, VASpinner, useToast } from "@/components/ui";
+import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -168,7 +169,7 @@ export default function TeamsPage() {
       )}
 
       {loading ? (
-        <p className="text-va-text2">Loading teams…</p>
+        <VASpinner label="Loading teams…" />
       ) : teams.length === 0 && !showCreate ? (
         <VACard className="p-6 text-center text-va-text2">
           No teams yet. Create one to get started.
@@ -189,7 +190,7 @@ export default function TeamsPage() {
                 )}
                 {t.created_at && (
                   <p className="mt-1 text-xs text-va-text2/80">
-                    Created {new Date(t.created_at).toLocaleString()}
+                    Created {formatDateTime(t.created_at)}
                   </p>
                 )}
               </Link>

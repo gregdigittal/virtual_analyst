@@ -2,7 +2,7 @@
 
 import { api, type TeamDetail, type TeamMember, type JobFunction } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -225,7 +225,7 @@ export default function TeamDetailPage() {
 
   if (!tenantId && !loading) return null;
   if (loading && !team) {
-    return <p className="text-va-text2">Loading team…</p>;
+    return <VASpinner label="Loading team…" />;
   }
   if (!team) {
     return (

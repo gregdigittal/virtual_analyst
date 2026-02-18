@@ -1,7 +1,7 @@
 "use client";
 
 import { api, type StatementsData, type KpiItem } from "@/lib/api";
-import { VAButton, VACard } from "@/components/ui";
+import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -268,7 +268,7 @@ export default function RunDetailPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading run…</p>
+          <VASpinner label="Loading run…" />
         ) : tab === "statements" ? (
           <div>
             {isRows.length > 0 && (

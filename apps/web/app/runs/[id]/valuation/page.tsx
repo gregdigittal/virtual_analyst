@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { VACard } from "@/components/ui";
+import { VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -80,7 +80,7 @@ export default function RunValuationPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading valuation…</p>
+          <VASpinner label="Loading valuation…" />
         ) : data ? (
           <div className="grid gap-6 sm:grid-cols-2">
             {dcf && (

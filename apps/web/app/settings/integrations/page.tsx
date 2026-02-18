@@ -1,9 +1,10 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, VAInput, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASpinner, useToast } from "@/components/ui";
 import { api, type IntegrationConnection, type IntegrationSnapshot } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 
 type SnapshotState = Record<string, IntegrationSnapshot[]>;
@@ -185,7 +186,7 @@ export default function IntegrationsPage() {
         </div>
 
         {loading ? (
-          <p className="text-va-text2">Loading integrations…</p>
+          <VASpinner label="Loading integrations…" />
         ) : filtered.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No connections yet. Connect your ERP to start syncing.
@@ -211,9 +212,7 @@ export default function IntegrationsPage() {
                       </div>
                       <div className="text-xs text-va-text2">
                         Last sync:{" "}
-                        {conn.last_sync_at
-                          ? new Date(conn.last_sync_at).toLocaleString()
-                          : "—"}
+                        {formatDateTime(conn.last_sync_at)}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -270,9 +269,7 @@ export default function IntegrationsPage() {
                                 {snap.snapshot_id}
                               </td>
                               <td className="px-3 py-2">
-                                {snap.as_of
-                                  ? new Date(snap.as_of).toLocaleString()
-                                  : "—"}
+                                {formatDateTime(snap.as_of)}
                               </td>
                               <td className="px-3 py-2 text-va-text2">
                                 {snap.period_start || "—"} →{" "}

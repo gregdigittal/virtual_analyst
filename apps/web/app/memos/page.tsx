@@ -1,9 +1,10 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import { api, type MemoSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 
 const MEMO_TYPES = [
@@ -142,7 +143,7 @@ export default function MemosPage() {
         </VACard>
 
         {loading ? (
-          <p className="mt-4 text-va-text2">Loading memos…</p>
+          <VASpinner label="Loading memos…" className="mt-4" />
         ) : items.length === 0 ? (
           <VACard className="mt-4 p-6 text-center text-va-text2">
             No memos generated yet.
@@ -169,9 +170,7 @@ export default function MemosPage() {
                       {memo.memo_type}
                     </td>
                     <td className="px-3 py-2 text-va-text2">
-                      {memo.created_at
-                        ? new Date(memo.created_at).toLocaleString()
-                        : "—"}
+                      {formatDateTime(memo.created_at)}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <a

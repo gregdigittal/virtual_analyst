@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { VACard } from "@/components/ui";
+import { VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -83,7 +83,7 @@ export default function RunMcPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading MC results…</p>
+          <VASpinner label="Loading MC results…" />
         ) : data ? (
           <div className="space-y-6">
             <VACard className="p-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
 import { api, type MarketplaceTemplate } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -120,10 +120,10 @@ export default function MarketplacePage() {
         </VACard>
 
         {loading ? (
-          <p className="text-va-text2">Loading marketplace…</p>
+          <VASpinner label="Loading marketplace…" />
         ) : templates.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
-            No templates found.
+            No templates available. Check back soon for community-contributed models.
           </VACard>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">

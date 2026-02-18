@@ -1,8 +1,9 @@
 "use client";
 
 import { api, type BudgetSummary } from "@/lib/api";
-import { VACard } from "@/components/ui";
+import { VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -60,7 +61,7 @@ export default function BudgetsPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading budgets…</p>
+          <VASpinner label="Loading budgets…" />
         ) : items.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
             No budgets yet. Create one from the API or from a template.
@@ -92,7 +93,7 @@ export default function BudgetsPage() {
                   </p>
                   {b.created_at && (
                     <p className="mt-0.5 text-xs text-va-text2">
-                      {new Date(b.created_at).toLocaleString()}
+                      {formatDateTime(b.created_at)}
                     </p>
                   )}
                 </Link>

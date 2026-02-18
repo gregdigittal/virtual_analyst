@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { VAButton, VACard } from "@/components/ui";
+import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -92,7 +92,7 @@ export default function BaselineDetailPage() {
           </div>
         )}
         {loading ? (
-          <p className="text-va-text2">Loading…</p>
+          <VASpinner label="Loading…" />
         ) : config ? (
           <VACard className="p-4">
             <p className="text-sm text-va-text2">

@@ -2,7 +2,7 @@
 
 import { api, type FeedbackItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton } from "@/components/ui";
+import { VACard, VAButton, VASpinner } from "@/components/ui";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -181,11 +181,7 @@ export default function FeedbackPage() {
   }
 
   if (!tenantId || !userId) {
-    return (
-      <div className="flex items-center justify-center py-12 text-va-text2">
-        Loading…
-      </div>
-    );
+    return <VASpinner label="Loading…" className="py-12 justify-center" />;
   }
 
   return (
@@ -221,7 +217,7 @@ export default function FeedbackPage() {
       )}
 
       {loading ? (
-        <p className="py-8 text-center text-va-text2">Loading feedback…</p>
+        <VASpinner label="Loading feedback…" className="py-8 justify-center" />
       ) : items.length === 0 ? (
         <VACard className="py-12 text-center text-va-text2">
           No feedback yet. Feedback appears here after a reviewer returns your work with

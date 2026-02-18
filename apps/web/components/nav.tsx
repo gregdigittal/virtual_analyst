@@ -5,17 +5,40 @@ import { getAuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-const navLinkClass =
-  "text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1 block py-2";
+const baseClass =
+  "text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded px-1 block py-2";
+
+const navLinks = [
+  { href: "/baselines", label: "Baselines" },
+  { href: "/drafts", label: "Drafts" },
+  { href: "/runs", label: "Runs" },
+  { href: "/scenarios", label: "Scenarios" },
+  { href: "/budgets", label: "Budgets" },
+  { href: "/covenants", label: "Covenants" },
+  { href: "/memos", label: "Memos" },
+  { href: "/documents", label: "Documents" },
+  { href: "/board-packs", label: "Board packs" },
+  { href: "/excel-import", label: "Import Excel" },
+  { href: "/org-structures", label: "Groups" },
+  { href: "/marketplace", label: "Marketplace" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/settings", label: "Settings" },
+];
 
 export function Nav() {
   const router = useRouter();
+  const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  function linkClass(href: string) {
+    const active = pathname === href || pathname.startsWith(href + "/");
+    return `${baseClass} ${active ? "text-va-blue" : "text-va-text hover:text-va-text2"}`;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -56,27 +79,29 @@ export function Nav() {
     router.refresh();
   }
 
-  const linkProps = { className: navLinkClass, onClick: () => setMenuOpen(false) };
-
   return (
     <nav className="border-b border-va-border bg-va-panel/80">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-6" ref={menuRef}>
-          {/* Desktop: full horizontal links */}
-          <div className="hidden md:flex md:items-center md:gap-6">
-            <Link href="/baselines" className="flex items-center gap-2 text-sm font-medium text-va-text hover:text-va-text2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded">
+          {/* Desktop: horizontal links */}
+          <div className="hidden md:flex md:items-center md:gap-4">
+            <Link
+              href="/baselines"
+              className={`flex items-center gap-2 ${linkClass("/baselines")}`}
+            >
               <Image src="/va-icon.svg" alt="" width={28} height={28} aria-hidden />
               <span>Baselines</span>
             </Link>
-            <Link href="/drafts" className={navLinkClass}>Drafts</Link>
-            <Link href="/excel-import" className={navLinkClass}>Import Excel Model</Link>
-            <Link href="/org-structures" className={navLinkClass}>Group Structures</Link>
-            <Link href="/runs" className={navLinkClass}>Runs</Link>
-            <Link href="/scenarios" className={navLinkClass}>Scenarios</Link>
-            <Link href="/budgets" className={navLinkClass}>Budgets</Link>
-            <Link href="/board-packs" className={navLinkClass}>Board packs</Link>
-            <Link href="/dashboard" className={navLinkClass}>Dashboard</Link>
-            <Link href="/notifications" className={`relative ${navLinkClass}`} aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}>
+            {navLinks.slice(1).map((item) => (
+              <Link key={item.href} href={item.href} className={linkClass(item.href)}>
+                {item.label}
+              </Link>
+            ))}
+            <Link
+              href="/notifications"
+              className={`relative ${linkClass("/notifications")}`}
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+            >
               <span aria-hidden>🔔</span>
               {unreadCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-va-danger px-1 text-[10px] font-medium text-va-text">
@@ -84,9 +109,7 @@ export function Nav() {
                 </span>
               )}
             </Link>
-            <Link href="/settings/teams" className={navLinkClass}>Teams</Link>
-            <Link href="/inbox" className={navLinkClass}>Inbox</Link>
-            <Link href="/inbox/feedback" className={navLinkClass}>Feedback</Link>
+            <Link href="/inbox" className={linkClass("/inbox")}>Inbox</Link>
           </div>
 
           {/* Mobile: hamburger + dropdown */}
@@ -107,22 +130,31 @@ export function Nav() {
               )}
             </button>
             {menuOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-va-border bg-va-panel py-2 shadow-lg">
-                <Link href="/baselines" {...linkProps}>Baselines</Link>
-                <Link href="/drafts" {...linkProps}>Drafts</Link>
-                <Link href="/excel-import" {...linkProps}>Import Excel Model</Link>
-                <Link href="/org-structures" {...linkProps}>Group Structures</Link>
-                <Link href="/runs" {...linkProps}>Runs</Link>
-                <Link href="/scenarios" {...linkProps}>Scenarios</Link>
-                <Link href="/budgets" {...linkProps}>Budgets</Link>
-                <Link href="/board-packs" {...linkProps}>Board packs</Link>
-                <Link href="/dashboard" {...linkProps}>Dashboard</Link>
-                <Link href="/notifications" {...linkProps} className={`relative ${navLinkClass}`}>
+              <div className="absolute left-0 top-full z-20 mt-1 w-56 max-h-[80vh] overflow-y-auto rounded-lg border border-va-border bg-va-panel py-2 shadow-lg">
+                {navLinks.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={linkClass(item.href)}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                <Link
+                  href="/notifications"
+                  className={linkClass("/notifications")}
+                  onClick={() => setMenuOpen(false)}
+                >
                   Notifications {unreadCount > 0 && `(${unreadCount})`}
                 </Link>
-                <Link href="/settings/teams" {...linkProps}>Teams</Link>
-                <Link href="/inbox" {...linkProps}>Inbox</Link>
-                <Link href="/inbox/feedback" {...linkProps}>Feedback</Link>
+                <Link
+                  href="/inbox"
+                  className={linkClass("/inbox")}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Inbox
+                </Link>
               </div>
             )}
           </div>

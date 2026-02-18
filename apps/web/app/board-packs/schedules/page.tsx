@@ -1,13 +1,14 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner, useToast } from "@/components/ui";
 import {
   api,
   type BoardPackHistoryItem,
   type BoardPackSchedule,
 } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 
 export default function BoardPackSchedulesPage() {
@@ -161,7 +162,7 @@ export default function BoardPackSchedulesPage() {
         </VACard>
 
         {loading ? (
-          <p className="mt-4 text-va-text2">Loading schedules…</p>
+          <VASpinner label="Loading schedules…" className="mt-4" />
         ) : schedules.length === 0 ? (
           <VACard className="mt-4 p-6 text-center text-va-text2">
             No schedules yet.
@@ -180,9 +181,7 @@ export default function BoardPackSchedulesPage() {
                     </p>
                     <p className="text-xs text-va-text2">
                       Next run:{" "}
-                      {s.next_run_at
-                        ? new Date(s.next_run_at).toLocaleString()
-                        : "—"}
+                      {formatDateTime(s.next_run_at)}
                     </p>
                   </div>
                   <VAButton
@@ -220,9 +219,7 @@ export default function BoardPackSchedulesPage() {
                       <td className="px-3 py-2 text-va-text2">{h.run_id}</td>
                       <td className="px-3 py-2">{h.status}</td>
                       <td className="px-3 py-2 text-va-text2">
-                        {h.generated_at
-                          ? new Date(h.generated_at).toLocaleString()
-                          : "—"}
+                        {formatDateTime(h.generated_at)}
                       </td>
                     </tr>
                   ))}

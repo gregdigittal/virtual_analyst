@@ -1,9 +1,10 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
 import { api, type ActivityItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 
 export default function ActivityPage() {
@@ -114,10 +115,10 @@ export default function ActivityPage() {
         )}
 
         {loading ? (
-          <p className="text-va-text2">Loading activity…</p>
+          <VASpinner label="Loading activity…" />
         ) : items.length === 0 ? (
           <VACard className="p-6 text-center text-va-text2">
-            No activity recorded yet.
+            No activity recorded yet. Actions across your workspace will appear here.
           </VACard>
         ) : (
           <div className="space-y-3">
@@ -126,9 +127,7 @@ export default function ActivityPage() {
                 <div className="flex items-center justify-between text-sm text-va-text2">
                   <span>{item.type.toUpperCase()}</span>
                   <span>
-                    {item.timestamp
-                      ? new Date(item.timestamp).toLocaleString()
-                      : "—"}
+                    {formatDateTime(item.timestamp)}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-va-text">

@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
 import { api, type SamlConfigResponse } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -104,7 +104,7 @@ export default function SsoSettingsPage() {
         )}
 
         {loading ? (
-          <p className="text-va-text2">Loading SSO configuration…</p>
+          <VASpinner label="Loading SSO configuration…" />
         ) : (
           <VACard className="p-5">
             <div className="mb-3 text-sm text-va-text2">

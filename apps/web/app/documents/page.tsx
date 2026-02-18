@@ -1,9 +1,10 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import { api, type CommentItem, type DocumentItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 
 const ENTITY_TYPES = [
@@ -158,7 +159,7 @@ export default function DocumentsPage() {
         </VACard>
 
         {loading ? (
-          <p className="mt-4 text-va-text2">Loading documents…</p>
+          <VASpinner label="Loading documents…" className="mt-4" />
         ) : docs.length === 0 ? (
           <VACard className="mt-4 p-6 text-center text-va-text2">
             No documents uploaded for this entity.
@@ -211,7 +212,7 @@ export default function DocumentsPage() {
                 <li key={c.comment_id} className="rounded-va-xs border border-va-border/60 p-3">
                   <p className="text-va-text">{c.body}</p>
                   <p className="mt-1 text-xs text-va-text2">
-                    {c.created_at ? new Date(c.created_at).toLocaleString() : "—"}
+                    {formatDateTime(c.created_at)}
                   </p>
                 </li>
               ))}

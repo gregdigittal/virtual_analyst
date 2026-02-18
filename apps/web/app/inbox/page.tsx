@@ -2,7 +2,7 @@
 
 import { api, type AssignmentItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton } from "@/components/ui";
+import { VACard, VAButton, VASpinner } from "@/components/ui";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -206,7 +206,7 @@ export default function InboxPage() {
       )}
 
       {loading ? (
-        <p className="text-va-text2">Loading…</p>
+        <VASpinner label="Loading…" />
       ) : assignments.length === 0 ? (
         <VACard className="p-6 text-center text-va-text2">
           {tab === "my_tasks"
