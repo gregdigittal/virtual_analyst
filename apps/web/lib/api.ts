@@ -21,7 +21,7 @@ export function setAccessToken(token: string | null): void {
 export interface ApiOptions {
   tenantId: string;
   userId?: string;
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
 }
 
@@ -888,6 +888,387 @@ export const api = {
         { tenantId }
       ),
   },
+  covenants: {
+    list: (tenantId: string, opts?: { limit?: number; offset?: number }) =>
+      request<{ items: CovenantDefinition[]; total: number; limit: number; offset: number }>(
+        `/api/v1/covenants?${new URLSearchParams({
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    metricRefs: (tenantId: string) =>
+      request<CovenantMetricRefs>("/api/v1/covenants/metric-refs", { tenantId }),
+    create: (tenantId: string, body: { label: string; metric_ref: string; operator: string; threshold_value: number }) =>
+      request<CovenantDefinition>("/api/v1/covenants", { tenantId, method: "POST", body }),
+    delete: (tenantId: string, covenantId: string) =>
+      request<void>(`/api/v1/covenants/${encodeURIComponent(covenantId)}`, { tenantId, method: "DELETE" }),
+  },
+  billing: {
+    listPlans: (tenantId: string) =>
+      request<{ plans: BillingPlan[] }>("/api/v1/billing/plans", { tenantId }),
+    getSubscription: (tenantId: string) =>
+      request<{ subscription: BillingSubscription }>("/api/v1/billing/subscription", { tenantId }),
+    getUsage: (tenantId: string, period?: string) =>
+      request<BillingUsageResponse>(
+        `/api/v1/billing/usage${period ? `?period=${encodeURIComponent(period)}` : ""}`,
+        { tenantId }
+      ),
+    createOrUpdateSubscription: (tenantId: string, userId: string | undefined, planId: string) =>
+      request<{ subscription: BillingSubscription; updated: boolean }>(
+        "/api/v1/billing/subscription",
+        { tenantId, userId, method: "POST", body: { plan_id: planId } }
+      ),
+    cancelSubscription: (tenantId: string, userId: string | undefined) =>
+      request<void>("/api/v1/billing/subscription", { tenantId, userId, method: "DELETE" }),
+  },
+  integrations: {
+    list: (tenantId: string, opts?: { limit?: number; offset?: number }) =>
+      request<{ items: IntegrationConnection[]; total: number; limit: number; offset: number }>(
+        `/api/v1/integrations/connections?${new URLSearchParams({
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    initiate: (tenantId: string, userId: string | undefined, provider: string) =>
+      request<{ authorize_url: string; state: string }>(
+        "/api/v1/integrations/connections",
+        { tenantId, userId, method: "POST", body: { provider } }
+      ),
+    sync: (tenantId: string, connectionId: string, body: { period_start?: string; period_end?: string }) =>
+      request<{ sync_run_id: string; status: string; snapshot_id: string; records_synced: number }>(
+        `/api/v1/integrations/connections/${encodeURIComponent(connectionId)}/sync`,
+        { tenantId, method: "POST", body }
+      ),
+    snapshots: (tenantId: string, connectionId: string, opts?: { limit?: number; offset?: number }) =>
+      request<{ snapshots: IntegrationSnapshot[] }>(
+        `/api/v1/integrations/connections/${encodeURIComponent(connectionId)}/snapshots?${new URLSearchParams({
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    disconnect: (tenantId: string, connectionId: string) =>
+      request<void>(
+        `/api/v1/integrations/connections/${encodeURIComponent(connectionId)}`,
+        { tenantId, method: "DELETE" }
+      ),
+  },
+  audit: {
+    catalog: (tenantId: string) =>
+      request<AuditCatalogResponse>("/api/v1/audit/events/catalog", { tenantId }),
+    list: (tenantId: string, filters?: { user_id?: string; event_type?: string; resource_type?: string; start_date?: string; end_date?: string; limit?: number; offset?: number }) =>
+      request<{ events: AuditEvent[]; limit: number; offset: number }>(
+        `/api/v1/audit/events?${new URLSearchParams({
+          ...(filters?.user_id && { user_id: filters.user_id }),
+          ...(filters?.event_type && { event_type: filters.event_type }),
+          ...(filters?.resource_type && { resource_type: filters.resource_type }),
+          ...(filters?.start_date && { start_date: filters.start_date }),
+          ...(filters?.end_date && { end_date: filters.end_date }),
+          ...(filters?.limit != null && { limit: String(filters.limit) }),
+          ...(filters?.offset != null && { offset: String(filters.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    exportUrl: (filters?: { format?: string; user_id?: string; event_type?: string; resource_type?: string; start_date?: string; end_date?: string }) => {
+      const params = new URLSearchParams({
+        ...(filters?.format && { format: filters.format }),
+        ...(filters?.user_id && { user_id: filters.user_id }),
+        ...(filters?.event_type && { event_type: filters.event_type }),
+        ...(filters?.resource_type && { resource_type: filters.resource_type }),
+        ...(filters?.start_date && { start_date: filters.start_date }),
+        ...(filters?.end_date && { end_date: filters.end_date }),
+      });
+      return `${API_URL}/api/v1/audit/events/export?${params.toString()}`;
+    },
+  },
+  memos: {
+    list: (tenantId: string, opts?: { limit?: number; offset?: number; memo_type?: string }) =>
+      request<{ items: MemoSummary[]; total: number; limit: number; offset: number }>(
+        `/api/v1/memos?${new URLSearchParams({
+          ...(opts?.memo_type && { memo_type: opts.memo_type }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    create: (tenantId: string, userId: string | undefined, body: { run_id: string; memo_type?: string; title?: string }) =>
+      request<{ memo_id: string; memo_type: string; run_id: string; status: string }>(
+        "/api/v1/memos",
+        { tenantId, userId, method: "POST", body }
+      ),
+    get: (tenantId: string, memoId: string) =>
+      request<MemoSummary & { sections_json: unknown[]; outputs_json: Record<string, unknown> }>(
+        `/api/v1/memos/${encodeURIComponent(memoId)}`,
+        { tenantId }
+      ),
+    downloadUrl: (memoId: string, format: string = "html") =>
+      `${API_URL}/api/v1/memos/${encodeURIComponent(memoId)}/download?format=${encodeURIComponent(format)}`,
+    delete: (tenantId: string, memoId: string) =>
+      request<void>(`/api/v1/memos/${encodeURIComponent(memoId)}`, { tenantId, method: "DELETE" }),
+  },
+  documents: {
+    list: (tenantId: string, opts: { entity_type: string; entity_id: string; limit?: number; offset?: number }) =>
+      request<{ items: DocumentItem[]; total: number; limit: number; offset: number }>(
+        `/api/v1/documents?${new URLSearchParams({
+          entity_type: opts.entity_type,
+          entity_id: opts.entity_id,
+          ...(opts.limit != null && { limit: String(opts.limit) }),
+          ...(opts.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    upload: (tenantId: string, userId: string | undefined, opts: { entity_type: string; entity_id: string; file: File }) => {
+      const form = new FormData();
+      form.append("file", opts.file);
+      return requestForm<DocumentItem>(
+        `/api/v1/documents?entity_type=${encodeURIComponent(opts.entity_type)}&entity_id=${encodeURIComponent(opts.entity_id)}`,
+        { tenantId, userId, body: form }
+      );
+    },
+    downloadUrl: (documentId: string) =>
+      `${API_URL}/api/v1/documents/${encodeURIComponent(documentId)}`,
+    delete: (tenantId: string, documentId: string) =>
+      request<void>(`/api/v1/documents/${encodeURIComponent(documentId)}`, { tenantId, method: "DELETE" }),
+  },
+  comments: {
+    list: (tenantId: string, opts: { entity_type: string; entity_id: string; limit?: number; offset?: number }) =>
+      request<{ items: CommentItem[]; total: number; limit: number; offset: number }>(
+        `/api/v1/comments?${new URLSearchParams({
+          entity_type: opts.entity_type,
+          entity_id: opts.entity_id,
+          ...(opts.limit != null && { limit: String(opts.limit) }),
+          ...(opts.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    create: (tenantId: string, userId: string | undefined, body: { entity_type: string; entity_id: string; body: string; parent_comment_id?: string }) =>
+      request<CommentItem>("/api/v1/comments", { tenantId, userId, method: "POST", body }),
+    delete: (tenantId: string, userId: string | undefined, commentId: string) =>
+      request<void>(`/api/v1/comments/${encodeURIComponent(commentId)}`, { tenantId, userId, method: "DELETE" }),
+  },
+  activity: {
+    list: (tenantId: string, opts?: { user_id?: string; resource_type?: string; resource_id?: string; since?: string; limit?: number; offset?: number }) =>
+      request<{ items: ActivityItem[]; total: number; limit: number; offset: number }>(
+        `/api/v1/activity?${new URLSearchParams({
+          ...(opts?.user_id && { user_id: opts.user_id }),
+          ...(opts?.resource_type && { resource_type: opts.resource_type }),
+          ...(opts?.resource_id && { resource_id: opts.resource_id }),
+          ...(opts?.since && { since: opts.since }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+  },
+  boardPackSchedules: {
+    list: (tenantId: string, opts?: { limit?: number; offset?: number }) =>
+      request<{ items: BoardPackSchedule[]; total: number; limit: number; offset: number }>(
+        `/api/v1/board-packs/schedules?${new URLSearchParams({
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    history: (tenantId: string, opts?: { schedule_id?: string; limit?: number; offset?: number }) =>
+      request<{ items: BoardPackHistoryItem[]; total: number; limit: number; offset: number }>(
+        `/api/v1/board-packs/schedules/history?${new URLSearchParams({
+          ...(opts?.schedule_id && { schedule_id: opts.schedule_id }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    create: (tenantId: string, userId: string | undefined, body: { label: string; run_id: string; cron_expr: string; distribution_emails?: string[]; budget_id?: string; section_order?: string[] }) =>
+      request<{ schedule_id: string; label: string; run_id: string; cron_expr: string; distribution_emails: string[] }>(
+        "/api/v1/board-packs/schedules",
+        { tenantId, userId, method: "POST", body }
+      ),
+    runNow: (tenantId: string, userId: string | undefined, scheduleId: string) =>
+      request<{ pack_id: string; history_id: string; status: string }>(
+        `/api/v1/board-packs/schedules/${encodeURIComponent(scheduleId)}/run-now`,
+        { tenantId, userId, method: "POST" }
+      ),
+    delete: (tenantId: string, scheduleId: string) =>
+      request<void>(`/api/v1/board-packs/schedules/${encodeURIComponent(scheduleId)}`, { tenantId, method: "DELETE" }),
+  },
+  currency: {
+    getSettings: (tenantId: string) =>
+      request<CurrencySettings>("/api/v1/currency/settings", { tenantId }),
+    updateSettings: (tenantId: string, body: { base_currency: string; reporting_currency: string; fx_source: string }) =>
+      request<{ ok: boolean; base_currency: string; reporting_currency: string }>(
+        "/api/v1/currency/settings",
+        { tenantId, method: "PUT", body }
+      ),
+    listRates: (tenantId: string, opts?: { limit?: number; offset?: number; from_currency?: string; to_currency?: string }) =>
+      request<{ rates: FxRate[]; total: number; limit: number; offset: number }>(
+        `/api/v1/currency/rates?${new URLSearchParams({
+          ...(opts?.from_currency && { from_currency: opts.from_currency }),
+          ...(opts?.to_currency && { to_currency: opts.to_currency }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    addRate: (tenantId: string, body: { from_currency: string; to_currency: string; effective_date: string; rate: number }) =>
+      request<{ from_currency: string; to_currency: string; effective_date: string; rate: number }>(
+        "/api/v1/currency/rates",
+        { tenantId, method: "POST", body }
+      ),
+    deleteRate: (tenantId: string, fromCurrency: string, toCurrency: string, effectiveDate: string) =>
+      request<void>(
+        `/api/v1/currency/rates/${encodeURIComponent(fromCurrency)}/${encodeURIComponent(toCurrency)}/${encodeURIComponent(effectiveDate)}`,
+        { tenantId, method: "DELETE" }
+      ),
+    convert: (tenantId: string, opts: { from_currency: string; to_currency: string; as_of?: string }) =>
+      request<{ rate: number; from_currency: string; to_currency: string; as_of: string }>(
+        `/api/v1/currency/convert?${new URLSearchParams({
+          from_currency: opts.from_currency,
+          to_currency: opts.to_currency,
+          ...(opts.as_of && { as_of: opts.as_of }),
+        }).toString()}`,
+        { tenantId }
+      ),
+  },
+  benchmark: {
+    getOptIn: (tenantId: string) =>
+      request<BenchmarkOptIn>("/api/v1/benchmark/opt-in", { tenantId }),
+    setOptIn: (tenantId: string, body: { industry_segment?: string; size_segment?: string }) =>
+      request<{ ok: boolean; industry_segment: string; size_segment: string }>(
+        "/api/v1/benchmark/opt-in",
+        { tenantId, method: "PUT", body }
+      ),
+    deleteOptIn: (tenantId: string) =>
+      request<void>("/api/v1/benchmark/opt-in", { tenantId, method: "DELETE" }),
+    getSummary: (tenantId: string, segmentKey?: string) =>
+      request<BenchmarkSummary>(
+        `/api/v1/benchmark/summary${segmentKey ? `?segment_key=${encodeURIComponent(segmentKey)}` : ""}`,
+        { tenantId }
+      ),
+  },
+  marketplace: {
+    list: (tenantId: string, opts?: { industry?: string; template_type?: string; limit?: number; offset?: number }) =>
+      request<{ items: MarketplaceTemplate[]; total: number; limit: number; offset: number }>(
+        `/api/v1/marketplace/templates?${new URLSearchParams({
+          ...(opts?.industry && { industry: opts.industry }),
+          ...(opts?.template_type && { template_type: opts.template_type }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    get: (tenantId: string, templateId: string) =>
+      request<MarketplaceTemplate>(`/api/v1/marketplace/templates/${encodeURIComponent(templateId)}`, { tenantId }),
+    useTemplate: (tenantId: string, userId: string | undefined, templateId: string, body: { label: string; fiscal_year: string; answers?: Record<string, unknown>; num_periods?: number }) =>
+      request<{ ok: boolean; template_id: string; created: { type: string; budget_id?: string } }>(
+        `/api/v1/marketplace/templates/${encodeURIComponent(templateId)}/use`,
+        { tenantId, userId, method: "POST", body }
+      ),
+  },
+  sso: {
+    getConfig: (tenantId: string) =>
+      request<SamlConfigResponse>("/api/v1/auth/saml/config", { tenantId }),
+    updateConfig: (tenantId: string, body: { idp_metadata_url?: string | null; idp_metadata_xml?: string | null; entity_id?: string; acs_url?: string; idp_sso_url?: string | null; idp_certificate?: string | null; attribute_mapping?: Record<string, string> }) =>
+      request<{ ok: boolean }>(
+        "/api/v1/auth/saml/config",
+        { tenantId, method: "PUT", body }
+      ),
+  },
+  compliance: {
+    export: (tenantId: string, userId: string | undefined, targetUserId: string) =>
+      request<ComplianceExport>(
+        `/api/v1/compliance/export?user_id=${encodeURIComponent(targetUserId)}`,
+        { tenantId, userId }
+      ),
+    anonymize: (tenantId: string, userId: string | undefined, targetUserId: string) =>
+      request<{ status: string; tenant_id: string; user_id: string }>(
+        `/api/v1/compliance/anonymize-user?user_id=${encodeURIComponent(targetUserId)}`,
+        { tenantId, userId, method: "POST" }
+      ),
+  },
+  excelConnections: {
+    list: (tenantId: string, opts?: { limit?: number; offset?: number }) =>
+      request<{ items: ExcelConnection[]; total: number; limit: number; offset: number }>(
+        `/api/v1/excel/connections?${new URLSearchParams({
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
+    create: (tenantId: string, userId: string | undefined, body: { label?: string; mode: string; target_json: Record<string, unknown>; bindings_json: Record<string, unknown>[] }) =>
+      request<{ excel_connection_id: string; label: string | null; mode: string; target_json: Record<string, unknown>; bindings_json: Record<string, unknown>[] }>(
+        "/api/v1/excel/connections",
+        { tenantId, userId, method: "POST", body }
+      ),
+    pull: (tenantId: string, userId: string | undefined, connectionId: string) =>
+      request<{ values: ExcelPullValue[] }>(
+        `/api/v1/excel/connections/${encodeURIComponent(connectionId)}/pull`,
+        { tenantId, userId, method: "POST" }
+      ),
+    push: (tenantId: string, connectionId: string, changes: { binding_id: string; new_value: unknown }[]) =>
+      request<{ received: number; status: string }>(
+        `/api/v1/excel/connections/${encodeURIComponent(connectionId)}/push`,
+        { tenantId, method: "POST", body: { changes } }
+      ),
+    delete: (tenantId: string, connectionId: string) =>
+      request<void>(`/api/v1/excel/connections/${encodeURIComponent(connectionId)}`, { tenantId, method: "DELETE" }),
+  },
+  ventures: {
+    create: (tenantId: string, body: { template_id: string; entity_name?: string }) =>
+      request<{ venture_id: string; template_id: string; entity_name: string; question_plan: Record<string, unknown>[] }>(
+        "/api/v1/ventures",
+        { tenantId, method: "POST", body }
+      ),
+    submitAnswers: (tenantId: string, ventureId: string, answers: Record<string, string>) =>
+      request<{ venture_id: string; answers: Record<string, string> }>(
+        `/api/v1/ventures/${encodeURIComponent(ventureId)}/answers`,
+        { tenantId, method: "POST", body: { answers } }
+      ),
+    generateDraft: (tenantId: string, userId: string | undefined, ventureId: string) =>
+      request<{ draft_session_id: string; venture_id: string; status: string }>(
+        `/api/v1/ventures/${encodeURIComponent(ventureId)}/generate-draft`,
+        { tenantId, userId, method: "POST" }
+      ),
+  },
+  changesets: {
+    create: (tenantId: string, userId: string | undefined, body: { baseline_id: string; base_version: string; overrides?: { path: string; value: unknown }[]; label?: string }) =>
+      request<{ changeset_id: string; baseline_id: string; base_version: string; status: string; overrides: unknown[] }>(
+        "/api/v1/changesets",
+        { tenantId, userId, method: "POST", body }
+      ),
+    get: (tenantId: string, changesetId: string) =>
+      request<{ changeset_id: string; baseline_id: string; base_version: string; status: string; created_at: string | null; overrides: unknown[] }>(
+        `/api/v1/changesets/${encodeURIComponent(changesetId)}`,
+        { tenantId }
+      ),
+    test: (tenantId: string, changesetId: string) =>
+      request<{ time_series: Record<string, number[]>; applied_overrides: number }>(
+        `/api/v1/changesets/${encodeURIComponent(changesetId)}/test`,
+        { tenantId, method: "POST" }
+      ),
+    merge: (tenantId: string, userId: string | undefined, changesetId: string) =>
+      request<{ changeset_id: string; baseline_id: string; new_version: string; status: string }>(
+        `/api/v1/changesets/${encodeURIComponent(changesetId)}/merge`,
+        { tenantId, userId, method: "POST" }
+      ),
+  },
+  csvImport: {
+    upload: (tenantId: string, userId: string | undefined, opts: { file: File; parent_baseline_id: string; parent_baseline_version?: string; label?: string; column_mapping?: Record<string, string> }) => {
+      const form = new FormData();
+      form.append("file", opts.file);
+      const params = new URLSearchParams({
+        parent_baseline_id: opts.parent_baseline_id,
+        ...(opts.parent_baseline_version && { parent_baseline_version: opts.parent_baseline_version }),
+        ...(opts.label && { label: opts.label }),
+        ...(opts.column_mapping && { column_mapping: JSON.stringify(opts.column_mapping) }),
+      });
+      return requestForm<CsvImportResponse>(
+        `/api/v1/import/csv?${params.toString()}`,
+        { tenantId, userId, body: form }
+      );
+    },
+  },
 };
 
 export interface ScenarioItem {
@@ -1032,4 +1413,261 @@ export interface FeedbackListResponse {
   items: FeedbackItem[];
   limit: number;
   offset: number;
+}
+
+// --- Covenants ---
+export interface CovenantDefinition {
+  covenant_id: string;
+  label: string;
+  metric_ref: string;
+  operator: string;
+  threshold_value: number;
+  created_at?: string | null;
+}
+
+export interface CovenantMetricRefs {
+  metric_refs: string[];
+  operators: string[];
+}
+
+// --- Billing ---
+export interface BillingPlan {
+  plan_id: string;
+  name: string;
+  label?: string;
+  tier?: string | number;
+  price_monthly?: number;
+  llm_tokens_monthly?: number;
+  features?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface BillingSubscription {
+  subscription_id: string;
+  plan_id: string;
+  status: string;
+  created_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface BillingUsageResponse {
+  usage: {
+    usage?: {
+      llm_tokens_total?: number;
+      mc_runs?: number;
+      sync_events?: number;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  limits: { llm_tokens_monthly: number | null };
+}
+
+// --- Integrations ---
+export interface IntegrationConnection {
+  connection_id: string;
+  provider: string;
+  status: string;
+  org_name: string | null;
+  last_sync_at: string | null;
+  created_at: string | null;
+}
+
+export interface IntegrationSnapshot {
+  snapshot_id: string;
+  connection_id: string;
+  as_of: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  storage_path: string | null;
+  created_at?: string | null;
+}
+
+// --- Audit ---
+export interface AuditEvent {
+  audit_event_id: string;
+  tenant_id?: string;
+  user_id: string | null;
+  event_type: string;
+  event_category: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  timestamp: string | null;
+  event_data?: Record<string, unknown>;
+}
+
+export interface AuditCatalogResponse {
+  events: Record<string, unknown>[];
+}
+
+// --- Memos ---
+export interface MemoSummary {
+  memo_id: string;
+  memo_type: string;
+  title: string;
+  source_json: Record<string, unknown>;
+  status: string;
+  created_at: string | null;
+}
+
+// --- Documents ---
+export interface DocumentItem {
+  document_id: string;
+  entity_type: string;
+  entity_id: string;
+  filename: string;
+  content_type: string;
+  file_size: number | null;
+  created_at: string | null;
+  created_by: string | null;
+}
+
+// --- Comments ---
+export interface CommentItem {
+  comment_id: string;
+  entity_type: string;
+  entity_id: string;
+  parent_comment_id: string | null;
+  body: string;
+  created_at: string | null;
+  created_by: string | null;
+}
+
+// --- Activity ---
+export interface ActivityItem {
+  type: "audit" | "comment";
+  id: string;
+  timestamp: string | null;
+  user_id: string | null;
+  resource_type: string | null;
+  resource_id: string | null;
+  summary: string;
+  event_type?: string;
+  event_category?: string;
+  event_data?: Record<string, unknown>;
+  body?: string;
+}
+
+// --- Board Pack Schedules ---
+export interface BoardPackSchedule {
+  schedule_id: string;
+  label: string;
+  run_id: string;
+  budget_id: string | null;
+  section_order: string[];
+  cron_expr: string;
+  next_run_at: string | null;
+  distribution_emails: string[];
+  enabled: boolean;
+  created_at: string | null;
+}
+
+export interface BoardPackHistoryItem {
+  history_id: string;
+  schedule_id: string;
+  pack_id: string;
+  label: string;
+  run_id: string;
+  generated_at: string | null;
+  distributed_at: string | null;
+  status: string;
+  error_message: string | null;
+}
+
+// --- Currency ---
+export interface CurrencySettings {
+  base_currency: string;
+  reporting_currency: string;
+  fx_source: string;
+  updated_at: string | null;
+}
+
+export interface FxRate {
+  from_currency: string;
+  to_currency: string;
+  effective_date: string;
+  rate: number;
+  created_at: string | null;
+  created_by: string | null;
+}
+
+// --- Benchmark ---
+export interface BenchmarkOptIn {
+  opted_in: boolean;
+  industry_segment?: string;
+  size_segment?: string;
+  opted_in_at?: string | null;
+}
+
+export interface BenchmarkSummary {
+  segment_key: string;
+  metrics: {
+    metric_name: string;
+    median: number;
+    p25: number | null;
+    p75: number | null;
+    sample_count: number;
+    computed_at: string | null;
+  }[];
+}
+
+// --- Marketplace ---
+export interface MarketplaceTemplate {
+  template_id: string;
+  name: string;
+  industry: string;
+  template_type: string;
+  description: string;
+  created_at: string | null;
+}
+
+// --- SSO ---
+export interface SamlConfigResponse {
+  entity_id?: string | null;
+  acs_url?: string | null;
+  idp_sso_url?: string | null;
+  idp_certificate?: string | null;
+  idp_metadata_url?: string | null;
+  attribute_mapping?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+// --- Compliance ---
+export interface ComplianceExport {
+  tenant_id: string;
+  user_id: string;
+  audit_events: Record<string, unknown>[];
+  drafts: Record<string, unknown>[];
+  notifications: Record<string, unknown>[];
+  scenarios: Record<string, unknown>[];
+  integration_connections: Record<string, unknown>[];
+  excel_connections: Record<string, unknown>[];
+  excel_sync_events: Record<string, unknown>[];
+  memo_packs: Record<string, unknown>[];
+}
+
+// --- Excel Connections ---
+export interface ExcelConnection {
+  excel_connection_id: string;
+  label: string | null;
+  mode: string;
+  status: string;
+  target_json: Record<string, unknown>;
+  bindings_json: Record<string, unknown>[];
+  created_at: string | null;
+  created_by: string | null;
+}
+
+export interface ExcelPullValue {
+  binding_id: string;
+  path: string;
+  value: unknown;
+}
+
+// --- CSV Import ---
+export interface CsvImportResponse {
+  draft_session_id: string;
+  scenario_id: string;
+  overrides_count: number;
+  status: string;
 }
