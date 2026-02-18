@@ -213,13 +213,13 @@ export default function BillingSettingsPage() {
                       Current period:{" "}
                       {subscription.current_period_start
                         ? new Date(
-                            subscription.current_period_start
+                            String(subscription.current_period_start)
                           ).toLocaleDateString()
                         : "—"}{" "}
                       →{" "}
                       {subscription.current_period_end
                         ? new Date(
-                            subscription.current_period_end
+                            String(subscription.current_period_end)
                           ).toLocaleDateString()
                         : "—"}
                     </div>

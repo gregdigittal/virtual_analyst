@@ -8,7 +8,7 @@ EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  ALTER FUNCTION generate_id() SET search_path = public;
+  ALTER FUNCTION generate_id(text) SET search_path = public;
 EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 

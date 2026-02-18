@@ -1,6 +1,6 @@
 "use client";
 
-import { api, type BudgetDetail } from "@/lib/api";
+import { api, type BudgetDetail, type BudgetDashboardWidget } from "@/lib/api";
 import { VACard } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
@@ -13,7 +13,7 @@ export default function BudgetDetailPage() {
   const router = useRouter();
   const budgetId = params?.id as string;
   const [budget, setBudget] = useState<BudgetDetail | null>(null);
-  const [dashboard, setDashboard] = useState<{ widgets: { alerts: unknown[]; variance_trend: unknown[]; department_ranking: unknown[] }[] } | null>(null);
+  const [dashboard, setDashboard] = useState<{ widgets: BudgetDashboardWidget[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);

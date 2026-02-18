@@ -266,7 +266,7 @@ export default function ExcelImportPage() {
         {step === 3 && (
           <VACard className="p-6">
             <h2 className="font-semibold text-va-text mb-4">Review mapping</h2>
-            {mapping?.revenue_streams && Array.isArray(mapping.revenue_streams) && (
+            {Array.isArray(mapping?.revenue_streams) && (
               <section className="mb-6">
                 <h3 className="text-sm font-medium text-va-text2 mb-2">Revenue streams</h3>
                 <ul className="list-disc pl-5 text-sm text-va-text">
@@ -278,7 +278,7 @@ export default function ExcelImportPage() {
                 </ul>
               </section>
             )}
-            {mapping?.cost_items && Array.isArray(mapping.cost_items) && (
+            {Array.isArray(mapping?.cost_items) && (
               <section className="mb-6">
                 <h3 className="text-sm font-medium text-va-text2 mb-2">Cost items</h3>
                 <ul className="list-disc pl-5 text-sm text-va-text">

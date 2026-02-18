@@ -180,7 +180,7 @@ export default function FeedbackPage() {
     }
   }
 
-  if (!tenantId) {
+  if (!tenantId || !userId) {
     return (
       <div className="flex items-center justify-center py-12 text-va-text2">
         Loading…

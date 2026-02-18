@@ -40,7 +40,6 @@ def _apply_overrides(config_dict: dict[str, Any], overrides: list[dict[str, Any]
     return out
 
 
-@router.post("", status_code=201)
 class CreateChangesetBody(BaseModel):
     baseline_id: str = Field(..., min_length=1)
     base_version: str = Field(..., min_length=1)
@@ -48,6 +47,7 @@ class CreateChangesetBody(BaseModel):
     label: str = Field("", max_length=200)
 
 
+@router.post("", status_code=201)
 async def create_changeset(
     body: CreateChangesetBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
