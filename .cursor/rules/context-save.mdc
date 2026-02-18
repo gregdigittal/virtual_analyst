@@ -1,0 +1,50 @@
+---
+description: Generate a context save file after every git commit so a new agent can continue the project
+alwaysApply: true
+---
+
+# Context Save After Commits
+
+After every `git commit` (whether you initiated it or the user asked), generate or update the file `CONTEXT.md` in the project root.
+
+## What to include
+
+```markdown
+# Project Context — Virtual Analyst
+
+> Last updated: <ISO date-time of commit>
+> Commit: <short hash> — <commit message first line>
+> Branch: <current branch>
+
+## Architecture
+
+<Brief summary of the tech stack and project structure. Keep to 5-10 lines.>
+
+## Recent Changes (this commit)
+
+<Bullet list of what changed in this commit — files, features, fixes. 3-10 bullets.>
+
+## Current State
+
+<What is working, what is deployed, what feature flags are active.>
+
+## In Progress / Next Steps
+
+<Anything left incomplete, planned next phases, known issues. Bullet list.>
+
+## Key Files & Patterns
+
+<List the most important files/directories a new agent should read first to understand the codebase. 5-15 entries.>
+
+## Conventions
+
+<Summarise coding conventions: language version, frameworks, testing approach, DB access pattern, error handling, etc. Bullet list.>
+```
+
+## Rules
+
+- Always overwrite `CONTEXT.md` (not append). Each save is a full snapshot.
+- Keep it under 120 lines. Be concise — this is a handoff doc, not a changelog.
+- Do NOT include secrets, API keys, or .env values.
+- Do NOT block the commit to write this file. Write it immediately after the commit succeeds, then `git add CONTEXT.md && git commit --amend --no-edit` to include it in the same commit (only if the commit was just created by you and has not been pushed yet). If the commit was already pushed, create a separate small commit for the context save.
+- If multiple commits happen in one session, only generate the context save after the final commit before the conversation ends or the user moves on.
