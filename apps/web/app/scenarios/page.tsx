@@ -1,7 +1,7 @@
 "use client";
 
-import { api, type ScenarioItem } from "@/lib/api";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { api, type BaselineSummary, type ScenarioItem } from "@/lib/api";
+import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import { useEffect, useState } from "react";
@@ -16,6 +16,8 @@ export default function ScenariosPage() {
   const [compareResult, setCompareResult] = useState<{
     scenarios: Record<string, unknown>[];
   } | null>(null);
+  const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +32,8 @@ export default function ScenariosPage() {
       try {
         const res = await api.scenarios.list(tid);
         if (!cancelled) setItems(res.items ?? []);
+        const blRes = await api.baselines.list(tid);
+        if (!cancelled) setBaselines(blRes.items ?? []);
       } catch (e) {
         if (!cancelled)
           setError(e instanceof Error ? e.message : String(e));
@@ -55,8 +59,11 @@ export default function ScenariosPage() {
         scenario_ids: scenarioIds,
       });
       setCompareResult({ scenarios: res.scenarios ?? [] });
+      toast.success("Comparison complete");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -139,12 +146,17 @@ export default function ScenariosPage() {
                   <label className="mb-1 block text-sm font-medium text-va-text">
                     Baseline ID
                   </label>
-                  <VAInput
-                    type="text"
+                  <VASelect
                     value={compareBaselineId}
                     onChange={(e) => setCompareBaselineId(e.target.value)}
-                    placeholder="e.g. bl_xxx"
-                  />
+                  >
+                    <option value="">Select a baseline</option>
+                    {baselines.map((b) => (
+                      <option key={b.baseline_id} value={b.baseline_id}>
+                        {b.baseline_id} ({b.baseline_version})
+                      </option>
+                    ))}
+                  </VASelect>
                 </div>
                 <div className="min-w-[220px]">
                   <label className="mb-1 block text-sm font-medium text-va-text">

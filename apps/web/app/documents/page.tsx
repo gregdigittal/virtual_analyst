@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
 import { api, type CommentItem, type DocumentItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -26,6 +26,7 @@ export default function DocumentsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const loadDocuments = useCallback(async () => {
     if (!tenantId || !entityId) return;
@@ -74,8 +75,11 @@ export default function DocumentsPage() {
       });
       setFile(null);
       await loadDocuments();
+      toast.success("Document uploaded");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -90,8 +94,11 @@ export default function DocumentsPage() {
       });
       setCommentBody("");
       await loadDocuments();
+      toast.success("Comment added");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -119,8 +126,7 @@ export default function DocumentsPage() {
 
         <VACard className="p-5">
           <div className="grid gap-3 md:grid-cols-3">
-            <select
-              className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
+            <VASelect
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
             >
@@ -129,7 +135,7 @@ export default function DocumentsPage() {
                   {t}
                 </option>
               ))}
-            </select>
+            </VASelect>
             <VAInput
               placeholder="Entity ID"
               value={entityId}

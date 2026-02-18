@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAInput, useToast } from "@/components/ui";
 import {
   api,
   type BoardPackHistoryItem,
@@ -17,6 +17,7 @@ export default function BoardPackSchedulesPage() {
   const [history, setHistory] = useState<BoardPackHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   const [form, setForm] = useState({
     label: "",
     run_id: "",
@@ -71,9 +72,12 @@ export default function BoardPackSchedulesPage() {
           .filter(Boolean),
       });
       setForm({ label: "", run_id: "", cron_expr: "", distribution_emails: "" });
+      toast.success("Schedule created");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -83,9 +87,12 @@ export default function BoardPackSchedulesPage() {
     setError(null);
     try {
       await api.boardPackSchedules.runNow(tenantId, userId, scheduleId);
+      toast.success("Board pack generation started");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
 import {
   api,
   type CurrencySettings,
@@ -17,6 +17,8 @@ export default function CurrencySettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
   const [rateForm, setRateForm] = useState({
     from_currency: "USD",
     to_currency: "EUR",
@@ -72,8 +74,11 @@ export default function CurrencySettingsPage() {
         fx_source: settings.fx_source,
       });
       await load();
+      toast.success("Currency settings saved");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -91,8 +96,11 @@ export default function CurrencySettingsPage() {
       });
       setRateForm((prev) => ({ ...prev, rate: "" }));
       await load();
+      toast.success("FX rate added");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -107,8 +115,11 @@ export default function CurrencySettingsPage() {
         rate.effective_date
       );
       await load();
+      toast.success("FX rate deleted");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -125,8 +136,11 @@ export default function CurrencySettingsPage() {
         ...prev,
         result: res.rate.toFixed(4),
       }));
+      toast.success("Conversion complete");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -195,8 +209,7 @@ export default function CurrencySettingsPage() {
                   <label className="mb-1 block text-sm font-medium text-va-text">
                     FX source
                   </label>
-                  <select
-                    className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
+                  <VASelect
                     value={settings.fx_source}
                     onChange={(e) =>
                       setSettings((prev) =>
@@ -206,7 +219,7 @@ export default function CurrencySettingsPage() {
                   >
                     <option value="manual">Manual</option>
                     <option value="feed">Feed</option>
-                  </select>
+                  </VASelect>
                 </div>
               </div>
               <VAButton
@@ -293,7 +306,11 @@ export default function CurrencySettingsPage() {
                           <td className="px-3 py-2 text-right">
                             <VAButton
                               variant="ghost"
-                              onClick={() => handleDeleteRate(rate)}
+                              onClick={() => setConfirmAction({
+                              action: () => handleDeleteRate(rate),
+                              title: `Delete FX rate ${rate.from_currency}/${rate.to_currency}?`,
+                              description: "This action cannot be undone.",
+                            })}
                             >
                               Delete
                             </VAButton>
@@ -350,6 +367,13 @@ export default function CurrencySettingsPage() {
             </VACard>
           </div>
         ) : null}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
       </main>
     </div>
   );

@@ -1,8 +1,8 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
-import { api, type CsvImportResponse } from "@/lib/api";
+import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
+import { api, type BaselineSummary, type CsvImportResponse } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useEffect, useState } from "react";
 
@@ -17,6 +17,8 @@ export default function CsvImportPage() {
   const [result, setResult] = useState<CsvImportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -25,6 +27,10 @@ export default function CsvImportPage() {
       api.setAccessToken(ctx.accessToken);
       setTenantId(ctx.tenantId);
       setUserId(ctx.userId);
+      try {
+        const blRes = await api.baselines.list(ctx.tenantId);
+        setBaselines(blRes.items ?? []);
+      } catch { /* baselines list is optional */ }
     })();
   }, []);
 
@@ -42,8 +48,11 @@ export default function CsvImportPage() {
         column_mapping: mapping,
       });
       setResult(res);
+      toast.success("CSV imported successfully");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -73,11 +82,17 @@ export default function CsvImportPage() {
 
         <VACard className="p-5">
           <div className="grid gap-3 md:grid-cols-2">
-            <VAInput
-              placeholder="Baseline ID"
+            <VASelect
               value={baselineId}
               onChange={(e) => setBaselineId(e.target.value)}
-            />
+            >
+              <option value="">Select a baseline</option>
+              {baselines.map((b) => (
+                <option key={b.baseline_id} value={b.baseline_id}>
+                  {b.baseline_id} ({b.baseline_version})
+                </option>
+              ))}
+            </VASelect>
             <VAInput
               placeholder="Baseline version"
               value={baselineVersion}

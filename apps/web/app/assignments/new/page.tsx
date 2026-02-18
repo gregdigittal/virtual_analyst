@@ -2,7 +2,7 @@
 
 import { api, type WorkflowTemplate } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -20,6 +20,8 @@ export default function NewAssignmentPage() {
   const [workflowInstanceId, setWorkflowInstanceId] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [entityOptions, setEntityOptions] = useState<{ id: string; label: string }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +38,11 @@ export default function NewAssignmentPage() {
       try {
         const res = await api.workflows.listTemplates(ctx.tenantId);
         if (!cancelled) setTemplates(res.templates);
+        // Load entity options for default type
+        try {
+          const draftRes = await api.drafts.list(ctx.tenantId);
+          if (!cancelled) setEntityOptions((draftRes.items ?? []).map((d: { draft_session_id: string; status?: string }) => ({ id: d.draft_session_id, label: `${d.draft_session_id} ${d.status ? `(${d.status})` : ""}` })));
+        } catch { /* optional */ }
       } catch {
         if (!cancelled) setTemplates([]);
       }
@@ -44,6 +51,28 @@ export default function NewAssignmentPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        let options: { id: string; label: string }[] = [];
+        if (entityType === "draft") {
+          const res = await api.drafts.list(tenantId);
+          options = (res.items ?? []).map((d: { draft_session_id: string; status?: string }) => ({ id: d.draft_session_id, label: `${d.draft_session_id} ${d.status ? `(${d.status})` : ""}` }));
+        } else if (entityType === "baseline") {
+          const res = await api.baselines.list(tenantId);
+          options = (res.items ?? []).map((b: { baseline_id: string; label?: string }) => ({ id: b.baseline_id, label: `${b.baseline_id} ${b.label ? `— ${b.label}` : ""}` }));
+        } else if (entityType === "run") {
+          const res = await api.runs.list(tenantId);
+          options = (res.items ?? []).map((r: { run_id: string; status?: string }) => ({ id: r.run_id, label: `${r.run_id} ${r.status ? `(${r.status})` : ""}` }));
+        }
+        if (!cancelled) setEntityOptions(options);
+      } catch { if (!cancelled) setEntityOptions([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [tenantId, entityType]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -67,8 +96,11 @@ export default function NewAssignmentPage() {
         workflow_instance_id: workflowInstanceId.trim() || null,
       });
       router.push("/inbox");
+      toast.success("Assignment created");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setCreating(false);
     }
@@ -102,29 +134,31 @@ export default function NewAssignmentPage() {
             <label htmlFor="entity_type" className="mb-1 block text-sm font-medium text-va-text2">
               Entity type
             </label>
-            <select
+            <VASelect
               id="entity_type"
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
-              className="w-full rounded-va-xs border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
             >
               <option value="draft">Draft</option>
               <option value="baseline">Baseline</option>
               <option value="run">Run</option>
-            </select>
+            </VASelect>
           </div>
           <div>
             <label htmlFor="entity_id" className="mb-1 block text-sm font-medium text-va-text2">
               Entity ID <span className="text-va-danger">*</span>
             </label>
-            <VAInput
+            <VASelect
               id="entity_id"
               value={entityId}
               onChange={(e) => setEntityId(e.target.value)}
-              placeholder="e.g. draft session or baseline ID"
               required
-              className="w-full"
-            />
+            >
+              <option value="">Select an entity</option>
+              {entityOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </VASelect>
           </div>
           <div>
             <label htmlFor="assignee" className="mb-1 block text-sm font-medium text-va-text2">

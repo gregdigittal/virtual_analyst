@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, useToast } from "@/components/ui";
 import { api, type BillingPlan, type BillingSubscription, type BillingUsageResponse } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -44,6 +44,8 @@ export default function BillingSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   const loadBilling = useCallback(async () => {
     if (!tenantId) return;
@@ -86,8 +88,11 @@ export default function BillingSettingsPage() {
     try {
       await api.billing.createOrUpdateSubscription(tenantId, userId, planId);
       await loadBilling();
+      toast.success("Plan updated");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusyPlanId(null);
     }
@@ -99,8 +104,11 @@ export default function BillingSettingsPage() {
     try {
       await api.billing.cancelSubscription(tenantId, userId);
       await loadBilling();
+      toast.success("Subscription cancelled");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -226,7 +234,11 @@ export default function BillingSettingsPage() {
                     <VAButton
                       variant="danger"
                       className="mt-3"
-                      onClick={handleCancel}
+                      onClick={() => setConfirmAction({
+                      action: handleCancel,
+                      title: "Cancel your subscription?",
+                      description: "Your subscription will be cancelled at the end of the current billing period.",
+                    })}
                     >
                       Cancel subscription
                     </VAButton>
@@ -240,6 +252,15 @@ export default function BillingSettingsPage() {
             </section>
           </div>
         )}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        confirmLabel="Cancel subscription"
+        variant="danger"
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
       </main>
     </div>
   );

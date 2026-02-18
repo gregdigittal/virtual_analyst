@@ -2,7 +2,7 @@
 
 import { api, type TeamDetail, type TeamMember, type JobFunction } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -91,6 +91,8 @@ export default function TeamDetailPage() {
   const [editMemberReportsTo, setEditMemberReportsTo] = useState("");
   const [savingMember, setSavingMember] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -150,8 +152,11 @@ export default function TeamDetailPage() {
         description: editDescription.trim() || null,
       });
       setTeam(updated);
+      toast.success("Team updated");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setEditing(false);
     }
@@ -172,8 +177,11 @@ export default function TeamDetailPage() {
       setShowAddMember(false);
       setAddUserId("");
       setAddReportsTo("");
+      toast.success("Member added");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setAdding(false);
     }
@@ -191,21 +199,27 @@ export default function TeamDetailPage() {
       });
       await load();
       setEditMember(null);
+      toast.success("Member updated");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingMember(false);
     }
   }
 
-  async function handleRemoveMember(userId: string) {
-    if (!tenantId || !confirm("Remove this member from the team?")) return;
+  async function handleRemoveMember(memberUserId: string) {
+    if (!tenantId) return;
     setError(null);
     try {
-      await api.teams.removeMember(tenantId, teamId, userId);
+      await api.teams.removeMember(tenantId, teamId, memberUserId);
       await load();
+      toast.success("Member removed");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -306,28 +320,26 @@ export default function TeamDetailPage() {
               <label htmlFor="add-jf" className="mb-1 block text-sm font-medium text-va-text2">
                 Job function
               </label>
-              <select
+              <VASelect
                 id="add-jf"
                 value={addJobFunctionId}
                 onChange={(e) => setAddJobFunctionId(e.target.value)}
-                className="w-full rounded-va-xs border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
               >
                 {jobFunctions.map((j) => (
                   <option key={j.job_function_id} value={j.job_function_id}>
                     {j.name}
                   </option>
                 ))}
-              </select>
+              </VASelect>
             </div>
             <div>
               <label htmlFor="add-reports-to" className="mb-1 block text-sm font-medium text-va-text2">
                 Reports to (user ID, optional)
               </label>
-              <select
+              <VASelect
                 id="add-reports-to"
                 value={addReportsTo}
                 onChange={(e) => setAddReportsTo(e.target.value)}
-                className="w-full rounded-va-xs border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
               >
                 <option value="">— None —</option>
                 {team.members.map((m) => (
@@ -335,7 +347,7 @@ export default function TeamDetailPage() {
                     {m.user_id.slice(0, 8)}… — {jobFunctions.find((j) => j.job_function_id === m.job_function_id)?.name ?? m.job_function_id}
                   </option>
                 ))}
-              </select>
+              </VASelect>
             </div>
             <div className="flex gap-2">
               <VAButton type="submit" disabled={adding}>
@@ -366,24 +378,22 @@ export default function TeamDetailPage() {
             <p className="text-sm text-va-text2 font-mono">{editMember.user_id}</p>
             <div>
               <label className="mb-1 block text-sm font-medium text-va-text2">Job function</label>
-              <select
+              <VASelect
                 value={editMemberJf}
                 onChange={(e) => setEditMemberJf(e.target.value)}
-                className="w-full rounded-va-xs border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
               >
                 {jobFunctions.map((j) => (
                   <option key={j.job_function_id} value={j.job_function_id}>
                     {j.name}
                   </option>
                 ))}
-              </select>
+              </VASelect>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-va-text2">Reports to</label>
-              <select
+              <VASelect
                 value={editMemberReportsTo}
                 onChange={(e) => setEditMemberReportsTo(e.target.value)}
-                className="w-full rounded-va-xs border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
               >
                 <option value="">— None —</option>
                 {team.members
@@ -393,7 +403,7 @@ export default function TeamDetailPage() {
                       {m.user_id.slice(0, 8)}… — {jobFunctions.find((j) => j.job_function_id === m.job_function_id)?.name ?? m.job_function_id}
                     </option>
                   ))}
-              </select>
+              </VASelect>
             </div>
             <div className="flex gap-2">
               <VAButton type="submit" disabled={savingMember}>
@@ -421,7 +431,11 @@ export default function TeamDetailPage() {
           <HierarchyTree
             members={team.members}
             jobFunctions={jobFunctions}
-            onRemove={handleRemoveMember}
+            onRemove={(uid) => setConfirmAction({
+              action: () => handleRemoveMember(uid),
+              title: "Remove this member?",
+              description: "They will be removed from the team.",
+            })}
             onEdit={(m) => {
               setEditMember(m);
               setEditMemberJf(m.job_function_id);
@@ -430,6 +444,14 @@ export default function TeamDetailPage() {
           />
         </VACard>
       )}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        confirmLabel="Remove"
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
 import {
   api,
   type ExcelConnection,
@@ -24,6 +24,8 @@ export default function ExcelConnectionsPage() {
   });
   const [pullResults, setPullResults] = useState<Record<string, ExcelPullValue[]>>({});
   const [pushInputs, setPushInputs] = useState<Record<string, string>>({});
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -66,8 +68,11 @@ export default function ExcelConnectionsPage() {
         bindings_json: Array.isArray(bindings) ? bindings : [],
       });
       await load();
+      toast.success("Connection created");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -77,8 +82,11 @@ export default function ExcelConnectionsPage() {
     try {
       const res = await api.excelConnections.pull(tenantId, userId, connectionId);
       setPullResults((prev) => ({ ...prev, [connectionId]: res.values ?? [] }));
+      toast.success("Pull complete");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -89,8 +97,11 @@ export default function ExcelConnectionsPage() {
       const changesRaw = pushInputs[connectionId] || "[]";
       const changes = JSON.parse(changesRaw);
       await api.excelConnections.push(tenantId, connectionId, changes);
+      toast.success("Push sent");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -100,8 +111,11 @@ export default function ExcelConnectionsPage() {
     try {
       await api.excelConnections.delete(tenantId, connectionId);
       await load();
+      toast.success("Connection deleted");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -137,8 +151,7 @@ export default function ExcelConnectionsPage() {
                 setForm((prev) => ({ ...prev, label: e.target.value }))
               }
             />
-            <select
-              className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
+            <VASelect
               value={form.mode}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, mode: e.target.value }))
@@ -146,7 +159,7 @@ export default function ExcelConnectionsPage() {
             >
               <option value="readonly">Read-only</option>
               <option value="readwrite">Read-write</option>
-            </select>
+            </VASelect>
           </div>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <textarea
@@ -203,7 +216,11 @@ export default function ExcelConnectionsPage() {
                     </VAButton>
                     <VAButton
                       variant="danger"
-                      onClick={() => handleDelete(conn.excel_connection_id)}
+                      onClick={() => setConfirmAction({
+                      action: () => handleDelete(conn.excel_connection_id),
+                      title: "Delete this Excel connection?",
+                      description: "This action cannot be undone.",
+                    })}
                     >
                       Delete
                     </VAButton>
@@ -239,6 +256,13 @@ export default function ExcelConnectionsPage() {
             ))}
           </div>
         )}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
       </main>
     </div>
   );

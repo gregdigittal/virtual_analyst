@@ -11,8 +11,10 @@ import {
   RiskBadge,
   StatePill,
   VAButton,
-  VAInput,
   VACard,
+  VAConfirmDialog,
+  VAInput,
+  useToast,
 } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
@@ -111,6 +113,8 @@ export default function DraftWorkspacePage() {
     status: string;
   } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   const loadDraft = useCallback(async () => {
     if (!tenantId) return;
@@ -165,8 +169,10 @@ export default function DraftWorkspacePage() {
       await api.drafts.chat(tenantId, id, chatMessage.trim());
       setChatMessage("");
       await loadDraft();
+      toast.success("Message sent");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setChatSending(false);
     }
@@ -178,8 +184,10 @@ export default function DraftWorkspacePage() {
     try {
       await api.drafts.acceptProposal(tenantId, id, proposalId);
       await loadDraft();
+      toast.success("Proposal accepted");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -189,8 +197,10 @@ export default function DraftWorkspacePage() {
     try {
       await api.drafts.rejectProposal(tenantId, id, proposalId);
       await loadDraft();
+      toast.success("Proposal rejected");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -201,8 +211,10 @@ export default function DraftWorkspacePage() {
     try {
       await api.drafts.patch(tenantId, id, { status: "ready_to_commit" });
       await loadDraft();
+      toast.success("Draft marked ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setMarkingReady(false);
     }
@@ -215,8 +227,10 @@ export default function DraftWorkspacePage() {
       await api.drafts.delete(tenantId, id);
       router.push("/drafts");
       router.refresh();
+      toast.success("Draft abandoned");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -229,6 +243,7 @@ export default function DraftWorkspacePage() {
       const result = await api.drafts.commit(tenantId, id, acknowledgeWarnings);
       router.push(`/baselines/${result.baseline_id}`);
       router.refresh();
+      toast.success("Draft committed");
     } catch (e) {
       if (e instanceof ApiError && e.statusCode === 409) {
         const integrity = (e.body as { detail?: { integrity?: { checks: { check_id?: string; severity?: string; message?: string }[]; status: string } } })?.detail?.integrity;
@@ -238,6 +253,7 @@ export default function DraftWorkspacePage() {
         }
       }
       setError(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setCommitting(false);
     }
@@ -430,7 +446,11 @@ export default function DraftWorkspacePage() {
                 <VAButton
                   type="button"
                   variant="secondary"
-                  onClick={abandonDraft}
+                  onClick={() => setConfirmAction({
+                    action: abandonDraft,
+                    title: "Abandon this draft?",
+                    description: "This action cannot be undone. The draft will be permanently deleted.",
+                  })}
                   className="border-va-danger/50 text-va-danger hover:bg-va-danger/10"
                 >
                   Abandon
@@ -517,6 +537,14 @@ export default function DraftWorkspacePage() {
           </VACard>
         </div>
       )}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        confirmLabel="Confirm"
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Inter, JetBrains_Mono, Sora } from "next/font/google";
+import { ToastProvider } from "@/components/ui";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,7 +36,7 @@ export default function RootLayout({
       className={`${inter.variable} ${sora.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen bg-va-midnight text-va-text font-sans antialiased">
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

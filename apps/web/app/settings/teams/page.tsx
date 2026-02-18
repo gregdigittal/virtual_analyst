@@ -2,7 +2,7 @@
 
 import { api, type TeamSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton, VAInput } from "@/components/ui";
+import { VACard, VAButton, VAInput, useToast } from "@/components/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -10,6 +10,7 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -65,11 +66,14 @@ export default function TeamsPage() {
       });
       const res = await api.teams.list(tenantId);
       setTeams(res.teams);
+      toast.success("Team created");
       setShowCreate(false);
       setCreateName("");
       setCreateDescription("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setCreating(false);
     }

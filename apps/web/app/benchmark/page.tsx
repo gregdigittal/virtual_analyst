@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, useToast } from "@/components/ui";
 import { api, type BenchmarkSummary, type BenchmarkOptIn } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -13,6 +13,8 @@ export default function BenchmarkPage() {
   const [form, setForm] = useState({ industry_segment: "general", size_segment: "general" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -56,8 +58,11 @@ export default function BenchmarkPage() {
         size_segment: form.size_segment,
       });
       await load();
+      toast.success("Opted in to benchmarking");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -67,8 +72,11 @@ export default function BenchmarkPage() {
     try {
       await api.benchmark.deleteOptIn(tenantId);
       await load();
+      toast.success("Opted out of benchmarking");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -108,7 +116,11 @@ export default function BenchmarkPage() {
                     Segment: {optIn.industry_segment} · {optIn.size_segment}
                   </p>
                 </div>
-                <VAButton variant="ghost" onClick={handleOptOut}>
+                <VAButton variant="ghost" onClick={() => setConfirmAction({
+                  action: handleOptOut,
+                  title: "Opt out of benchmarking?",
+                  description: "Your anonymized data will no longer be shared with peers.",
+                })}>
                   Opt out
                 </VAButton>
               </div>
@@ -193,6 +205,15 @@ export default function BenchmarkPage() {
             </VAButton>
           </VACard>
         )}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        confirmLabel="Opt out"
+        variant="warning"
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
       </main>
     </div>
   );

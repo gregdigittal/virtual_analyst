@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, useToast } from "@/components/ui";
 import { api, type IntegrationConnection, type IntegrationSnapshot } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -30,6 +30,8 @@ export default function IntegrationsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   const loadConnections = useCallback(async () => {
     if (!tenantId) return;
@@ -67,7 +69,9 @@ export default function IntegrationsPage() {
       const res = await api.integrations.initiate(tenantId, userId, provider);
       window.location.href = res.authorize_url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
@@ -80,8 +84,11 @@ export default function IntegrationsPage() {
     try {
       await api.integrations.sync(tenantId, connectionId, {});
       await loadConnections();
+      toast.success("Sync started");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
@@ -111,8 +118,11 @@ export default function IntegrationsPage() {
     try {
       await api.integrations.disconnect(tenantId, connectionId);
       await loadConnections();
+      toast.success("Integration disconnected");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
@@ -223,7 +233,11 @@ export default function IntegrationsPage() {
                       </VAButton>
                       <VAButton
                         variant="danger"
-                        onClick={() => handleDisconnect(conn.connection_id)}
+                        onClick={() => setConfirmAction({
+                        action: () => handleDisconnect(conn.connection_id),
+                        title: "Disconnect this integration?",
+                        description: "You will need to re-authenticate to reconnect.",
+                      })}
                         disabled={busyId === conn.connection_id}
                       >
                         Disconnect
@@ -275,6 +289,14 @@ export default function IntegrationsPage() {
             })}
           </div>
         )}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        confirmLabel="Disconnect"
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
       </main>
     </div>
   );

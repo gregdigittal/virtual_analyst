@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, useToast } from "@/components/ui";
 import { api, type ComplianceExport } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -13,6 +13,8 @@ export default function CompliancePage() {
   const [exportData, setExportData] = useState<ComplianceExport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -32,8 +34,11 @@ export default function CompliancePage() {
     try {
       const res = await api.compliance.export(tenantId, userId, targetUserId);
       setExportData(res);
+      toast.success("Data exported");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -46,8 +51,11 @@ export default function CompliancePage() {
     try {
       await api.compliance.anonymize(tenantId, userId, targetUserId);
       setExportData(null);
+      toast.success("User anonymized");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -88,7 +96,11 @@ export default function CompliancePage() {
             <VAButton onClick={handleExport} disabled={loading}>
               Export data
             </VAButton>
-            <VAButton variant="danger" onClick={handleAnonymize} disabled={loading}>
+            <VAButton variant="danger" onClick={() => setConfirmAction({
+              action: handleAnonymize,
+              title: "Anonymize this user?",
+              description: "This is irreversible. All personal data for this user will be permanently removed.",
+            })} disabled={loading}>
               Anonymize user
             </VAButton>
           </div>
@@ -102,6 +114,14 @@ export default function CompliancePage() {
             </pre>
           </VACard>
         )}
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        confirmLabel="Anonymize"
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
       </main>
     </div>
   );

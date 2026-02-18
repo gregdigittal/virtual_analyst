@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, useToast } from "@/components/ui";
 import {
   api,
   type CovenantDefinition,
@@ -11,11 +11,13 @@ import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
 
 export default function CovenantsPage() {
+  const { toast } = useToast();
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [items, setItems] = useState<CovenantDefinition[]>([]);
   const [refs, setRefs] = useState<CovenantMetricRefs | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
   const [form, setForm] = useState({
     label: "",
     metric_ref: "",
@@ -66,8 +68,11 @@ export default function CovenantsPage() {
       });
       setForm((prev) => ({ ...prev, label: "", threshold_value: "" }));
       await load();
+      toast.success("Covenant created");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -77,8 +82,11 @@ export default function CovenantsPage() {
     try {
       await api.covenants.delete(tenantId, id);
       await load();
+      toast.success("Covenant deleted");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -114,8 +122,7 @@ export default function CovenantsPage() {
                 setForm((prev) => ({ ...prev, label: e.target.value }))
               }
             />
-            <select
-              className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
+            <VASelect
               value={form.metric_ref}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, metric_ref: e.target.value }))
@@ -127,9 +134,8 @@ export default function CovenantsPage() {
                   {ref}
                 </option>
               ))}
-            </select>
-            <select
-              className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
+            </VASelect>
+            <VASelect
               value={form.operator}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, operator: e.target.value }))
@@ -140,7 +146,7 @@ export default function CovenantsPage() {
                   {op}
                 </option>
               ))}
-            </select>
+            </VASelect>
             <VAInput
               placeholder="Threshold"
               value={form.threshold_value}
@@ -185,7 +191,11 @@ export default function CovenantsPage() {
                     <td className="px-3 py-2 text-right">
                       <VAButton
                         variant="ghost"
-                        onClick={() => handleDelete(c.covenant_id)}
+                        onClick={() => setConfirmAction({
+                          action: () => handleDelete(c.covenant_id),
+                          title: `Delete covenant "${c.label}"?`,
+                          description: "This action cannot be undone.",
+                        })}
                       >
                         Delete
                       </VAButton>
@@ -197,6 +207,13 @@ export default function CovenantsPage() {
           </div>
         )}
       </main>
+      <VAConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

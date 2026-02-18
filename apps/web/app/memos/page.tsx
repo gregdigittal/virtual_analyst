@@ -1,8 +1,8 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput } from "@/components/ui";
-import { api, type MemoSummary } from "@/lib/api";
+import { VAButton, VACard, VAInput, VASelect, useToast } from "@/components/ui";
+import { api, type MemoSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
 
@@ -23,6 +23,8 @@ export default function MemosPage() {
     memo_type: MEMO_TYPES[0],
     title: "",
   });
+  const [runs, setRuns] = useState<RunSummary[]>([]);
+  const { toast } = useToast();
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -31,6 +33,11 @@ export default function MemosPage() {
     try {
       const res = await api.memos.list(tenantId, { limit: 50, offset: 0 });
       setItems(res.items ?? []);
+      // Fetch runs for the dropdown
+      try {
+        const runsRes = await api.runs.list(tenantId);
+        setRuns(runsRes.items ?? []);
+      } catch { /* runs list is optional */ }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -63,8 +70,11 @@ export default function MemosPage() {
       });
       setForm((prev) => ({ ...prev, title: "" }));
       await load();
+      toast.success("Memo created");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -93,15 +103,20 @@ export default function MemosPage() {
         <VACard className="p-5">
           <h2 className="text-lg font-medium text-va-text">Create memo</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <VAInput
-              placeholder="Run ID"
+            <VASelect
               value={form.run_id}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, run_id: e.target.value }))
               }
-            />
-            <select
-              className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
+            >
+              <option value="">Select a run</option>
+              {runs.map((r) => (
+                <option key={r.run_id} value={r.run_id}>
+                  {r.run_id} {r.status ? `(${r.status})` : ""}
+                </option>
+              ))}
+            </VASelect>
+            <VASelect
               value={form.memo_type}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, memo_type: e.target.value }))
@@ -112,7 +127,7 @@ export default function MemosPage() {
                   {t}
                 </option>
               ))}
-            </select>
+            </VASelect>
             <VAInput
               placeholder="Title (optional)"
               value={form.title}
