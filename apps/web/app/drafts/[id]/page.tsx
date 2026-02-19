@@ -19,6 +19,8 @@ import {
 } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
+import { EntityTimeline } from "@/components/EntityTimeline";
+import { CommentThread } from "@/components/CommentThread";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -105,6 +107,7 @@ export default function DraftWorkspacePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [chatMessage, setChatMessage] = useState("");
   const [chatSending, setChatSending] = useState(false);
   const [markingReady, setMarkingReady] = useState(false);
@@ -139,6 +142,7 @@ export default function DraftWorkspacePage() {
       } = await supabase.auth.getSession();
       if (!session?.user?.id) return;
       setTenantId(session.user.id);
+      setUserId(session.user.id);
       if (!cancelled) setLoading(true);
       try {
         const res = await api.drafts.get(session.user.id, id);
@@ -535,6 +539,33 @@ export default function DraftWorkspacePage() {
                 Acknowledge and commit
               </VAButton>
             </div>
+          </VACard>
+        </div>
+      )}
+      {tenantId && !loading && (
+        <div className="mx-4 mb-4 mt-2 grid gap-6 lg:grid-cols-2">
+          <VACard className="p-4">
+            <h2 className="mb-3 font-brand text-lg font-medium text-va-text">
+              History
+            </h2>
+            <EntityTimeline
+              tenantId={tenantId}
+              resourceType="draft"
+              resourceId={id}
+            />
+          </VACard>
+          <VACard className="p-4">
+            <h2 className="mb-3 font-brand text-lg font-medium text-va-text">
+              Comments
+            </h2>
+            {userId && (
+              <CommentThread
+                tenantId={tenantId}
+                userId={userId}
+                entityType="draft"
+                entityId={id}
+              />
+            )}
           </VACard>
         </div>
       )}

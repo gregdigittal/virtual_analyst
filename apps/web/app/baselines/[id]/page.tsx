@@ -4,6 +4,8 @@ import { api } from "@/lib/api";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
+import { EntityTimeline } from "@/components/EntityTimeline";
+import { CommentThread } from "@/components/CommentThread";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -16,6 +18,7 @@ export default function BaselineDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [runCreating, setRunCreating] = useState(false);
 
   useEffect(() => {
@@ -28,6 +31,7 @@ export default function BaselineDetailPage() {
       if (!session?.user?.id) return;
       const tid = session.user.id;
       setTenantId(tid);
+      setUserId(session.user.id);
       try {
         const res = await api.baselines.get(tid, id);
         if (!cancelled) setConfig(res.model_config);
@@ -105,6 +109,34 @@ export default function BaselineDetailPage() {
           </VACard>
         ) : (
           <p className="text-va-text2">Baseline not found.</p>
+        )}
+
+        {tenantId && !loading && (
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            <VACard className="p-4">
+              <h2 className="mb-3 font-brand text-lg font-medium text-va-text">
+                History
+              </h2>
+              <EntityTimeline
+                tenantId={tenantId}
+                resourceType="baseline"
+                resourceId={id}
+              />
+            </VACard>
+            <VACard className="p-4">
+              <h2 className="mb-3 font-brand text-lg font-medium text-va-text">
+                Comments
+              </h2>
+              {userId && (
+                <CommentThread
+                  tenantId={tenantId}
+                  userId={userId}
+                  entityType="baseline"
+                  entityId={id}
+                />
+              )}
+            </VACard>
+          </div>
         )}
       </main>
     </div>

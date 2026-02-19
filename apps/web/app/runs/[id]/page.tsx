@@ -4,6 +4,8 @@ import { api, type StatementsData, type KpiItem } from "@/lib/api";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
+import { EntityTimeline } from "@/components/EntityTimeline";
+import { CommentThread } from "@/components/CommentThread";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -151,6 +153,7 @@ export default function RunDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("statements");
 
   useEffect(() => {
@@ -163,6 +166,7 @@ export default function RunDetailPage() {
       if (!session?.user?.id) return;
       const tid = session.user.id;
       setTenantId(tid);
+      setUserId(session.user.id);
       try {
         const [runRes, stRes, kpiRes] = await Promise.all([
           api.runs.get(tid, runId),
@@ -257,6 +261,12 @@ export default function RunDetailPage() {
             >
               Valuation
             </Link>
+            <Link
+              href={`/runs/${runId}/sensitivity`}
+              className="rounded-va-sm border border-va-border bg-transparent px-3 py-1.5 text-sm font-medium text-va-text2 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
+            >
+              Sensitivity
+            </Link>
           </div>
         </div>
         {error && (
@@ -313,6 +323,35 @@ export default function RunDetailPage() {
                 </VACard>
               ))
             )}
+          </div>
+        )}
+
+        {/* History & Comments */}
+        {tenantId && !loading && (
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            <VACard className="p-4">
+              <h2 className="mb-3 font-brand text-lg font-medium text-va-text">
+                History
+              </h2>
+              <EntityTimeline
+                tenantId={tenantId}
+                resourceType="run"
+                resourceId={runId}
+              />
+            </VACard>
+            <VACard className="p-4">
+              <h2 className="mb-3 font-brand text-lg font-medium text-va-text">
+                Comments
+              </h2>
+              {userId && (
+                <CommentThread
+                  tenantId={tenantId}
+                  userId={userId}
+                  entityType="run"
+                  entityId={runId}
+                />
+              )}
+            </VACard>
           </div>
         )}
       </main>
