@@ -1,7 +1,7 @@
 # Project Context — Virtual Analyst
 
-> Last updated: 2026-02-19T00:00:00Z
-> Commit: 9e85005 — P1 UI/UX: nav active state, error boundary, loading spinners, date formatting, empty states
+> Last updated: 2026-02-19T22:35:00Z
+> Commit: b5d8925 — Add frontend unit tests: vitest + React Testing Library (33 tests)
 > Branch: main
 
 ## Architecture
@@ -23,21 +23,24 @@
 ## Current State
 
 - All production readiness items (A-01 through C-11) implemented
-- TypeScript `tsc --noEmit` reports 0 errors
+- TypeScript `tsc --noEmit` reports 0 errors (33 frontend tests pass)
 - Agent SDK flags default to `true`; `claude-agent-sdk` is optional (`pip install .[agent]`)
 - Migration 0048 applied to Supabase
-- 45 agent-related tests pass; CI pipeline runs all tests
+- Backend tests: `python -m pytest tests/unit/ tests/golden/ -q` (root-level `tests/`; 171 pass, ~20 fail on external deps — Stripe, LLM providers, OSError in workflow templates)
 - Custom domain `virtual-analyst.ai` active on Vercel
-- Round 19 cursor prompts ready on disk (gitignored): PAGINATION_FILTER (1,007 lines), FORM_VALIDATION (899 lines), MISSING_TESTS (435 lines), COMPETITIVE_FEATURES (773 lines)
+- Round 19 cursor prompts applied: pagination/filter, form validation, missing backend tests, competitive features (dashboard, tornado, MC fan chart, timeline, comments)
+- Round 20 applied: middleware auth for 22 routes, download fix, API_URL dedup, budget variance UI, ventures questionnaire form, logger.ts, .env.example, api.boardPacks.update
+- Backlog cursor prompts on disk: G-02 (compare — implemented), G-05 (board pack builder), W6 (multi-tenancy enforcement), I1 (error logging)
 
 ## In Progress / Next Steps
 
-- Round 20 housekeeping: middleware auth coverage for 19 routes, download handler fix, API_URL dedup, package updates (in progress)
-- Round 20 feature completions: budget variance/reforecast UI, ventures dynamic questionnaire form
-- Round 19A: Pagination & filter controls on all 13 list pages (cursor prompt ready)
-- Round 19B: Client-side form validation with per-field error display (cursor prompt ready)
-- Round 19F: Missing test coverage — MC P50, memo_service, excel_export, circuit_breaker (cursor prompt ready)
-- Round 19G: Competitive features — financial KPI dashboard, tornado chart, MC fan chart, timeline, comment widgets (cursor prompt ready)
+- G-05: Board pack section builder (`board-packs/[id]/builder`) — cursor prompt on disk
+- W6: Multi-tenancy auth.ts enforcement (`NEXT_PUBLIC_REQUIRE_TENANT_ID`) — cursor prompt on disk
+- Missing pages: `/import` (CSV import UI), `/runs/[id]/valuation`
+- Auth pattern standardisation: ~12 pages use raw `createClient()` instead of `getAuthContext()` + redirect
+- Compare page (`/compare`): run-fetch logic needs scoping per entity (currently fetches global latest)
+- KPI card display on run detail page (raw JSON pre block today)
+- Backend test failures: ~20 tests failing on external deps (Stripe, LLM providers, OSError in workflow templates) — need mocking or skip markers
 
 ## Key Files & Patterns
 

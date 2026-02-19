@@ -630,6 +630,15 @@ export const api = {
         `/api/v1/board-packs/${encodeURIComponent(packId)}/generate`,
         { tenantId, method: "POST" }
       ),
+    update: (
+      tenantId: string,
+      packId: string,
+      body: { section_order?: string[]; label?: string; branding_json?: Record<string, unknown> }
+    ) =>
+      request<BoardPackSummary>(
+        `/api/v1/board-packs/${encodeURIComponent(packId)}`,
+        { tenantId, method: "PATCH", body }
+      ),
     exportUrl: (packId: string, format: "html" | "pdf" | "pptx") =>
       `${API_URL}/api/v1/board-packs/${encodeURIComponent(packId)}/export?format=${format}`,
   },
