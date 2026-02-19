@@ -1,7 +1,7 @@
 # Project Context — Virtual Analyst
 
-> Last updated: 2026-02-18T14:00:00Z
-> Commit: f5a77dd — Fix remaining TypeScript errors and changeset/migration bugs
+> Last updated: 2026-02-19T00:00:00Z
+> Commit: 9e85005 — P1 UI/UX: nav active state, error boundary, loading spinners, date formatting, empty states
 > Branch: main
 
 ## Architecture
@@ -16,24 +16,28 @@
 
 ## Recent Changes (this commit)
 
-- Fixed 11 TypeScript errors across 4 page files (budget dashboard widget type, JSX unknown narrowing, userId null guard, Date constructor overload)
-- Fixed changesets.py decorator placement and migration 0048 function signature
+- P0 UI/UX: confirmation dialogs, toast notifications, UUID dropdowns, VASelect component (fd72903)
+- P1 UI/UX: nav active state, error boundary (error.tsx), VASpinner across 36 pages, shared date formatting, empty states, missing nav links (9e85005)
+- Round 17 API client bindings (18 binding groups, 25 TypeScript interfaces) committed in 0c69516
 
 ## Current State
 
 - All production readiness items (A-01 through C-11) implemented
-- TypeScript `tsc --noEmit` should report 0 errors
+- TypeScript `tsc --noEmit` reports 0 errors
 - Agent SDK flags default to `true`; `claude-agent-sdk` is optional (`pip install .[agent]`)
 - Migration 0048 applied to Supabase
 - 45 agent-related tests pass; CI pipeline runs all tests
 - Custom domain `virtual-analyst.ai` active on Vercel
+- Round 19 cursor prompts ready on disk (gitignored): PAGINATION_FILTER (1,007 lines), FORM_VALIDATION (899 lines), MISSING_TESTS (435 lines), COMPETITIVE_FEATURES (773 lines)
 
 ## In Progress / Next Steps
 
-- Part E from CURSOR_PROMPT_PRODUCTION_READINESS.md: 17 frontend pages for backend features with no UI
-- Part F: Additional test coverage (valuation, security, billing, scenarios, currency)
-- Part G: Competitive features (dashboard KPIs, multi-entity comparison, report builder, scenario viz)
-- `apps/web/lib/api.ts` has uncommitted Round 17 API client bindings (18 binding groups, 25 interfaces)
+- Round 20 housekeeping: middleware auth coverage for 19 routes, download handler fix, API_URL dedup, package updates (in progress)
+- Round 20 feature completions: budget variance/reforecast UI, ventures dynamic questionnaire form
+- Round 19A: Pagination & filter controls on all 13 list pages (cursor prompt ready)
+- Round 19B: Client-side form validation with per-field error display (cursor prompt ready)
+- Round 19F: Missing test coverage — MC P50, memo_service, excel_export, circuit_breaker (cursor prompt ready)
+- Round 19G: Competitive features — financial KPI dashboard, tornado chart, MC fan chart, timeline, comment widgets (cursor prompt ready)
 
 ## Key Files & Patterns
 
@@ -47,7 +51,7 @@
 - `shared/fm_shared/errors.py` — error hierarchy (IntegrationError, AuthError) with context in to_dict()
 - `shared/fm_shared/storage/artifact_store.py` — sync + async methods
 - `shared/fm_shared/model/schemas.py` — `ModelConfig`, `BlueprintNode` (with classification field)
-- `apps/web/lib/api.ts` — typed API client with 18 binding groups
+- `apps/web/lib/api.ts` — typed API client with 18+ binding groups (including metrics, budgets.reforecast)
 - `.github/workflows/ci.yml` — lint + pytest + integration tests
 
 ## Conventions
@@ -59,3 +63,4 @@
 - List endpoints return `{"items": [...], "total": N, "limit": N, "offset": N}`
 - Tests: pytest + pytest-asyncio, mock `tenant_conn` and SDK, no real API calls
 - Frontend: Next.js App Router, Tailwind, Shadcn UI, `fetchApi()` wrapper, strict TypeScript
+- Auth pattern: `getAuthContext()` → redirect to `/login` if null, then `api.setAccessToken(ctx.accessToken)`

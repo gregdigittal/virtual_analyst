@@ -1,7 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPaths = ["/baselines", "/runs", "/dashboard", "/drafts", "/scenarios", "/notifications", "/settings", "/inbox", "/assignments"];
+const protectedPaths = [
+  "/baselines", "/runs", "/dashboard", "/drafts", "/scenarios",
+  "/notifications", "/settings", "/inbox", "/assignments",
+  "/budgets", "/memos", "/documents", "/activity",
+  "/excel-connections", "/excel-import", "/covenants",
+  "/org-structures", "/ventures", "/board-packs",
+  "/import", "/benchmark", "/marketplace",
+];
 
 function isProtected(pathname: string): boolean {
   return protectedPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -57,5 +64,18 @@ export const config = {
     "/settings/:path*",
     "/inbox/:path*",
     "/assignments/:path*",
+    "/budgets/:path*",
+    "/memos/:path*",
+    "/documents/:path*",
+    "/activity/:path*",
+    "/excel-connections/:path*",
+    "/excel-import/:path*",
+    "/covenants/:path*",
+    "/org-structures/:path*",
+    "/ventures/:path*",
+    "/board-packs/:path*",
+    "/import/:path*",
+    "/benchmark/:path*",
+    "/marketplace/:path*",
   ],
 };

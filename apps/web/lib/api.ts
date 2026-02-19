@@ -4,7 +4,7 @@
  * When setAccessToken() is set, requests include Authorization: Bearer for API auth (C1).
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /**
  * Module-level access token. ONLY safe in client-side ("use client") contexts. R6-09.
@@ -596,6 +596,11 @@ export const api = {
         { tenantId }
       );
     },
+    reforecast: (tenantId: string, budgetId: string, body: { horizon_months?: number; department?: string }) =>
+      request<{ budget_id: string; horizon_months: number; reforecast_rows: number; status: string }>(
+        `/api/v1/budgets/${encodeURIComponent(budgetId)}/reforecast`,
+        { tenantId, method: "POST", body }
+      ),
   },
   boardPacks: {
     list: (tenantId: string, opts?: { status?: string; limit?: number; offset?: number }) =>
@@ -1283,6 +1288,10 @@ export const api = {
         { tenantId, userId, method: "POST" }
       ),
   },
+  metrics: {
+    getSummary: (tenantId: string) =>
+      request<MetricsSummary>("/api/v1/metrics/summary", { tenantId }),
+  },
   csvImport: {
     upload: (tenantId: string, userId: string | undefined, opts: { file: File; parent_baseline_id: string; parent_baseline_version?: string; label?: string; column_mapping?: Record<string, string> }) => {
       const form = new FormData();
@@ -1700,4 +1709,11 @@ export interface CsvImportResponse {
   scenario_id: string;
   overrides_count: number;
   status: string;
+}
+
+export interface MetricsSummary {
+  request_count: number;
+  latency_p50_ms: number;
+  latency_p95_ms: number;
+  by_endpoint: Record<string, number>;
 }

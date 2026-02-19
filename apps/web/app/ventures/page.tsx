@@ -4,9 +4,11 @@ import { Nav } from "@/components/nav";
 import { VAButton, VACard, VAInput } from "@/components/ui";
 import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function VenturesPage() {
+  const router = useRouter();
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [ventureId, setVentureId] = useState<string | null>(null);
@@ -19,12 +21,12 @@ export default function VenturesPage() {
   useEffect(() => {
     (async () => {
       const ctx = await getAuthContext();
-      if (!ctx) return;
+      if (!ctx) { router.replace("/login"); return; }
       api.setAccessToken(ctx.accessToken);
       setTenantId(ctx.tenantId);
       setUserId(ctx.userId);
     })();
-  }, []);
+  }, [router]);
 
   async function handleCreate() {
     if (!tenantId || !form.template_id) return;

@@ -1,14 +1,12 @@
 "use client";
 
-import { api, type BoardPackDetail } from "@/lib/api";
+import { api, API_URL, type BoardPackDetail } from "@/lib/api";
 import { VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function BoardPackDetailPage() {
   const params = useParams();
@@ -67,23 +65,28 @@ export default function BoardPackDetailPage() {
   async function handleDownload(format: "html" | "pdf" | "pptx") {
     if (!tenantId || !accessToken) return;
     const url = `${API_URL}/api/v1/board-packs/${encodeURIComponent(packId)}/export?format=${format}`;
-    const res = await fetch(url, {
-      headers: {
-        "X-Tenant-ID": tenantId,
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-    if (!res.ok) {
-      setError(`Download failed: ${res.status}`);
-      return;
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "X-Tenant-ID": tenantId,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (!res.ok) {
+        setError(`Download failed: ${res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      const ext = format === "pptx" ? "pptx" : format;
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `${packId}.${ext}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Download failed");
     }
-    const blob = await res.blob();
-    const ext = format === "pptx" ? "pptx" : format;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${packId}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(a.href);
   }
 
   if (!tenantId && !loading) return null;
