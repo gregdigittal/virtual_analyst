@@ -1,16 +1,20 @@
 "use client";
 
 import { api, type BaselineSummary, type ScenarioItem } from "@/lib/api";
-import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function ScenariosPage() {
   const [items, setItems] = useState<ScenarioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [compareBaselineId, setCompareBaselineId] = useState("");
   const [compareScenarioIdsRaw, setCompareScenarioIdsRaw] = useState("");
   const [compareResult, setCompareResult] = useState<{
@@ -19,8 +23,25 @@ export default function ScenariosPage() {
   const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
   const { toast } = useToast();
 
+  const load = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.scenarios.list(tenantId, {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+      });
+      setItems(res.items ?? []);
+      setHasMore(res.items.length === PAGE_SIZE);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, page]);
+
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       const supabase = createClient();
       const {
@@ -30,21 +51,15 @@ export default function ScenariosPage() {
       const tid = session.user.id;
       setTenantId(tid);
       try {
-        const res = await api.scenarios.list(tid);
-        if (!cancelled) setItems(res.items ?? []);
         const blRes = await api.baselines.list(tid);
-        if (!cancelled) setBaselines(blRes.items ?? []);
-      } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+        setBaselines(blRes.items ?? []);
+      } catch { /* baselines list is optional */ }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    if (tenantId) load();
+  }, [tenantId, load]);
 
   async function handleCompare() {
     if (!tenantId || !compareBaselineId) return;
@@ -97,44 +112,52 @@ export default function ScenariosPage() {
                   No scenarios yet. Create one from a baseline.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-va-lg border border-va-border">
-                  <table className="w-full text-sm text-va-text">
-                    <thead>
-                      <tr className="border-b border-va-border bg-va-surface">
-                        <th className="px-3 py-2 text-left font-medium">
-                          Label
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium">
-                          Baseline
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium">
-                          Overrides
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((s) => (
-                        <tr
-                          key={s.scenario_id}
-                          className="border-b border-va-border/50"
-                        >
-                          <td className="px-3 py-2 font-medium">
-                            {s.label}
-                          </td>
-                          <td className="px-3 py-2 text-va-text2">
-                            {s.baseline_id} (v{s.baseline_version})
-                          </td>
-                          <td className="px-3 py-2 text-va-text2">
-                            {Array.isArray(s.overrides)
-                              ? s.overrides.length
-                              : 0}{" "}
-                            override(s)
-                          </td>
+                <>
+                  <div className="overflow-x-auto rounded-va-lg border border-va-border">
+                    <table className="w-full text-sm text-va-text">
+                      <thead>
+                        <tr className="border-b border-va-border bg-va-surface">
+                          <th className="px-3 py-2 text-left font-medium">
+                            Label
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            Baseline
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            Overrides
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {items.map((s) => (
+                          <tr
+                            key={s.scenario_id}
+                            className="border-b border-va-border/50"
+                          >
+                            <td className="px-3 py-2 font-medium">
+                              {s.label}
+                            </td>
+                            <td className="px-3 py-2 text-va-text2">
+                              {s.baseline_id} (v{s.baseline_version})
+                            </td>
+                            <td className="px-3 py-2 text-va-text2">
+                              {Array.isArray(s.overrides)
+                                ? s.overrides.length
+                                : 0}{" "}
+                              override(s)
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <VAPagination
+                    page={page}
+                    pageSize={PAGE_SIZE}
+                    hasMore={hasMore}
+                    onPageChange={setPage}
+                  />
+                </>
               )}
             </section>
             <section>

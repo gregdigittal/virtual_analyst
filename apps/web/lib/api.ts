@@ -280,8 +280,14 @@ export interface NotificationsResponse {
 export const api = {
   setAccessToken,
   baselines: {
-    list: (tenantId: string) =>
-      request<BaselinesResponse>("/api/v1/baselines", { tenantId }),
+    list: (tenantId: string, opts?: { limit?: number; offset?: number }) =>
+      request<BaselinesResponse>(
+        `/api/v1/baselines?${new URLSearchParams({
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
     get: (tenantId: string, baselineId: string) =>
       request<{ model_config: unknown } & Record<string, unknown>>(
         `/api/v1/baselines/${encodeURIComponent(baselineId)}`,
@@ -294,8 +300,16 @@ export const api = {
       ),
   },
   runs: {
-    list: (tenantId: string) =>
-      request<RunsResponse>("/api/v1/runs", { tenantId }),
+    list: (tenantId: string, opts?: { limit?: number; offset?: number; status?: string; baseline_id?: string }) =>
+      request<RunsResponse>(
+        `/api/v1/runs?${new URLSearchParams({
+          ...(opts?.status && { status: opts.status }),
+          ...(opts?.baseline_id && { baseline_id: opts.baseline_id }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
     get: (tenantId: string, runId: string) =>
       request<RunDetail>(`/api/v1/runs/${encodeURIComponent(runId)}`, {
         tenantId,
@@ -340,9 +354,13 @@ export const api = {
       ),
   },
   drafts: {
-    list: (tenantId: string, status?: string) =>
+    list: (tenantId: string, opts?: { status?: string; limit?: number; offset?: number }) =>
       request<DraftsResponse>(
-        `/api/v1/drafts${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+        `/api/v1/drafts?${new URLSearchParams({
+          ...(opts?.status && { status: opts.status }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
         { tenantId }
       ),
     get: (tenantId: string, draftSessionId: string) =>
@@ -409,9 +427,13 @@ export const api = {
       ),
   },
   scenarios: {
-    list: (tenantId: string, baselineId?: string) =>
+    list: (tenantId: string, opts?: { baseline_id?: string; limit?: number; offset?: number }) =>
       request<{ items: ScenarioItem[]; limit: number; offset: number }>(
-        `/api/v1/scenarios${baselineId ? `?baseline_id=${encodeURIComponent(baselineId)}` : ""}`,
+        `/api/v1/scenarios?${new URLSearchParams({
+          ...(opts?.baseline_id && { baseline_id: opts.baseline_id }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
         { tenantId }
       ),
     get: (tenantId: string, scenarioId: string) =>
@@ -548,9 +570,13 @@ export const api = {
       ),
   },
   budgets: {
-    list: (tenantId: string, status?: string) =>
+    list: (tenantId: string, opts?: { status?: string; limit?: number; offset?: number }) =>
       request<{ budgets: BudgetSummary[]; limit: number; offset: number }>(
-        `/api/v1/budgets${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+        `/api/v1/budgets?${new URLSearchParams({
+          ...(opts?.status && { status: opts.status }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
         { tenantId }
       ),
     get: (tenantId: string, budgetId: string) =>
@@ -572,9 +598,13 @@ export const api = {
     },
   },
   boardPacks: {
-    list: (tenantId: string, status?: string) =>
+    list: (tenantId: string, opts?: { status?: string; limit?: number; offset?: number }) =>
       request<{ items: BoardPackSummary[] }>(
-        `/api/v1/board-packs${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+        `/api/v1/board-packs?${new URLSearchParams({
+          ...(opts?.status && { status: opts.status }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
         { tenantId }
       ),
     get: (tenantId: string, packId: string) =>

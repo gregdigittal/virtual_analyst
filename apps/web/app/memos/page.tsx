@@ -1,11 +1,13 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
 import { api, type MemoSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 const MEMO_TYPES = [
   "investment_committee",
@@ -26,15 +28,22 @@ export default function MemosPage() {
   });
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const { toast } = useToast();
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [memoTypeFilter, setMemoTypeFilter] = useState("");
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await api.memos.list(tenantId, { limit: 50, offset: 0 });
+      const res = await api.memos.list(tenantId, {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+        ...(memoTypeFilter && { memo_type: memoTypeFilter }),
+      });
       setItems(res.items ?? []);
-      // Fetch runs for the dropdown
+      setTotal(res.total);
       try {
         const runsRes = await api.runs.list(tenantId);
         setRuns(runsRes.items ?? []);
@@ -44,7 +53,7 @@ export default function MemosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, page, memoTypeFilter]);
 
   useEffect(() => {
     (async () => {
@@ -59,6 +68,10 @@ export default function MemosPage() {
   useEffect(() => {
     if (tenantId) load();
   }, [tenantId, load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [memoTypeFilter]);
 
   async function handleCreate() {
     if (!tenantId || !form.run_id) return;
@@ -142,51 +155,73 @@ export default function MemosPage() {
           </VAButton>
         </VACard>
 
+        <div className="mt-4 mb-4">
+          <VASelect
+            value={memoTypeFilter}
+            onChange={(e) => setMemoTypeFilter(e.target.value)}
+          >
+            <option value="">All memo types</option>
+            {MEMO_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </VASelect>
+        </div>
+
         {loading ? (
-          <VASpinner label="Loading memos…" className="mt-4" />
+          <VASpinner label="Loading memos…" />
         ) : items.length === 0 ? (
-          <VACard className="mt-4 p-6 text-center text-va-text2">
+          <VACard className="p-6 text-center text-va-text2">
             No memos generated yet.
           </VACard>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded-va-lg border border-va-border">
-            <table className="w-full text-sm text-va-text">
-              <thead>
-                <tr className="border-b border-va-border bg-va-surface">
-                  <th className="px-3 py-2 text-left font-medium">Title</th>
-                  <th className="px-3 py-2 text-left font-medium">Type</th>
-                  <th className="px-3 py-2 text-left font-medium">Created</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((memo) => (
-                  <tr
-                    key={memo.memo_id}
-                    className="border-b border-va-border/50"
-                  >
-                    <td className="px-3 py-2">{memo.title}</td>
-                    <td className="px-3 py-2 text-va-text2">
-                      {memo.memo_type}
-                    </td>
-                    <td className="px-3 py-2 text-va-text2">
-                      {formatDateTime(memo.created_at)}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <a
-                        className="text-va-blue hover:underline"
-                        href={api.memos.downloadUrl(memo.memo_id, "pdf")}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Download PDF
-                      </a>
-                    </td>
+          <>
+            <div className="overflow-x-auto rounded-va-lg border border-va-border">
+              <table className="w-full text-sm text-va-text">
+                <thead>
+                  <tr className="border-b border-va-border bg-va-surface">
+                    <th className="px-3 py-2 text-left font-medium">Title</th>
+                    <th className="px-3 py-2 text-left font-medium">Type</th>
+                    <th className="px-3 py-2 text-left font-medium">Created</th>
+                    <th className="px-3 py-2" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {items.map((memo) => (
+                    <tr
+                      key={memo.memo_id}
+                      className="border-b border-va-border/50"
+                    >
+                      <td className="px-3 py-2">{memo.title}</td>
+                      <td className="px-3 py-2 text-va-text2">
+                        {memo.memo_type}
+                      </td>
+                      <td className="px-3 py-2 text-va-text2">
+                        {formatDateTime(memo.created_at)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <a
+                          className="text-va-blue hover:underline"
+                          href={api.memos.downloadUrl(memo.memo_id, "pdf")}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Download PDF
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </main>
     </div>

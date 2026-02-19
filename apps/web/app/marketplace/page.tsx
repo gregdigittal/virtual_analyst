@@ -1,10 +1,12 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner, VAPagination } from "@/components/ui";
 import { api, type MarketplaceTemplate } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function MarketplacePage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -17,6 +19,8 @@ export default function MarketplacePage() {
   const [forms, setForms] = useState<Record<string, { label: string; fiscal_year: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -26,16 +30,17 @@ export default function MarketplacePage() {
       const res = await api.marketplace.list(tenantId, {
         industry: filters.industry || undefined,
         template_type: filters.template_type || undefined,
-        limit: 50,
-        offset: 0,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
       });
       setTemplates(res.items ?? []);
+      setTotal(res.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [tenantId, filters]);
+  }, [tenantId, filters, page]);
 
   useEffect(() => {
     (async () => {
@@ -50,6 +55,10 @@ export default function MarketplacePage() {
   useEffect(() => {
     if (tenantId) load();
   }, [tenantId, load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   async function handleUse(templateId: string) {
     if (!tenantId) return;
@@ -126,60 +135,68 @@ export default function MarketplacePage() {
             No templates available. Check back soon for community-contributed models.
           </VACard>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {templates.map((tpl) => {
-              const form = forms[tpl.template_id] || { label: "", fiscal_year: "" };
-              return (
-                <VACard key={tpl.template_id} className="p-5">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-medium text-va-text">
-                      {tpl.name}
-                    </h2>
-                    <span className="rounded-full bg-va-border px-2 py-0.5 text-xs text-va-text2">
-                      {tpl.template_type}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-va-text2">
-                    {tpl.description}
-                  </p>
-                  <p className="mt-1 text-xs text-va-text2">
-                    Industry: {tpl.industry}
-                  </p>
-                  <div className="mt-4 grid gap-2 md:grid-cols-2">
-                    <VAInput
-                      placeholder="Label"
-                      value={form.label}
-                      onChange={(e) =>
-                        setForms((prev) => ({
-                          ...prev,
-                          [tpl.template_id]: {
-                            ...form,
-                            label: e.target.value,
-                          },
-                        }))
-                      }
-                    />
-                    <VAInput
-                      placeholder="Fiscal year"
-                      value={form.fiscal_year}
-                      onChange={(e) =>
-                        setForms((prev) => ({
-                          ...prev,
-                          [tpl.template_id]: {
-                            ...form,
-                            fiscal_year: e.target.value,
-                          },
-                        }))
-                      }
-                    />
-                  </div>
-                  <VAButton className="mt-3" onClick={() => handleUse(tpl.template_id)}>
-                    Use template
-                  </VAButton>
-                </VACard>
-              );
-            })}
-          </div>
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              {templates.map((tpl) => {
+                const form = forms[tpl.template_id] || { label: "", fiscal_year: "" };
+                return (
+                  <VACard key={tpl.template_id} className="p-5">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-medium text-va-text">
+                        {tpl.name}
+                      </h2>
+                      <span className="rounded-full bg-va-border px-2 py-0.5 text-xs text-va-text2">
+                        {tpl.template_type}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-va-text2">
+                      {tpl.description}
+                    </p>
+                    <p className="mt-1 text-xs text-va-text2">
+                      Industry: {tpl.industry}
+                    </p>
+                    <div className="mt-4 grid gap-2 md:grid-cols-2">
+                      <VAInput
+                        placeholder="Label"
+                        value={form.label}
+                        onChange={(e) =>
+                          setForms((prev) => ({
+                            ...prev,
+                            [tpl.template_id]: {
+                              ...form,
+                              label: e.target.value,
+                            },
+                          }))
+                        }
+                      />
+                      <VAInput
+                        placeholder="Fiscal year"
+                        value={form.fiscal_year}
+                        onChange={(e) =>
+                          setForms((prev) => ({
+                            ...prev,
+                            [tpl.template_id]: {
+                              ...form,
+                              fiscal_year: e.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <VAButton className="mt-3" onClick={() => handleUse(tpl.template_id)}>
+                      Use template
+                    </VAButton>
+                  </VACard>
+                );
+              })}
+            </div>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </main>
     </div>

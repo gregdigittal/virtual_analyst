@@ -1,21 +1,47 @@
 "use client";
 
-import { api, type RunSummary } from "@/lib/api";
-import { VACard, VASpinner } from "@/components/ui";
+import { api, type BaselineSummary, type RunSummary } from "@/lib/api";
+import { VACard, VASelect, VASpinner, VAPagination } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function RunsPage() {
   const [items, setItems] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [baselineFilter, setBaselineFilter] = useState("");
+  const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
+
+  const load = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.runs.list(tenantId, {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+        ...(statusFilter && { status: statusFilter }),
+        ...(baselineFilter && { baseline_id: baselineFilter }),
+      });
+      setItems(res.items);
+      setHasMore(res.items.length === PAGE_SIZE);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, page, statusFilter, baselineFilter]);
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       const supabase = createClient();
       const {
@@ -25,18 +51,19 @@ export default function RunsPage() {
       const tid = session.user.id;
       setTenantId(tid);
       try {
-        const res = await api.runs.list(tid);
-        if (!cancelled) setItems(res.items);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+        const blRes = await api.baselines.list(tid);
+        setBaselines(blRes.items ?? []);
+      } catch { /* baselines list is optional for filter */ }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    if (tenantId) load();
+  }, [tenantId, load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, baselineFilter]);
 
   if (!tenantId && !loading) return null;
 
@@ -52,6 +79,31 @@ export default function RunsPage() {
             View run results, statements, and KPIs.
           </p>
         </div>
+
+        <div className="mb-4 flex flex-wrap gap-3">
+          <VASelect
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All statuses</option>
+            <option value="succeeded">Succeeded</option>
+            <option value="failed">Failed</option>
+            <option value="running">Running</option>
+            <option value="pending">Pending</option>
+          </VASelect>
+          <VASelect
+            value={baselineFilter}
+            onChange={(e) => setBaselineFilter(e.target.value)}
+          >
+            <option value="">All baselines</option>
+            {baselines.map((b) => (
+              <option key={b.baseline_id} value={b.baseline_id}>
+                {b.baseline_id} (v{b.baseline_version})
+              </option>
+            ))}
+          </VASelect>
+        </div>
+
         {error && (
           <div
             className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
@@ -68,40 +120,48 @@ export default function RunsPage() {
             detail page.
           </VACard>
         ) : (
-          <ul className="space-y-2">
-            {items.map((r) => (
-              <li key={r.run_id}>
-                <Link
-                  href={`/runs/${r.run_id}`}
-                  className="block rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-va-text">{r.run_id}</span>
-                    <span
-                      className={`text-sm ${
-                        r.status === "succeeded"
-                          ? "text-va-success"
-                          : r.status === "failed"
-                            ? "text-va-danger"
-                            : "text-va-text2"
-                      }`}
-                    >
-                      {r.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-va-text2">
-                    Baseline {r.baseline_id}
-                    {r.scenario_id ? ` · Scenario ${r.scenario_id}` : ""}
-                  </p>
-                  {r.created_at && (
-                    <p className="mt-0.5 text-xs text-va-text2">
-                      {formatDateTime(r.created_at)}
+          <>
+            <ul className="space-y-2">
+              {items.map((r) => (
+                <li key={r.run_id}>
+                  <Link
+                    href={`/runs/${r.run_id}`}
+                    className="block rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-va-text">{r.run_id}</span>
+                      <span
+                        className={`text-sm ${
+                          r.status === "succeeded"
+                            ? "text-va-success"
+                            : r.status === "failed"
+                              ? "text-va-danger"
+                              : "text-va-text2"
+                        }`}
+                      >
+                        {r.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-va-text2">
+                      Baseline {r.baseline_id}
+                      {r.scenario_id ? ` · Scenario ${r.scenario_id}` : ""}
                     </p>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+                    {r.created_at && (
+                      <p className="mt-0.5 text-xs text-va-text2">
+                        {formatDateTime(r.created_at)}
+                      </p>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              hasMore={hasMore}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </main>
     </div>

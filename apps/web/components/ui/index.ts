@@ -10,3 +10,4 @@ export { VASelect } from "./VASelect";
 export { VAConfirmDialog } from "./VAConfirmDialog";
 export { ToastProvider, useToast } from "./ToastProvider";
 export { VASpinner } from "./VASpinner";
+export { VAPagination } from "./VAPagination";

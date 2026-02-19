@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
 import {
   api,
   type CovenantDefinition,
@@ -9,6 +9,8 @@ import {
 } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function CovenantsPage() {
   const { toast } = useToast();
@@ -24,6 +26,8 @@ export default function CovenantsPage() {
     operator: ">=",
     threshold_value: "",
   });
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -31,17 +35,21 @@ export default function CovenantsPage() {
     setError(null);
     try {
       const [listRes, refsRes] = await Promise.all([
-        api.covenants.list(tenantId, { limit: 50, offset: 0 }),
+        api.covenants.list(tenantId, {
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
         api.covenants.metricRefs(tenantId),
       ]);
       setItems(listRes.items ?? []);
+      setTotal(listRes.total);
       setRefs(refsRes);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, page]);
 
   useEffect(() => {
     (async () => {
@@ -170,41 +178,49 @@ export default function CovenantsPage() {
             No covenants defined yet. Use the form above to create your first covenant threshold.
           </VACard>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded-va-lg border border-va-border">
-            <table className="w-full text-sm text-va-text">
-              <thead>
-                <tr className="border-b border-va-border bg-va-surface">
-                  <th className="px-3 py-2 text-left font-medium">Label</th>
-                  <th className="px-3 py-2 text-left font-medium">Metric</th>
-                  <th className="px-3 py-2 text-left font-medium">Operator</th>
-                  <th className="px-3 py-2 text-left font-medium">Threshold</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((c) => (
-                  <tr key={c.covenant_id} className="border-b border-va-border/50">
-                    <td className="px-3 py-2">{c.label}</td>
-                    <td className="px-3 py-2 text-va-text2">{c.metric_ref}</td>
-                    <td className="px-3 py-2">{c.operator}</td>
-                    <td className="px-3 py-2">{c.threshold_value}</td>
-                    <td className="px-3 py-2 text-right">
-                      <VAButton
-                        variant="ghost"
-                        onClick={() => setConfirmAction({
-                          action: () => handleDelete(c.covenant_id),
-                          title: `Delete covenant "${c.label}"?`,
-                          description: "This action cannot be undone.",
-                        })}
-                      >
-                        Delete
-                      </VAButton>
-                    </td>
+          <>
+            <div className="mt-4 overflow-x-auto rounded-va-lg border border-va-border">
+              <table className="w-full text-sm text-va-text">
+                <thead>
+                  <tr className="border-b border-va-border bg-va-surface">
+                    <th className="px-3 py-2 text-left font-medium">Label</th>
+                    <th className="px-3 py-2 text-left font-medium">Metric</th>
+                    <th className="px-3 py-2 text-left font-medium">Operator</th>
+                    <th className="px-3 py-2 text-left font-medium">Threshold</th>
+                    <th className="px-3 py-2" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {items.map((c) => (
+                    <tr key={c.covenant_id} className="border-b border-va-border/50">
+                      <td className="px-3 py-2">{c.label}</td>
+                      <td className="px-3 py-2 text-va-text2">{c.metric_ref}</td>
+                      <td className="px-3 py-2">{c.operator}</td>
+                      <td className="px-3 py-2">{c.threshold_value}</td>
+                      <td className="px-3 py-2 text-right">
+                        <VAButton
+                          variant="ghost"
+                          onClick={() => setConfirmAction({
+                            action: () => handleDelete(c.covenant_id),
+                            title: `Delete covenant "${c.label}"?`,
+                            description: "This action cannot be undone.",
+                          })}
+                        >
+                          Delete
+                        </VAButton>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </main>
       <VAConfirmDialog

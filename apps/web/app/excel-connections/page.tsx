@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
 import {
   api,
   type ExcelConnection,
@@ -9,6 +9,8 @@ import {
 } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function ExcelConnectionsPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -26,20 +28,26 @@ export default function ExcelConnectionsPage() {
   const [pushInputs, setPushInputs] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await api.excelConnections.list(tenantId, { limit: 50, offset: 0 });
+      const res = await api.excelConnections.list(tenantId, {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+      });
       setConnections(res.items ?? []);
+      setTotal(res.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, page]);
 
   useEffect(() => {
     (async () => {
@@ -189,72 +197,80 @@ export default function ExcelConnectionsPage() {
             No Excel connections yet. Create a connection to sync data between your models and Excel.
           </VACard>
         ) : (
-          <div className="mt-4 space-y-4">
-            {connections.map((conn) => (
-              <VACard key={conn.excel_connection_id} className="p-5">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-base font-medium text-va-text">
-                      {conn.label || conn.excel_connection_id}
-                    </h3>
-                    <p className="text-sm text-va-text2">
-                      Mode: {conn.mode} · Status: {conn.status ?? "active"}
-                    </p>
+          <>
+            <div className="mt-4 space-y-4">
+              {connections.map((conn) => (
+                <VACard key={conn.excel_connection_id} className="p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-base font-medium text-va-text">
+                        {conn.label || conn.excel_connection_id}
+                      </h3>
+                      <p className="text-sm text-va-text2">
+                        Mode: {conn.mode} · Status: {conn.status ?? "active"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <VAButton
+                        variant="secondary"
+                        onClick={() => handlePull(conn.excel_connection_id)}
+                      >
+                        Pull
+                      </VAButton>
+                      <VAButton
+                        variant="secondary"
+                        onClick={() => handlePush(conn.excel_connection_id)}
+                      >
+                        Push
+                      </VAButton>
+                      <VAButton
+                        variant="danger"
+                        onClick={() => setConfirmAction({
+                        action: () => handleDelete(conn.excel_connection_id),
+                        title: "Delete this Excel connection?",
+                        description: "This action cannot be undone.",
+                      })}
+                      >
+                        Delete
+                      </VAButton>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <VAButton
-                      variant="secondary"
-                      onClick={() => handlePull(conn.excel_connection_id)}
-                    >
-                      Pull
-                    </VAButton>
-                    <VAButton
-                      variant="secondary"
-                      onClick={() => handlePush(conn.excel_connection_id)}
-                    >
-                      Push
-                    </VAButton>
-                    <VAButton
-                      variant="danger"
-                      onClick={() => setConfirmAction({
-                      action: () => handleDelete(conn.excel_connection_id),
-                      title: "Delete this Excel connection?",
-                      description: "This action cannot be undone.",
-                    })}
-                    >
-                      Delete
-                    </VAButton>
+                  <div className="mt-3">
+                    <label className="mb-1 block text-xs font-medium text-va-text2">
+                      Push changes (JSON)
+                    </label>
+                    <textarea
+                      className="min-h-[80px] w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-xs text-va-text"
+                      value={pushInputs[conn.excel_connection_id] ?? "[]"}
+                      onChange={(e) =>
+                        setPushInputs((prev) => ({
+                          ...prev,
+                          [conn.excel_connection_id]: e.target.value,
+                        }))
+                      }
+                    />
                   </div>
-                </div>
-                <div className="mt-3">
-                  <label className="mb-1 block text-xs font-medium text-va-text2">
-                    Push changes (JSON)
-                  </label>
-                  <textarea
-                    className="min-h-[80px] w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-xs text-va-text"
-                    value={pushInputs[conn.excel_connection_id] ?? "[]"}
-                    onChange={(e) =>
-                      setPushInputs((prev) => ({
-                        ...prev,
-                        [conn.excel_connection_id]: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                {pullResults[conn.excel_connection_id]?.length ? (
-                  <div className="mt-3 rounded-va-lg border border-va-border p-3 text-xs text-va-text2">
-                    {pullResults[conn.excel_connection_id]
-                      .slice(0, 5)
-                      .map((v) => (
-                        <div key={v.binding_id}>
-                          {v.binding_id}: {String(v.value)}
-                        </div>
-                      ))}
-                  </div>
-                ) : null}
-              </VACard>
-            ))}
-          </div>
+                  {pullResults[conn.excel_connection_id]?.length ? (
+                    <div className="mt-3 rounded-va-lg border border-va-border p-3 text-xs text-va-text2">
+                      {pullResults[conn.excel_connection_id]
+                        .slice(0, 5)
+                        .map((v) => (
+                          <div key={v.binding_id}>
+                            {v.binding_id}: {String(v.value)}
+                          </div>
+                        ))}
+                    </div>
+                  ) : null}
+                </VACard>
+              ))}
+            </div>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setPage}
+            />
+          </>
         )}
       <VAConfirmDialog
         open={!!confirmAction}

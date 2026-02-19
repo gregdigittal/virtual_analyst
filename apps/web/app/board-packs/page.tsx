@@ -1,42 +1,55 @@
 "use client";
 
 import { api, type BoardPackSummary } from "@/lib/api";
-import { VACard, VASpinner } from "@/components/ui";
+import { VACard, VASpinner, VAPagination } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function BoardPacksPage() {
   const [items, setItems] = useState<BoardPackSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.boardPacks.list(tenantId, {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+      });
+      setItems(res.items);
+      setHasMore(res.items.length === PAGE_SIZE);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, page]);
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.user?.id) return;
-      const tid = session.user.user_metadata?.tenant_id ?? session.user.id;
-      setTenantId(tid);
-      try {
-        const res = await api.boardPacks.list(tid);
-        if (!cancelled) setItems(res.items);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      setTenantId(session.user.user_metadata?.tenant_id ?? session.user.id);
     })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    if (tenantId) load();
+  }, [tenantId, load]);
 
   if (!tenantId && !loading) return null;
 
@@ -67,42 +80,50 @@ export default function BoardPacksPage() {
             No board packs yet. Create one from the pack detail page (link a run and optionally a budget).
           </VACard>
         ) : (
-          <ul className="space-y-2">
-            {items.map((p) => (
-              <li key={p.pack_id}>
-                <Link
-                  href={`/board-packs/${p.pack_id}`}
-                  className="block rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-va-text">{p.label}</span>
-                    <span
-                      className={`text-sm ${
-                        p.status === "ready"
-                          ? "text-va-success"
-                          : p.status === "draft"
-                            ? "text-va-text2"
-                            : p.status === "error"
-                              ? "text-va-danger"
-                              : "text-va-warning"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-va-text2">
-                    Run: {p.run_id ?? "—"}
-                    {p.budget_id ? ` · Budget: ${p.budget_id}` : ""}
-                  </p>
-                  {p.created_at && (
-                    <p className="mt-0.5 text-xs text-va-text2">
-                      {formatDateTime(p.created_at)}
+          <>
+            <ul className="space-y-2">
+              {items.map((p) => (
+                <li key={p.pack_id}>
+                  <Link
+                    href={`/board-packs/${p.pack_id}`}
+                    className="block rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-va-text">{p.label}</span>
+                      <span
+                        className={`text-sm ${
+                          p.status === "ready"
+                            ? "text-va-success"
+                            : p.status === "draft"
+                              ? "text-va-text2"
+                              : p.status === "error"
+                                ? "text-va-danger"
+                                : "text-va-warning"
+                        }`}
+                      >
+                        {p.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-va-text2">
+                      Run: {p.run_id ?? "—"}
+                      {p.budget_id ? ` · Budget: ${p.budget_id}` : ""}
                     </p>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+                    {p.created_at && (
+                      <p className="mt-0.5 text-xs text-va-text2">
+                        {formatDateTime(p.created_at)}
+                      </p>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              hasMore={hasMore}
+              onPageChange={setPage}
+            />
+          </>
         )}
         <p className="mt-4 text-sm text-va-text2">
           Create new pack via API: <code className="rounded bg-va-panel px-1">POST /api/v1/board-packs</code> with label and run_id.

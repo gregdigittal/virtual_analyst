@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner, VAPagination, useToast } from "@/components/ui";
 import {
   api,
   type BoardPackHistoryItem,
@@ -10,6 +10,8 @@ import {
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function BoardPackSchedulesPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -26,6 +28,10 @@ export default function BoardPackSchedulesPage() {
     distribution_emails: "",
   });
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalSchedules, setTotalSchedules] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [totalHistory, setTotalHistory] = useState(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -33,17 +39,25 @@ export default function BoardPackSchedulesPage() {
     setError(null);
     try {
       const [schedRes, historyRes] = await Promise.all([
-        api.boardPackSchedules.list(tenantId, { limit: 50, offset: 0 }),
-        api.boardPackSchedules.history(tenantId, { limit: 50, offset: 0 }),
+        api.boardPackSchedules.list(tenantId, {
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
+        api.boardPackSchedules.history(tenantId, {
+          limit: PAGE_SIZE,
+          offset: (historyPage - 1) * PAGE_SIZE,
+        }),
       ]);
       setSchedules(schedRes.items ?? []);
+      setTotalSchedules(schedRes.total);
       setHistory(historyRes.items ?? []);
+      setTotalHistory(historyRes.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, page, historyPage]);
 
   useEffect(() => {
     (async () => {
@@ -168,33 +182,41 @@ export default function BoardPackSchedulesPage() {
             No schedules yet.
           </VACard>
         ) : (
-          <div className="mt-4 space-y-3">
-            {schedules.map((s) => (
-              <VACard key={s.schedule_id} className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-base font-medium text-va-text">
-                      {s.label}
-                    </h3>
-                    <p className="text-sm text-va-text2">
-                      Run: {s.run_id} · Cron: {s.cron_expr}
-                    </p>
-                    <p className="text-xs text-va-text2">
-                      Next run:{" "}
-                      {formatDateTime(s.next_run_at)}
-                    </p>
+          <>
+            <div className="mt-4 space-y-3">
+              {schedules.map((s) => (
+                <VACard key={s.schedule_id} className="p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-base font-medium text-va-text">
+                        {s.label}
+                      </h3>
+                      <p className="text-sm text-va-text2">
+                        Run: {s.run_id} · Cron: {s.cron_expr}
+                      </p>
+                      <p className="text-xs text-va-text2">
+                        Next run:{" "}
+                        {formatDateTime(s.next_run_at)}
+                      </p>
+                    </div>
+                    <VAButton
+                      variant="secondary"
+                      onClick={() => handleRunNow(s.schedule_id)}
+                      disabled={busyId === s.schedule_id}
+                    >
+                      Run now
+                    </VAButton>
                   </div>
-                  <VAButton
-                    variant="secondary"
-                    onClick={() => handleRunNow(s.schedule_id)}
-                    disabled={busyId === s.schedule_id}
-                  >
-                    Run now
-                  </VAButton>
-                </div>
-              </VACard>
-            ))}
-          </div>
+                </VACard>
+              ))}
+            </div>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={totalSchedules}
+              onPageChange={setPage}
+            />
+          </>
         )}
 
         <VACard className="mt-6 p-5">
@@ -202,30 +224,38 @@ export default function BoardPackSchedulesPage() {
           {history.length === 0 ? (
             <p className="mt-2 text-sm text-va-text2">No history yet.</p>
           ) : (
-            <div className="mt-3 overflow-x-auto rounded-va-lg border border-va-border">
-              <table className="w-full text-sm text-va-text">
-                <thead>
-                  <tr className="border-b border-va-border bg-va-surface">
-                    <th className="px-3 py-2 text-left font-medium">Pack</th>
-                    <th className="px-3 py-2 text-left font-medium">Run</th>
-                    <th className="px-3 py-2 text-left font-medium">Status</th>
-                    <th className="px-3 py-2 text-left font-medium">Generated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h) => (
-                    <tr key={h.history_id} className="border-b border-va-border/50">
-                      <td className="px-3 py-2 text-va-text2">{h.pack_id}</td>
-                      <td className="px-3 py-2 text-va-text2">{h.run_id}</td>
-                      <td className="px-3 py-2">{h.status}</td>
-                      <td className="px-3 py-2 text-va-text2">
-                        {formatDateTime(h.generated_at)}
-                      </td>
+            <>
+              <div className="mt-3 overflow-x-auto rounded-va-lg border border-va-border">
+                <table className="w-full text-sm text-va-text">
+                  <thead>
+                    <tr className="border-b border-va-border bg-va-surface">
+                      <th className="px-3 py-2 text-left font-medium">Pack</th>
+                      <th className="px-3 py-2 text-left font-medium">Run</th>
+                      <th className="px-3 py-2 text-left font-medium">Status</th>
+                      <th className="px-3 py-2 text-left font-medium">Generated</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {history.map((h) => (
+                      <tr key={h.history_id} className="border-b border-va-border/50">
+                        <td className="px-3 py-2 text-va-text2">{h.pack_id}</td>
+                        <td className="px-3 py-2 text-va-text2">{h.run_id}</td>
+                        <td className="px-3 py-2">{h.status}</td>
+                        <td className="px-3 py-2 text-va-text2">
+                          {formatDateTime(h.generated_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <VAPagination
+                page={historyPage}
+                pageSize={PAGE_SIZE}
+                total={totalHistory}
+                onPageChange={setHistoryPage}
+              />
+            </>
           )}
         </VACard>
       </main>

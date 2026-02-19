@@ -1,11 +1,13 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner, VAPagination } from "@/components/ui";
 import { api, type ActivityItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 export default function ActivityPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -18,6 +20,8 @@ export default function ActivityPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -29,16 +33,17 @@ export default function ActivityPage() {
         resource_type: filters.resource_type || undefined,
         resource_id: filters.resource_id || undefined,
         since: filters.since || undefined,
-        limit: 50,
-        offset: 0,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
       });
       setItems(res.items ?? []);
+      setTotal(res.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [tenantId, filters]);
+  }, [tenantId, filters, page]);
 
   useEffect(() => {
     (async () => {
@@ -52,6 +57,10 @@ export default function ActivityPage() {
   useEffect(() => {
     if (tenantId) load();
   }, [tenantId, load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   return (
     <div className="min-h-screen bg-va-midnight">
@@ -121,24 +130,32 @@ export default function ActivityPage() {
             No activity recorded yet. Actions across your workspace will appear here.
           </VACard>
         ) : (
-          <div className="space-y-3">
-            {items.map((item) => (
-              <VACard key={item.id} className="p-4">
-                <div className="flex items-center justify-between text-sm text-va-text2">
-                  <span>{item.type.toUpperCase()}</span>
-                  <span>
-                    {formatDateTime(item.timestamp)}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-va-text">
-                  {item.summary}
-                </p>
-                <p className="mt-1 text-xs text-va-text2">
-                  {item.resource_type} {item.resource_id}
-                </p>
-              </VACard>
-            ))}
-          </div>
+          <>
+            <div className="space-y-3">
+              {items.map((item) => (
+                <VACard key={item.id} className="p-4">
+                  <div className="flex items-center justify-between text-sm text-va-text2">
+                    <span>{item.type.toUpperCase()}</span>
+                    <span>
+                      {formatDateTime(item.timestamp)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-va-text">
+                    {item.summary}
+                  </p>
+                  <p className="mt-1 text-xs text-va-text2">
+                    {item.resource_type} {item.resource_id}
+                  </p>
+                </VACard>
+              ))}
+            </div>
+            <VAPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </main>
     </div>
