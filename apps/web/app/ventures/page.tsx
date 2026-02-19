@@ -14,7 +14,7 @@ export default function VenturesPage() {
   const [ventureId, setVentureId] = useState<string | null>(null);
   const [questionPlan, setQuestionPlan] = useState<Record<string, unknown>[]>([]);
   const [form, setForm] = useState({ template_id: "", entity_name: "" });
-  const [answersJson, setAnswersJson] = useState("{}");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [draftId, setDraftId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +38,7 @@ export default function VenturesPage() {
       });
       setVentureId(res.venture_id);
       setQuestionPlan(res.question_plan ?? []);
+      setAnswers({});
       setDraftId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -48,7 +49,6 @@ export default function VenturesPage() {
     if (!tenantId || !ventureId) return;
     setError(null);
     try {
-      const answers = JSON.parse(answersJson || "{}");
       await api.ventures.submitAnswers(tenantId, ventureId, answers);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -114,34 +114,54 @@ export default function VenturesPage() {
         {ventureId && (
           <div className="mt-6 space-y-4">
             <VACard className="p-5">
-              <h2 className="text-lg font-medium text-va-text">
-                Questionnaire
-              </h2>
+              <h2 className="text-lg font-medium text-va-text">Questionnaire</h2>
               {questionPlan.length === 0 ? (
                 <p className="mt-2 text-sm text-va-text2">
                   No question plan provided for this template.
                 </p>
               ) : (
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-va-text2">
-                  {questionPlan.map((section, idx) => (
-                    <li key={idx}>
-                      {String((section as Record<string, unknown>).section ?? "Section")}
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-4 space-y-5">
+                  {questionPlan.map((section, sIdx) => {
+                    const sectionName = String((section as Record<string, unknown>).section ?? `Section ${sIdx + 1}`);
+                    const questions = Array.isArray((section as Record<string, unknown>).questions)
+                      ? ((section as Record<string, unknown>).questions as string[])
+                      : [];
+                    return (
+                      <div key={sIdx}>
+                        <p className="mb-2 text-sm font-medium text-va-text">{sectionName}</p>
+                        {questions.length > 0 ? (
+                          <div className="space-y-2">
+                            {questions.map((q, qIdx) => {
+                              const key = `${sIdx}-${qIdx}`;
+                              return (
+                                <div key={key}>
+                                  <label className="mb-1 block text-xs text-va-text2">{q}</label>
+                                  <VAInput
+                                    placeholder="Your answer…"
+                                    value={answers[key] ?? ""}
+                                    onChange={(e) =>
+                                      setAnswers((prev) => ({ ...prev, [key]: e.target.value }))
+                                    }
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <VAInput
+                            placeholder={`Answer for ${sectionName}…`}
+                            value={answers[String(sIdx)] ?? ""}
+                            onChange={(e) =>
+                              setAnswers((prev) => ({ ...prev, [String(sIdx)]: e.target.value }))
+                            }
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-            </VACard>
-
-            <VACard className="p-5">
-              <h2 className="text-lg font-medium text-va-text">
-                Answers (JSON)
-              </h2>
-              <textarea
-                className="mt-3 min-h-[140px] w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
-                value={answersJson}
-                onChange={(e) => setAnswersJson(e.target.value)}
-              />
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <VAButton variant="secondary" onClick={handleSaveAnswers}>
                   Save answers
                 </VAButton>

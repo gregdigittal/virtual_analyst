@@ -1,7 +1,7 @@
 "use client";
 
-import { api, type BudgetDetail, type BudgetDashboardWidget } from "@/lib/api";
-import { VACard, VASpinner } from "@/components/ui";
+import { api, type BudgetDetail, type BudgetDashboardWidget, type BudgetVarianceItem } from "@/lib/api";
+import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -14,6 +14,8 @@ export default function BudgetDetailPage() {
   const budgetId = params?.id as string;
   const [budget, setBudget] = useState<BudgetDetail | null>(null);
   const [dashboard, setDashboard] = useState<{ widgets: BudgetDashboardWidget[] } | null>(null);
+  const [variance, setVariance] = useState<{ variances: BudgetVarianceItem[]; materiality_pct: number } | null>(null);
+  const [reforecasting, setReforecasting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -30,21 +32,38 @@ export default function BudgetDetailPage() {
     const tid = session.user.user_metadata?.tenant_id ?? session.user.id;
     setTenantId(tid);
     try {
-      const [b, d] = await Promise.all([
+      const [b, d, v] = await Promise.all([
         api.budgets.get(tid, budgetId),
         api.budgets.getDashboard(tid, budgetId).catch(() => null),
+        api.budgets.getVariance(tid, budgetId).catch(() => null),
       ]);
       setBudget(b);
       setDashboard(d ?? null);
+      setVariance(v ?? null);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setBudget(null);
       setDashboard(null);
+      setVariance(null);
     } finally {
       setLoading(false);
     }
   }, [budgetId, router]);
+
+  async function handleReforecast() {
+    if (!tenantId) return;
+    setReforecasting(true);
+    setError(null);
+    try {
+      await api.budgets.reforecast(tenantId, budgetId, { horizon_months: 3 });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReforecasting(false);
+    }
+  }
 
   useEffect(() => {
     if (!budgetId) return;
@@ -123,10 +142,66 @@ export default function BudgetDetailPage() {
                 )}
               </VACard>
             )}
-            <p className="mt-4 text-sm text-va-text2">
-              Variance and reforecast: use API <code className="rounded bg-va-panel px-1">GET /api/v1/budgets/{budgetId}/variance</code> and{" "}
-              <code className="rounded bg-va-panel px-1">POST /api/v1/budgets/{budgetId}/reforecast</code>.
-            </p>
+            {variance && variance.variances.length > 0 ? (
+              <VACard className="mt-6 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-medium text-va-text">Variance analysis</h2>
+                  <span className="text-xs text-va-text2">
+                    Materiality threshold: {variance.materiality_pct.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-va-border text-left text-xs text-va-text2">
+                        <th className="pb-2 pr-4 font-medium">Account</th>
+                        <th className="pb-2 pr-4 text-right font-medium">Budget</th>
+                        <th className="pb-2 pr-4 text-right font-medium">Actual</th>
+                        <th className="pb-2 pr-4 text-right font-medium">Variance</th>
+                        <th className="pb-2 text-right font-medium">%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variance.variances.map((v, i) => (
+                        <tr key={i} className="border-b border-va-border/50">
+                          <td className="py-1.5 pr-4 font-mono text-va-text">{v.account_ref}</td>
+                          <td className="py-1.5 pr-4 text-right font-mono text-va-text2">{v.budget_amount.toLocaleString()}</td>
+                          <td className="py-1.5 pr-4 text-right font-mono text-va-text2">{v.actual_amount.toLocaleString()}</td>
+                          <td className={`py-1.5 pr-4 text-right font-mono ${v.favourable ? "text-va-green" : "text-va-danger"}`}>
+                            {v.variance_absolute > 0 ? "+" : ""}{v.variance_absolute.toLocaleString()}
+                          </td>
+                          <td className={`py-1.5 text-right font-mono text-xs ${v.material ? "font-semibold" : ""} ${v.favourable ? "text-va-green" : "text-va-danger"}`}>
+                            {v.variance_percent.toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4">
+                  <VAButton
+                    variant="secondary"
+                    onClick={handleReforecast}
+                    disabled={reforecasting}
+                  >
+                    {reforecasting ? "Reforecasting…" : "Run 3-month reforecast"}
+                  </VAButton>
+                </div>
+              </VACard>
+            ) : (
+              <VACard className="mt-6 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-va-text2">No variance data available for this budget.</p>
+                  <VAButton
+                    variant="secondary"
+                    onClick={handleReforecast}
+                    disabled={reforecasting}
+                  >
+                    {reforecasting ? "Reforecasting…" : "Run 3-month reforecast"}
+                  </VAButton>
+                </div>
+              </VACard>
+            )}
           </>
         ) : (
           <p className="text-va-text2">Budget not found.</p>
