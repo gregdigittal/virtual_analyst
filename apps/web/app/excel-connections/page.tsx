@@ -26,6 +26,7 @@ export default function ExcelConnectionsPage() {
   });
   const [pullResults, setPullResults] = useState<Record<string, ExcelPullValue[]>>({});
   const [pushInputs, setPushInputs] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
   const [page, setPage] = useState(1);
@@ -65,6 +66,11 @@ export default function ExcelConnectionsPage() {
 
   async function handleCreate() {
     if (!tenantId) return;
+    const errors: Record<string, string> = {};
+    try { JSON.parse(form.target_json); } catch { errors.target_json = "Invalid JSON in target"; }
+    try { JSON.parse(form.bindings_json); } catch { errors.bindings_json = "Invalid JSON in bindings"; }
+    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
+    setFieldErrors({});
     setError(null);
     try {
       const target = JSON.parse(form.target_json);
@@ -101,8 +107,9 @@ export default function ExcelConnectionsPage() {
   async function handlePush(connectionId: string) {
     if (!tenantId) return;
     setError(null);
+    const changesRaw = pushInputs[connectionId] || "[]";
+    try { JSON.parse(changesRaw); } catch { toast.error("Invalid JSON in push changes"); return; }
     try {
-      const changesRaw = pushInputs[connectionId] || "[]";
       const changes = JSON.parse(changesRaw);
       await api.excelConnections.push(tenantId, connectionId, changes);
       toast.success("Push sent");
@@ -170,20 +177,28 @@ export default function ExcelConnectionsPage() {
             </VASelect>
           </div>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <textarea
-              className="min-h-[120px] w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
-              value={form.target_json}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, target_json: e.target.value }))
-              }
-            />
-            <textarea
-              className="min-h-[120px] w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-sm text-va-text"
-              value={form.bindings_json}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, bindings_json: e.target.value }))
-              }
-            />
+            <div>
+              <textarea
+                className={`min-h-[120px] w-full rounded-va-xs border bg-va-surface px-3 py-2 text-sm text-va-text ${fieldErrors.target_json ? "border-va-danger" : "border-va-border"}`}
+                value={form.target_json}
+                onChange={(e) => {
+                  setForm((prev) => ({ ...prev, target_json: e.target.value }));
+                  setFieldErrors((prev) => ({ ...prev, target_json: "" }));
+                }}
+              />
+              {fieldErrors.target_json && <p className="mt-1 text-xs text-va-danger">{fieldErrors.target_json}</p>}
+            </div>
+            <div>
+              <textarea
+                className={`min-h-[120px] w-full rounded-va-xs border bg-va-surface px-3 py-2 text-sm text-va-text ${fieldErrors.bindings_json ? "border-va-danger" : "border-va-border"}`}
+                value={form.bindings_json}
+                onChange={(e) => {
+                  setForm((prev) => ({ ...prev, bindings_json: e.target.value }));
+                  setFieldErrors((prev) => ({ ...prev, bindings_json: "" }));
+                }}
+              />
+              {fieldErrors.bindings_json && <p className="mt-1 text-xs text-va-danger">{fieldErrors.bindings_json}</p>}
+            </div>
           </div>
           <VAButton className="mt-3" onClick={handleCreate}>
             Create connection

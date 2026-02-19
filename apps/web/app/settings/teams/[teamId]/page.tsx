@@ -92,6 +92,7 @@ export default function TeamDetailPage() {
   const [savingMember, setSavingMember] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
+  const [teamErrors, setTeamErrors] = useState<Record<string, string>>({});
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -144,6 +145,10 @@ export default function TeamDetailPage() {
   async function handleUpdateTeam(e: React.FormEvent) {
     e.preventDefault();
     if (!tenantId || !team) return;
+    const errors: Record<string, string> = {};
+    if (!editName.trim()) errors.name = "Team name is required";
+    if (Object.keys(errors).length > 0) { setTeamErrors(errors); return; }
+    setTeamErrors({});
     setEditing(true);
     setError(null);
     try {
@@ -164,7 +169,9 @@ export default function TeamDetailPage() {
 
   async function handleAddMember(e: React.FormEvent) {
     e.preventDefault();
-    if (!tenantId || !addUserId.trim() || !addJobFunctionId) return;
+    if (!tenantId) return;
+    if (!addUserId.trim()) { toast.error("Enter a user ID"); return; }
+    if (!addJobFunctionId) { toast.error("Select a job function"); return; }
     setAdding(true);
     setError(null);
     try {
@@ -268,9 +275,13 @@ export default function TeamDetailPage() {
             <VAInput
               id="team-name"
               value={editName}
-              onChange={(e) => setEditName(e.target.value)}
+              onChange={(e) => {
+                setEditName(e.target.value);
+                setTeamErrors((prev) => ({ ...prev, name: "" }));
+              }}
               maxLength={255}
               className="w-full"
+              error={teamErrors.name}
             />
           </div>
           <div>

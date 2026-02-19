@@ -74,7 +74,8 @@ export default function MemosPage() {
   }, [memoTypeFilter]);
 
   async function handleCreate() {
-    if (!tenantId || !form.run_id) return;
+    if (!tenantId) return;
+    if (!form.run_id) { toast.error("Select a run to generate a memo"); return; }
     setError(null);
     try {
       await api.memos.create(tenantId, userId, {

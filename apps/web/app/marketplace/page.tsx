@@ -1,7 +1,7 @@
 "use client";
 
 import { Nav } from "@/components/nav";
-import { VAButton, VACard, VAInput, VASpinner, VAPagination } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner, VAPagination, useToast } from "@/components/ui";
 import { api, type MarketplaceTemplate } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -19,6 +19,7 @@ export default function MarketplacePage() {
   const [forms, setForms] = useState<Record<string, { label: string; fiscal_year: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -63,8 +64,8 @@ export default function MarketplacePage() {
   async function handleUse(templateId: string) {
     if (!tenantId) return;
     const form = forms[templateId] || { label: "", fiscal_year: "" };
-    if (!form.label || !form.fiscal_year) {
-      setError("Provide a label and fiscal year to use the template.");
+    if (!form.label.trim() || !form.fiscal_year.trim()) {
+      toast.error("Provide a label and fiscal year");
       return;
     }
     setError(null);
@@ -76,8 +77,11 @@ export default function MarketplacePage() {
         num_periods: 12,
       });
       setForms((prev) => ({ ...prev, [templateId]: { label: "", fiscal_year: "" } }));
+      toast.success("Template applied — baseline created");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(msg);
     }
   }
 

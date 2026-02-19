@@ -25,6 +25,7 @@ export default function CurrencySettingsPage() {
     effective_date: "",
     rate: "",
   });
+  const [rateErrors, setRateErrors] = useState<Record<string, string>>({});
   const [conversion, setConversion] = useState({
     from_currency: "USD",
     to_currency: "EUR",
@@ -86,13 +87,22 @@ export default function CurrencySettingsPage() {
 
   async function handleAddRate() {
     if (!tenantId) return;
+    const errors: Record<string, string> = {};
+    if (rateForm.from_currency.trim().length !== 3) errors.from_currency = "Must be a 3-letter currency code";
+    if (rateForm.to_currency.trim().length !== 3) errors.to_currency = "Must be a 3-letter currency code";
+    if (!rateForm.effective_date) errors.effective_date = "Effective date is required";
+    const rateNum = Number(rateForm.rate);
+    if (!rateForm.rate.trim() || !Number.isFinite(rateNum) || rateNum <= 0)
+      errors.rate = "Enter a positive number";
+    if (Object.keys(errors).length > 0) { setRateErrors(errors); return; }
+    setRateErrors({});
     setError(null);
     try {
       await api.currency.addRate(tenantId, {
-        from_currency: rateForm.from_currency,
-        to_currency: rateForm.to_currency,
+        from_currency: rateForm.from_currency.toUpperCase(),
+        to_currency: rateForm.to_currency.toUpperCase(),
         effective_date: rateForm.effective_date,
-        rate: Number(rateForm.rate),
+        rate: rateNum,
       });
       setRateForm((prev) => ({ ...prev, rate: "" }));
       await load();
@@ -237,39 +247,47 @@ export default function CurrencySettingsPage() {
                 <VAInput
                   placeholder="From (USD)"
                   value={rateForm.from_currency}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setRateForm((prev) => ({
                       ...prev,
                       from_currency: e.target.value.toUpperCase(),
-                    }))
-                  }
+                    }));
+                    setRateErrors((prev) => ({ ...prev, from_currency: "" }));
+                  }}
+                  error={rateErrors.from_currency}
                 />
                 <VAInput
                   placeholder="To (EUR)"
                   value={rateForm.to_currency}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setRateForm((prev) => ({
                       ...prev,
                       to_currency: e.target.value.toUpperCase(),
-                    }))
-                  }
+                    }));
+                    setRateErrors((prev) => ({ ...prev, to_currency: "" }));
+                  }}
+                  error={rateErrors.to_currency}
                 />
                 <VAInput
                   type="date"
                   value={rateForm.effective_date}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setRateForm((prev) => ({
                       ...prev,
                       effective_date: e.target.value,
-                    }))
-                  }
+                    }));
+                    setRateErrors((prev) => ({ ...prev, effective_date: "" }));
+                  }}
+                  error={rateErrors.effective_date}
                 />
                 <VAInput
                   placeholder="Rate"
                   value={rateForm.rate}
-                  onChange={(e) =>
-                    setRateForm((prev) => ({ ...prev, rate: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    setRateForm((prev) => ({ ...prev, rate: e.target.value }));
+                    setRateErrors((prev) => ({ ...prev, rate: "" }));
+                  }}
+                  error={rateErrors.rate}
                 />
               </div>
               <VAButton className="mt-3" onClick={handleAddRate}>

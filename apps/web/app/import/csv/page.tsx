@@ -35,7 +35,10 @@ export default function CsvImportPage() {
   }, []);
 
   async function handleImport() {
-    if (!tenantId || !file || !baselineId) return;
+    if (!tenantId) return;
+    if (!file) { toast.error("Select a CSV file to import"); return; }
+    if (!baselineId) { toast.error("Select a baseline"); return; }
+    try { JSON.parse(mappingJson || "{}"); } catch { toast.error("Invalid JSON in column mapping"); return; }
     setLoading(true);
     setError(null);
     try {

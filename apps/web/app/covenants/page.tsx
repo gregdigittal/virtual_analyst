@@ -26,6 +26,7 @@ export default function CovenantsPage() {
     operator: ">=",
     threshold_value: "",
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -66,6 +67,13 @@ export default function CovenantsPage() {
 
   async function handleCreate() {
     if (!tenantId) return;
+    const errors: Record<string, string> = {};
+    if (!form.label.trim()) errors.label = "Label is required";
+    if (!form.metric_ref) errors.metric_ref = "Select a metric ref";
+    if (!form.threshold_value.trim() || !Number.isFinite(Number(form.threshold_value)))
+      errors.threshold_value = "Enter a valid number";
+    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
+    setFieldErrors({});
     setError(null);
     try {
       await api.covenants.create(tenantId, {
@@ -126,15 +134,19 @@ export default function CovenantsPage() {
             <VAInput
               placeholder="Label"
               value={form.label}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, label: e.target.value }))
-              }
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, label: e.target.value }));
+                setFieldErrors((prev) => ({ ...prev, label: "" }));
+              }}
+              error={fieldErrors.label}
             />
             <VASelect
               value={form.metric_ref}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, metric_ref: e.target.value }))
-              }
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, metric_ref: e.target.value }));
+                setFieldErrors((prev) => ({ ...prev, metric_ref: "" }));
+              }}
+              error={fieldErrors.metric_ref}
             >
               <option value="">Metric ref</option>
               {refs?.metric_refs?.map((ref) => (
@@ -158,12 +170,14 @@ export default function CovenantsPage() {
             <VAInput
               placeholder="Threshold"
               value={form.threshold_value}
-              onChange={(e) =>
+              onChange={(e) => {
                 setForm((prev) => ({
                   ...prev,
                   threshold_value: e.target.value,
-                }))
-              }
+                }));
+                setFieldErrors((prev) => ({ ...prev, threshold_value: "" }));
+              }}
+              error={fieldErrors.threshold_value}
             />
           </div>
           <VAButton className="mt-3" onClick={handleCreate}>

@@ -30,7 +30,8 @@ export default function DocumentsPage() {
   const { toast } = useToast();
 
   const loadDocuments = useCallback(async () => {
-    if (!tenantId || !entityId) return;
+    if (!tenantId) return;
+    if (!entityId.trim()) { toast.error("Enter an entity ID to load documents"); return; }
     setLoading(true);
     setError(null);
     try {
@@ -66,7 +67,9 @@ export default function DocumentsPage() {
   }, []);
 
   async function handleUpload() {
-    if (!tenantId || !entityId || !file) return;
+    if (!tenantId) return;
+    if (!entityId.trim()) { toast.error("Enter an entity ID"); return; }
+    if (!file) { toast.error("Select a file to upload"); return; }
     setError(null);
     try {
       await api.documents.upload(tenantId, userId, {
@@ -85,7 +88,9 @@ export default function DocumentsPage() {
   }
 
   async function handleAddComment() {
-    if (!tenantId || !entityId || !commentBody.trim()) return;
+    if (!tenantId) return;
+    if (!entityId.trim()) { toast.error("Enter an entity ID first"); return; }
+    if (!commentBody.trim()) { toast.error("Enter a comment"); return; }
     setError(null);
     try {
       await api.comments.create(tenantId, userId, {

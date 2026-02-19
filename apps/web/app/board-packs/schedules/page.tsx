@@ -27,6 +27,7 @@ export default function BoardPackSchedulesPage() {
     cron_expr: "",
     distribution_emails: "",
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalSchedules, setTotalSchedules] = useState(0);
@@ -75,6 +76,12 @@ export default function BoardPackSchedulesPage() {
 
   async function handleCreate() {
     if (!tenantId) return;
+    const errors: Record<string, string> = {};
+    if (!form.label.trim()) errors.label = "Label is required";
+    if (!form.run_id.trim()) errors.run_id = "Run ID is required";
+    if (!form.cron_expr.trim()) errors.cron_expr = "Cron expression is required";
+    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
+    setFieldErrors({});
     setError(null);
     try {
       await api.boardPackSchedules.create(tenantId, userId, {
@@ -141,23 +148,29 @@ export default function BoardPackSchedulesPage() {
             <VAInput
               placeholder="Label"
               value={form.label}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, label: e.target.value }))
-              }
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, label: e.target.value }));
+                setFieldErrors((prev) => ({ ...prev, label: "" }));
+              }}
+              error={fieldErrors.label}
             />
             <VAInput
               placeholder="Run ID"
               value={form.run_id}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, run_id: e.target.value }))
-              }
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, run_id: e.target.value }));
+                setFieldErrors((prev) => ({ ...prev, run_id: "" }));
+              }}
+              error={fieldErrors.run_id}
             />
             <VAInput
               placeholder="Cron expression"
               value={form.cron_expr}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, cron_expr: e.target.value }))
-              }
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, cron_expr: e.target.value }));
+                setFieldErrors((prev) => ({ ...prev, cron_expr: "" }));
+              }}
+              error={fieldErrors.cron_expr}
             />
             <VAInput
               placeholder="Emails (comma-separated)"

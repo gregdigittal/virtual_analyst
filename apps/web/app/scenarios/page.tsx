@@ -62,7 +62,8 @@ export default function ScenariosPage() {
   }, [tenantId, load]);
 
   async function handleCompare() {
-    if (!tenantId || !compareBaselineId) return;
+    if (!tenantId) return;
+    if (!compareBaselineId) { toast.error("Select a baseline to compare scenarios"); return; }
     setCompareResult(null);
     const scenarioIds = compareScenarioIdsRaw
       .split(",")
