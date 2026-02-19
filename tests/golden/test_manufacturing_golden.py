@@ -9,11 +9,13 @@ import pytest
 
 from shared.fm_shared.model import ModelConfig, generate_statements, run_engine
 from shared.fm_shared.model.kpis import calculate_kpis
+from shared.fm_shared.analysis.monte_carlo import run_monte_carlo
 
 GOLDEN_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = GOLDEN_DIR / "manufacturing_config.json"
 STATEMENTS_GOLDEN = GOLDEN_DIR / "manufacturing_base_statements.json"
 KPIS_GOLDEN = GOLDEN_DIR / "manufacturing_base_kpis.json"
+MC_P50_GOLDEN = GOLDEN_DIR / "manufacturing_mc_p50.json"
 
 # Allow small float differences (rounding, order of ops)
 FLOAT_TOLERANCE = 0.01
@@ -96,3 +98,28 @@ def test_manufacturing_revenue_and_cogs_sanity() -> None:
     assert time_series["n_units_produced"][0] == pytest.approx(644.0, abs=0.01)
     assert time_series["n_revenue"][0] == pytest.approx(2_898_000.0, abs=0.01)
     assert time_series["n_material_cogs"][0] == pytest.approx(1_159_200.0, abs=0.01)
+
+def test_manufacturing_mc_p50_match_golden() -> None:
+    """MC P50 output with seed=42, 50 sims matches manufacturing_mc_p50.json within tolerance."""
+    config = _load_config()
+    golden = json.loads(MC_P50_GOLDEN.read_text())
+
+    seed = golden["seed"]
+    num_sims = golden["num_simulations"]
+
+    result = run_monte_carlo(config, num_simulations=num_sims, seed=seed)
+
+    assert result.seed == seed
+    assert result.num_simulations == num_sims
+
+    for metric_key in ("revenue", "ebitda", "net_income", "fcf"):
+        expected_p50 = golden["metrics"][metric_key]
+        got_p50 = result.percentiles[metric_key]["p50"]
+        assert len(got_p50) == len(expected_p50), (
+            f"{metric_key} P50 length mismatch: got {len(got_p50)}, expected {len(expected_p50)}"
+        )
+        for i, (got, exp) in enumerate(zip(got_p50, expected_p50)):
+            tol = max(abs(exp) * 0.0001, 0.01)
+            assert abs(got - exp) <= tol, (
+                f"{metric_key} P50 mismatch at period {i}: got {got}, expected {exp} (tol={tol})"
+            )
