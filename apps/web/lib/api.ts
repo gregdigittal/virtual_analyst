@@ -1276,6 +1276,16 @@ export const api = {
       ),
   },
   changesets: {
+    list: (tenantId: string, opts?: { baseline_id?: string; status?: string; limit?: number; offset?: number }) =>
+      request<{ items: { changeset_id: string; baseline_id: string; base_version: string; status: string; label?: string; created_at: string | null; overrides: unknown[] }[]; total: number; limit: number; offset: number }>(
+        `/api/v1/changesets?${new URLSearchParams({
+          ...(opts?.baseline_id && { baseline_id: opts.baseline_id }),
+          ...(opts?.status && { status: opts.status }),
+          ...(opts?.limit != null && { limit: String(opts.limit) }),
+          ...(opts?.offset != null && { offset: String(opts.offset) }),
+        }).toString()}`,
+        { tenantId }
+      ),
     create: (tenantId: string, userId: string | undefined, body: { baseline_id: string; base_version: string; overrides?: { path: string; value: unknown }[]; label?: string }) =>
       request<{ changeset_id: string; baseline_id: string; base_version: string; status: string; overrides: unknown[] }>(
         "/api/v1/changesets",

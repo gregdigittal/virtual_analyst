@@ -16,6 +16,7 @@ const navLinks = [
   { href: "/drafts", label: "Drafts" },
   { href: "/runs", label: "Runs" },
   { href: "/scenarios", label: "Scenarios" },
+  { href: "/changesets", label: "Changesets" },
   { href: "/budgets", label: "Budgets" },
   { href: "/covenants", label: "Covenants" },
   { href: "/memos", label: "Memos" },

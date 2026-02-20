@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const protectedPaths = [
-  "/baselines", "/runs", "/dashboard", "/drafts", "/scenarios",
+  "/baselines", "/runs", "/dashboard", "/drafts", "/scenarios", "/changesets",
   "/notifications", "/settings", "/inbox", "/assignments",
   "/budgets", "/memos", "/documents", "/activity",
   "/excel-connections", "/excel-import", "/covenants",
@@ -60,6 +60,7 @@ export const config = {
     "/dashboard/:path*",
     "/drafts/:path*",
     "/scenarios/:path*",
+    "/changesets/:path*",
     "/notifications/:path*",
     "/settings/:path*",
     "/inbox/:path*",
