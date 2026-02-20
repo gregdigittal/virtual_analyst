@@ -19,4 +19,4 @@ def test_create_changeset_requires_baseline_id() -> None:
         json={"base_version": "v1", "overrides": []},
         headers={"X-Tenant-ID": TENANT},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422

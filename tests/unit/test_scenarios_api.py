@@ -44,7 +44,7 @@ def test_compare_scenarios_rejects_too_many() -> None:
 def test_compare_scenarios_returns_base_and_scenario() -> None:
     baseline_id = "bl_1"
     store = MagicMock()
-    store.load = AsyncMock(return_value=minimal_model_config_dict(tenant_id="t1"))
+    store.load = MagicMock(return_value=minimal_model_config_dict(tenant_id="t1"))
     app.dependency_overrides[get_artifact_store] = lambda: store
 
     base_conn = MagicMock()

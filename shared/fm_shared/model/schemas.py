@@ -14,6 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class Metadata(BaseModel):
     entity_name: str = Field(..., min_length=1)
     entity_description: str | None = None
+
+    @field_validator("entity_name")
+    @classmethod
+    def _reject_html_tags(cls, v: str) -> str:
+        import re
+        if re.search(r"<[^>]+>", v):
+            raise ValueError("entity_name must not contain HTML tags")
+        return v
     currency: str = Field(..., pattern=r"^[A-Z]{3}$")
     country_iso: str | None = Field(None, pattern=r"^[A-Z]{2}$")
     start_date: str = Field(..., description="YYYY-MM-DD")

@@ -54,16 +54,17 @@ def test_enqueue_returns_task_id() -> None:
 
 def test_get_job_status_returns_state_from_backend() -> None:
     """GET /jobs/{id} returns task state (mocked)."""
-    with patch("apps.api.app.routers.jobs._get_task_status") as m:
-        m.return_value = {
-            "task_id": "fake-id",
-            "state": "SUCCESS",
-            "result": 42,
-        }
-        r = client.get(
-            "/api/v1/jobs/fake-id",
-            headers={"X-Tenant-ID": TENANT},
-        )
+    with patch("apps.api.app.routers.jobs._task_tenant_get", return_value=TENANT):
+        with patch("apps.api.app.routers.jobs._get_task_status") as m:
+            m.return_value = {
+                "task_id": "fake-id",
+                "state": "SUCCESS",
+                "result": 42,
+            }
+            r = client.get(
+                "/api/v1/jobs/fake-id",
+                headers={"X-Tenant-ID": TENANT},
+            )
     assert r.status_code == 200
     body = r.json()
     assert body["task_id"] == "fake-id"

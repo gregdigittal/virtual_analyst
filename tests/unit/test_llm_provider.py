@@ -31,15 +31,15 @@ def test_ensure_additional_properties_false_adds_to_objects() -> None:
 async def _run_anthropic_mocked() -> LLMResponse:
     schema = {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]}
     messages = [{"role": "user", "content": "What is 2+2?"}]
-    provider = AnthropicProvider(api_key="test-key")
     mock_resp = MagicMock()
     mock_resp.content = [type("Block", (), {"text": '{"answer": "4"}'})()]
     mock_resp.usage = type("Usage", (), {"input_tokens": 10, "output_tokens": 5})()
 
-    with patch("anthropic.AsyncAnthropic") as mock_cls:
-        mock_client = AsyncMock()
-        mock_cls.return_value = mock_client
-        mock_client.messages.create = AsyncMock(return_value=mock_resp)
+    mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_resp)
+
+    with patch("anthropic.AsyncAnthropic", return_value=mock_client):
+        provider = AnthropicProvider(api_key="test-key")
         return await provider.complete(messages, schema, "test_task")
 
 
@@ -56,7 +56,6 @@ async def test_anthropic_provider_returns_valid_structured_output() -> None:
 async def _run_openai_mocked() -> LLMResponse:
     schema = {"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"]}
     messages = [{"role": "user", "content": "Return value 42"}]
-    provider = OpenAIProvider(api_key="test-key")
     mock_usage = MagicMock()
     mock_usage.prompt_tokens = 8
     mock_usage.completion_tokens = 3
@@ -69,10 +68,11 @@ async def _run_openai_mocked() -> LLMResponse:
     mock_resp.choices = [mock_choice]
     mock_resp.usage = mock_usage
 
-    with patch("openai.AsyncOpenAI") as mock_cls:
-        mock_client = AsyncMock()
-        mock_cls.return_value = mock_client
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_resp)
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_resp)
+
+    with patch("openai.AsyncOpenAI", return_value=mock_client):
+        provider = OpenAIProvider(api_key="test-key")
         return await provider.complete(messages, schema, "test_task")
 
 

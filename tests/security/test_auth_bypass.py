@@ -18,7 +18,7 @@ SECRET = "test-secret"
 
 
 def _settings() -> Settings:
-    return Settings(supabase_jwt_secret=SECRET, environment="test")
+    return Settings(SUPABASE_JWT_SECRET=SECRET, ENVIRONMENT="test")
 
 
 def _make_token(
@@ -85,7 +85,7 @@ def test_spoofed_tenant_header_ignored() -> None:
     role_cm.__aexit__ = AsyncMock(return_value=None)
 
     with patch("apps.api.app.middleware.auth.get_settings", return_value=_settings()):
-        with patch("apps.api.app.middleware.auth.tenant_conn", return_value=role_cm):
+        with patch("apps.api.app.db.connection.tenant_conn", return_value=role_cm):
             with patch("apps.api.app.routers.drafts.tenant_conn", side_effect=_mock_tenant_conn):
                 r = client.get(
                     "/api/v1/drafts",

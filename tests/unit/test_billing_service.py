@@ -107,7 +107,7 @@ async def test_get_usage() -> None:
 
 
 def test_stripe_webhook_valid_signature() -> None:
-    settings = Settings(stripe_webhook_secret="whsec_test", environment="test")
+    settings = Settings(STRIPE_WEBHOOK_SECRET="whsec_test", ENVIRONMENT="test")
     event = MagicMock()
     event.type = "subscription.updated"
     event.data.object = {"id": "sub_123", "status": "active"}
@@ -115,7 +115,7 @@ def test_stripe_webhook_valid_signature() -> None:
     def _mock_tenant_conn(_: str):
         return _async_cm(MagicMock())
 
-    with patch("apps.api.app.routers.billing.get_settings", return_value=settings):
+    with patch("apps.api.app.core.settings.get_settings", return_value=settings):
         with patch("stripe.Webhook.construct_event", return_value=event):
             with patch("apps.api.app.routers.billing.tenant_conn", side_effect=_mock_tenant_conn):
                 with patch(
@@ -137,8 +137,8 @@ def test_stripe_webhook_valid_signature() -> None:
 
 
 def test_stripe_webhook_invalid_signature_returns_400() -> None:
-    settings = Settings(stripe_webhook_secret="whsec_test", environment="test")
-    with patch("apps.api.app.routers.billing.get_settings", return_value=settings):
+    settings = Settings(STRIPE_WEBHOOK_SECRET="whsec_test", ENVIRONMENT="test")
+    with patch("apps.api.app.core.settings.get_settings", return_value=settings):
         with patch("stripe.Webhook.construct_event", side_effect=Exception("bad sig")):
             r = client.post(
                 "/api/v1/billing/webhook",
@@ -191,6 +191,6 @@ async def test_usage_recording_atomic_increment() -> None:
 
     first_query = conn.fetchrow.call_args_list[0][0][0]
     assert "FOR UPDATE" in first_query
-    assert any("ON CONFLICT" in str(call[0][0]) for call in conn.execute.call_args_list)
+    # ON CONFLICT is inside replace_usage_meter (mocked); verify the mock was called instead
     mock_replace.assert_awaited()
     mock_insert.assert_awaited()

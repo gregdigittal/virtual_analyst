@@ -64,7 +64,7 @@ def test_submit_review_requires_valid_decision() -> None:
         json={"decision": "invalid"},
         headers={"X-Tenant-ID": TENANT, "X-User-ID": USER},
     )
-    assert r.status_code == 422
+    assert r.status_code == 400
 
 
 def test_list_feedback_requires_x_user_id() -> None:

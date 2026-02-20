@@ -75,13 +75,21 @@ async def auth_middleware(request: Request, call_next):
         )
 
     try:
+        # python-jose 3.x requires audience as a string; decode without audience
+        # check first, then verify manually to support both "authenticated" and "va-saml".
         payload = jose_jwt.decode(
             token,
             settings.supabase_jwt_secret,
             algorithms=["HS256"],
-            audience=["authenticated", "va-saml"],
-            options={"verify_exp": True},
+            options={"verify_exp": True, "verify_aud": False},
         )
+        token_aud = payload.get("aud")
+        allowed_audiences = {"authenticated", "va-saml"}
+        if isinstance(token_aud, list):
+            if not set(token_aud) & allowed_audiences:
+                raise ValueError("Invalid audience")
+        elif token_aud not in allowed_audiences:
+            raise ValueError("Invalid audience")
     except Exception as e:
         logger.warning("auth_jwt_invalid", path=path, error=str(e))
         return JSONResponse(
