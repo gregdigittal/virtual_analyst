@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(safeNext, origin));
     }
-    console.error("[auth/callback] code exchange failed:", error.message);
+    logger.error("[auth/callback] code exchange failed", { message: error.message });
   }
 
   // If code is missing or exchange failed, send to login with an error hint

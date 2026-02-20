@@ -2,7 +2,7 @@
 
 import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -109,13 +109,12 @@ export default function OrgStructuresPage() {
                 >
                   Group name
                 </label>
-                <input
+                <VAInput
                   id="org-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. Consolidated Group"
-                  className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
                 />
               </div>
               <div>
@@ -125,14 +124,14 @@ export default function OrgStructuresPage() {
                 >
                   Reporting currency
                 </label>
-                <input
+                <VAInput
                   id="org-currency"
                   type="text"
                   value={newCurrency}
                   onChange={(e) => setNewCurrency(e.target.value.toUpperCase().slice(0, 3))}
                   placeholder="USD"
                   maxLength={3}
-                  className="w-full rounded-va-xs border border-va-border bg-va-surface px-3 py-2 text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue uppercase"
+                  className="uppercase"
                   style={{ textTransform: "uppercase" }}
                 />
               </div>

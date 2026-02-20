@@ -313,13 +313,35 @@ export default function RunDetailPage() {
             {kpis.length === 0 ? (
               <p className="text-va-text2">No KPI data for this run.</p>
             ) : (
-              kpis.map((kpi, i) => (
-                <VACard key={i} className="p-4">
-                  <pre className="font-mono text-xs text-va-text2">
-                    {JSON.stringify(kpi, null, 2)}
-                  </pre>
-                </VACard>
-              ))
+              kpis.map((kpi, i) => {
+                const { period, ...rest } = kpi;
+                const entries = Object.entries(rest).filter(
+                  ([, v]) => v !== null && v !== undefined
+                );
+                return (
+                  <VACard key={i} className="p-4">
+                    {period !== undefined && (
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-va-text2">
+                        Period {period}
+                      </p>
+                    )}
+                    <dl className="space-y-1">
+                      {entries.map(([k, v]) => (
+                        <div key={k} className="flex items-baseline justify-between gap-2">
+                          <dt className="text-xs text-va-text2 capitalize">
+                            {k.replace(/_/g, " ")}
+                          </dt>
+                          <dd className="font-mono text-sm text-va-text">
+                            {typeof v === "number"
+                              ? v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                              : String(v)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </VACard>
+                );
+              })
             )}
           </div>
         )}

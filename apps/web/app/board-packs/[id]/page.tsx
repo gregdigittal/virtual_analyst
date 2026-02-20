@@ -2,7 +2,7 @@
 
 import { api, API_URL, type BoardPackDetail } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -124,40 +124,41 @@ export default function BoardPackDetailPage() {
               </Link>
             </div>
             {pack.status === "draft" || pack.status === "error" ? (
-              <button
+              <VAButton
                 type="button"
+                variant="primary"
                 onClick={handleGenerate}
                 disabled={generating}
-                className="mt-4 rounded-va-lg bg-va-blue px-4 py-2 text-sm font-medium text-white hover:bg-va-blue/90 disabled:opacity-50"
+                className="mt-4"
               >
                 {generating ? "Generating…" : "Generate narrative"}
-              </button>
+              </VAButton>
             ) : null}
             {pack.status === "ready" && (
               <VACard className="mt-6 p-4">
                 <h2 className="text-lg font-medium text-va-text">Export</h2>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button
+                  <VAButton
                     type="button"
+                    variant="secondary"
                     onClick={() => handleDownload("html")}
-                    className="rounded-va-lg border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text hover:bg-white/5"
                   >
                     Download HTML
-                  </button>
-                  <button
+                  </VAButton>
+                  <VAButton
                     type="button"
+                    variant="secondary"
                     onClick={() => handleDownload("pdf")}
-                    className="rounded-va-lg border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text hover:bg-white/5"
                   >
                     Download PDF
-                  </button>
-                  <button
+                  </VAButton>
+                  <VAButton
                     type="button"
+                    variant="secondary"
                     onClick={() => handleDownload("pptx")}
-                    className="rounded-va-lg border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text hover:bg-white/5"
                   >
                     Download PPTX
-                  </button>
+                  </VAButton>
                 </div>
               </VACard>
             )}
