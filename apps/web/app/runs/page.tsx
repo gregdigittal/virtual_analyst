@@ -1,16 +1,18 @@
 "use client";
 
 import { api, type BaselineSummary, type RunSummary } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VACard, VASelect, VASpinner, VAPagination } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 20;
 
 export default function RunsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,19 +45,16 @@ export default function RunsPage() {
 
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
-      setTenantId(tid);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
       try {
-        const blRes = await api.baselines.list(tid);
+        const blRes = await api.baselines.list(ctx.tenantId);
         setBaselines(blRes.items ?? []);
       } catch { /* baselines list is optional for filter */ }
     })();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (tenantId) load();

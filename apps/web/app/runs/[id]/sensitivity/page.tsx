@@ -1,11 +1,11 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface SensitivityDriver {
@@ -29,6 +29,7 @@ function fmtNum(n: number): string {
 
 export default function SensitivityPage() {
   const params = useParams();
+  const router = useRouter();
   const runId = params.id as string;
   const [data, setData] = useState<SensitivityData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,17 +40,14 @@ export default function SensitivityPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
-      setTenantId(tid);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
       setLoading(true);
       setError(null);
       try {
-        const res = await api.runs.getSensitivity(tid, runId, pct);
+        const res = await api.runs.getSensitivity(ctx.tenantId, runId, pct);
         if (!cancelled) setData(res);
       } catch (e) {
         if (!cancelled)
@@ -61,7 +59,7 @@ export default function SensitivityPage() {
     return () => {
       cancelled = true;
     };
-  }, [runId, pct]);
+  }, [router, runId, pct]);
 
   const sorted = [...(data?.drivers ?? [])].sort(
     (a, b) =>

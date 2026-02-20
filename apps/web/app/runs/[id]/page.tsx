@@ -1,13 +1,13 @@
 "use client";
 
 import { api, type StatementsData, type KpiItem } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import { EntityTimeline } from "@/components/EntityTimeline";
 import { CommentThread } from "@/components/CommentThread";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Tab = "statements" | "kpis";
@@ -144,6 +144,7 @@ function buildStatementRows(
 
 export default function RunDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const runId = params.id as string;
   const [run, setRun] = useState<{ run_id: string; status: string } | null>(
     null
@@ -159,19 +160,16 @@ export default function RunDetailPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
-      setTenantId(tid);
-      setUserId(session.user.id);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
+      setUserId(ctx.userId);
       try {
         const [runRes, stRes, kpiRes] = await Promise.all([
-          api.runs.get(tid, runId),
-          api.runs.getStatements(tid, runId),
-          api.runs.getKpis(tid, runId),
+          api.runs.get(ctx.tenantId, runId),
+          api.runs.getStatements(ctx.tenantId, runId),
+          api.runs.getKpis(ctx.tenantId, runId),
         ]);
         if (!cancelled) {
           setRun(runRes);
@@ -188,7 +186,7 @@ export default function RunDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [runId]);
+  }, [router, runId]);
 
   if (!tenantId && !loading) return null;
 

@@ -1,16 +1,18 @@
 "use client";
 
 import { api, type BudgetSummary } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VACard, VASpinner, VAPagination } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 20;
 
 export default function BudgetsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<BudgetSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,14 +40,12 @@ export default function BudgetsPage() {
 
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      setTenantId(session.user.user_metadata?.tenant_id ?? session.user.id);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
     })();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (tenantId) load();

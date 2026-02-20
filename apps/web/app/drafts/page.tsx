@@ -1,12 +1,13 @@
 "use client";
 
 import { api, type DraftSummary } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASelect, VASpinner, StatePill, VAPagination } from "@/components/ui";
 import { Nav } from "@/components/nav";
-import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 20;
 
@@ -20,6 +21,7 @@ function statusToState(
 }
 
 export default function DraftsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<DraftSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,14 +52,12 @@ export default function DraftsPage() {
 
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      setTenantId(session.user.id);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
     })();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (tenantId) load();

@@ -1,8 +1,8 @@
 "use client";
 
 import { api, type BudgetDetail, type BudgetDashboardWidget, type BudgetVarianceItem } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -21,21 +21,15 @@ export default function BudgetDetailPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.user?.id) {
-      router.replace("/login");
-      return;
-    }
-    const tid = session.user.user_metadata?.tenant_id ?? session.user.id;
-    setTenantId(tid);
+    const ctx = await getAuthContext();
+    if (!ctx) { router.replace("/login"); return; }
+    api.setAccessToken(ctx.accessToken);
+    setTenantId(ctx.tenantId);
     try {
       const [b, d, v] = await Promise.all([
-        api.budgets.get(tid, budgetId),
-        api.budgets.getDashboard(tid, budgetId).catch(() => null),
-        api.budgets.getVariance(tid, budgetId).catch(() => null),
+        api.budgets.get(ctx.tenantId, budgetId),
+        api.budgets.getDashboard(ctx.tenantId, budgetId).catch(() => null),
+        api.budgets.getVariance(ctx.tenantId, budgetId).catch(() => null),
       ]);
       setBudget(b);
       setDashboard(d ?? null);

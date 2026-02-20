@@ -1,8 +1,8 @@
 "use client";
 
 import { api, type KpiItem } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -53,19 +53,12 @@ export default function ComparePage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user) {
-        router.replace("/login");
-        return;
-      }
-      const tid =
-        session.user.user_metadata?.tenant_id ?? session.user.id;
-      setTenantId(tid);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
       try {
-        const res = await api.orgStructures.list(tid);
+        const res = await api.orgStructures.list(ctx.tenantId);
         if (!cancelled) setEntities(res.items ?? []);
       } catch (e) {
         if (!cancelled)
@@ -110,7 +103,8 @@ export default function ComparePage() {
     await Promise.all(
       selectedEntities.map(async (entity) => {
         try {
-          const runsRes = await api.runs.list(tenantId, { limit: 1 });
+          // TODO: scope runs per entity once baseline_id is exposed on OrgStructureItem
+          const runsRes = await api.runs.list(tenantId, { status: "completed", limit: 1 });
           const latestRun = runsRes.items?.[0];
           if (!latestRun) {
             results.set(entity.org_id, {

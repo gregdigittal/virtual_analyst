@@ -1,16 +1,18 @@
 "use client";
 
 import { api, type NotificationItem } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner, VAPagination } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 20;
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -45,19 +47,13 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user?.id) return;
-      const tid =
-        (user.app_metadata?.tenant_id as string) ??
-        (user.user_metadata?.tenant_id as string) ??
-        user.id;
-      setTenantId(tid);
-      setUserId(user.id);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
+      setUserId(ctx.userId);
     })();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (tenantId && userId) load();

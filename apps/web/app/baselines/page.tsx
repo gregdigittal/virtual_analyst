@@ -1,16 +1,18 @@
 "use client";
 
 import { api, type BaselineSummary } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VACard, VAInput, VASpinner, VAPagination } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 20;
 
 export default function BaselinesPage() {
+  const router = useRouter();
   const [items, setItems] = useState<BaselineSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,14 +41,12 @@ export default function BaselinesPage() {
 
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      setTenantId(session.user.id);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
     })();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (tenantId) load();

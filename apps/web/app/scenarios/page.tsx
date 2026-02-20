@@ -1,14 +1,16 @@
 "use client";
 
 import { api, type BaselineSummary, type ScenarioItem } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 20;
 
 export default function ScenariosPage() {
+  const router = useRouter();
   const [items, setItems] = useState<ScenarioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,19 +45,16 @@ export default function ScenariosPage() {
 
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
-      setTenantId(tid);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
       try {
-        const blRes = await api.baselines.list(tid);
+        const blRes = await api.baselines.list(ctx.tenantId);
         setBaselines(blRes.items ?? []);
       } catch { /* baselines list is optional */ }
     })();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (tenantId) load();

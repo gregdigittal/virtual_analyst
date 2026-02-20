@@ -1,15 +1,16 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VACard, VASpinner } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function RunValuationPage() {
   const params = useParams();
+  const router = useRouter();
   const runId = params.id as string;
   const [data, setData] = useState<{
     dcf?: Record<string, unknown>;
@@ -22,15 +23,12 @@ export default function RunValuationPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
-      setTenantId(tid);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
       try {
-        const res = await api.runs.getValuation(tid, runId);
+        const res = await api.runs.getValuation(ctx.tenantId, runId);
         if (!cancelled) setData(res);
       } catch (e) {
         if (!cancelled)
@@ -42,7 +40,7 @@ export default function RunValuationPage() {
     return () => {
       cancelled = true;
     };
-  }, [runId]);
+  }, [router, runId]);
 
   if (!tenantId && !loading) return null;
 

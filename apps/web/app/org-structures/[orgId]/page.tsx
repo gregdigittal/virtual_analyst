@@ -3,7 +3,6 @@
 import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner, VATabs } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";

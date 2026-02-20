@@ -17,7 +17,7 @@ import {
   VASpinner,
   useToast,
 } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
+import { getAuthContext } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { EntityTimeline } from "@/components/EntityTimeline";
 import { CommentThread } from "@/components/CommentThread";
@@ -136,16 +136,14 @@ export default function DraftWorkspacePage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      setTenantId(session.user.id);
-      setUserId(session.user.id);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
+      setUserId(ctx.userId);
       if (!cancelled) setLoading(true);
       try {
-        const res = await api.drafts.get(session.user.id, id);
+        const res = await api.drafts.get(ctx.tenantId, id);
         if (!cancelled) {
           setDetail(res);
           setError(null);
@@ -160,7 +158,7 @@ export default function DraftWorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [router, id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });

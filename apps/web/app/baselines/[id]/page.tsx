@@ -1,8 +1,8 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import { EntityTimeline } from "@/components/EntityTimeline";
 import { CommentThread } from "@/components/CommentThread";
@@ -24,16 +24,13 @@ export default function BaselineDetailPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
-      setTenantId(tid);
-      setUserId(session.user.id);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
+      setUserId(ctx.userId);
       try {
-        const res = await api.baselines.get(tid, id);
+        const res = await api.baselines.get(ctx.tenantId, id);
         if (!cancelled) setConfig(res.model_config);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -44,7 +41,7 @@ export default function BaselineDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [router, id]);
 
   async function createRun() {
     if (!tenantId) return;

@@ -1,11 +1,11 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VACard, VASpinner, VATabs } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useCallback } from "react";
 
 type McData = {
@@ -242,6 +242,7 @@ function FanChart({ data, metric }: { data: McData; metric: Metric }) {
 
 export default function RunMcPage() {
   const params = useParams();
+  const router = useRouter();
   const runId = params.id as string;
   const [data, setData] = useState<McData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -252,15 +253,12 @@ export default function RunMcPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      const tid = session.user.id;
-      setTenantId(tid);
+      const ctx = await getAuthContext();
+      if (!ctx) { router.replace("/login"); return; }
+      api.setAccessToken(ctx.accessToken);
+      setTenantId(ctx.tenantId);
       try {
-        const res = await api.runs.getMc(tid, runId);
+        const res = await api.runs.getMc(ctx.tenantId, runId);
         if (!cancelled) setData(res);
       } catch (e) {
         if (!cancelled)
@@ -272,7 +270,7 @@ export default function RunMcPage() {
     return () => {
       cancelled = true;
     };
-  }, [runId]);
+  }, [router, runId]);
 
   if (!tenantId && !loading) return null;
 

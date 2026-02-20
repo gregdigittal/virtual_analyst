@@ -1,8 +1,8 @@
 "use client";
 
 import { api, API_URL, type BoardPackDetail } from "@/lib/api";
+import { getAuthContext } from "@/lib/auth";
 import { VACard, VASpinner } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -20,19 +20,13 @@ export default function BoardPackDetailPage() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.user?.id) {
-      router.replace("/login");
-      return;
-    }
-    const tid = session.user.user_metadata?.tenant_id ?? session.user.id;
-    setTenantId(tid);
-    setAccessToken(session.access_token ?? null);
+    const ctx = await getAuthContext();
+    if (!ctx) { router.replace("/login"); return; }
+    api.setAccessToken(ctx.accessToken);
+    setTenantId(ctx.tenantId);
+    setAccessToken(ctx.accessToken);
     try {
-      const p = await api.boardPacks.get(tid, packId);
+      const p = await api.boardPacks.get(ctx.tenantId, packId);
       setPack(p);
       setError(null);
     } catch (e) {
@@ -121,6 +115,14 @@ export default function BoardPackDetailPage() {
             <p className="mt-1 text-sm text-va-text2">
               {pack.run_id ?? "—"} · {pack.status}
             </p>
+            <div className="mt-2">
+              <Link
+                href={`/board-packs/${packId}/builder`}
+                className="text-sm text-va-blue hover:underline"
+              >
+                Edit report sections →
+              </Link>
+            </div>
             {pack.status === "draft" || pack.status === "error" ? (
               <button
                 type="button"
