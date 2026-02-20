@@ -8,6 +8,64 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+function VarianceTrendChart({ data }: { data: { period_ordinal: number; budget_total: number; actual_total: number; variance_pct: number }[] }) {
+  if (data.length === 0) return null;
+  const W = 600, H = 200;
+  const PAD = { top: 20, right: 20, bottom: 30, left: 60 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+  const maxVal = Math.max(...data.flatMap((d) => [d.budget_total, d.actual_total]), 1);
+  const minVal = Math.min(...data.flatMap((d) => [d.budget_total, d.actual_total]), 0);
+  const range = maxVal - minVal || 1;
+  function x(i: number) { return PAD.left + (i / Math.max(data.length - 1, 1)) * plotW; }
+  function y(v: number) { return PAD.top + plotH - ((v - minVal) / range) * plotH; }
+  const budgetPath = data.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d.budget_total).toFixed(1)}`).join(" ");
+  const actualPath = data.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d.actual_total).toFixed(1)}`).join(" ");
+  return (
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[600px]" role="img" aria-label="Variance trend chart">
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+          const yy = PAD.top + plotH * (1 - t);
+          const val = minVal + range * t;
+          return (
+            <g key={t}>
+              <line x1={PAD.left} y1={yy} x2={W - PAD.right} y2={yy} stroke="rgba(255,255,255,0.08)" />
+              <text x={PAD.left - 6} y={yy + 4} textAnchor="end" className="fill-va-text2 text-[9px]">{(val / 1000).toFixed(0)}k</text>
+            </g>
+          );
+        })}
+        {data.map((d, i) => (
+          <text key={i} x={x(i)} y={H - 8} textAnchor="middle" className="fill-va-text2 text-[9px]">P{d.period_ordinal}</text>
+        ))}
+        <path d={budgetPath} fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="4 3" />
+        <path d={actualPath} fill="none" stroke="#22d3ee" strokeWidth="2" />
+        <line x1={PAD.left} y1={10} x2={PAD.left + 20} y2={10} stroke="#6366f1" strokeWidth="2" strokeDasharray="4 3" />
+        <text x={PAD.left + 24} y={13} className="fill-va-text2 text-[9px]">Budget</text>
+        <line x1={PAD.left + 80} y1={10} x2={PAD.left + 100} y2={10} stroke="#22d3ee" strokeWidth="2" />
+        <text x={PAD.left + 104} y={13} className="fill-va-text2 text-[9px]">Actual</text>
+      </svg>
+    </div>
+  );
+}
+
+function DepartmentRankingChart({ data }: { data: { department_ref: string; actual_total: number }[] }) {
+  if (data.length === 0) return null;
+  const maxVal = Math.max(...data.map((d) => d.actual_total), 1);
+  return (
+    <div className="space-y-2">
+      {data.map((d) => (
+        <div key={d.department_ref} className="flex items-center gap-3">
+          <span className="w-28 shrink-0 truncate text-xs text-va-text2 text-right">{d.department_ref}</span>
+          <div className="h-5 flex-1 rounded-sm bg-va-surface">
+            <div className="h-full rounded-sm bg-va-blue/60" style={{ width: `${(d.actual_total / maxVal) * 100}%` }} />
+          </div>
+          <span className="w-20 shrink-0 text-right font-mono text-xs text-va-text">{d.actual_total.toLocaleString()}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function BudgetDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -136,6 +194,18 @@ export default function BudgetDetailPage() {
                 )}
               </VACard>
             )}
+            {dashboard?.widgets?.[0]?.variance_trend?.length ? (
+              <VACard className="mt-6 p-4">
+                <h2 className="mb-3 text-lg font-medium text-va-text">Budget vs actual trend</h2>
+                <VarianceTrendChart data={dashboard.widgets[0].variance_trend} />
+              </VACard>
+            ) : null}
+            {dashboard?.widgets?.[0]?.department_ranking?.length ? (
+              <VACard className="mt-6 p-4">
+                <h2 className="mb-3 text-lg font-medium text-va-text">Spend by department</h2>
+                <DepartmentRankingChart data={dashboard.widgets[0].department_ranking} />
+              </VACard>
+            ) : null}
             {variance && variance.variances.length > 0 ? (
               <VACard className="mt-6 p-4">
                 <div className="mb-3 flex items-center justify-between">

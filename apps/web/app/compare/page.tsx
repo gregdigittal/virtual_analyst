@@ -1,8 +1,8 @@
 "use client";
 
-import { api, type KpiItem } from "@/lib/api";
+import { api, type KpiItem, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VASelect, VASpinner } from "@/components/ui";
 import { Nav } from "@/components/nav";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -49,6 +49,15 @@ export default function ComparePage() {
   const [loadingEntities, setLoadingEntities] = useState(true);
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"entity" | "run">("entity");
+
+  // Run comparison state
+  const [runIdA, setRunIdA] = useState("");
+  const [runIdB, setRunIdB] = useState("");
+  const [runKpisA, setRunKpisA] = useState<KpiItem[]>([]);
+  const [runKpisB, setRunKpisB] = useState<KpiItem[]>([]);
+  const [runComparing, setRunComparing] = useState(false);
+  const [availableRuns, setAvailableRuns] = useState<RunSummary[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +75,10 @@ export default function ComparePage() {
       } finally {
         if (!cancelled) setLoadingEntities(false);
       }
+      try {
+        const runsRes = await api.runs.list(ctx.tenantId, { status: "completed", limit: 50 });
+        if (!cancelled) setAvailableRuns(runsRes.items ?? []);
+      } catch { /* optional */ }
     })();
     return () => {
       cancelled = true;
@@ -142,6 +155,24 @@ export default function ComparePage() {
     setComparing(false);
   }, [tenantId, selected, entities]);
 
+  async function compareRuns() {
+    if (!tenantId || !runIdA || !runIdB) return;
+    setRunComparing(true);
+    setError(null);
+    try {
+      const [kA, kB] = await Promise.all([
+        api.runs.getKpis(tenantId, runIdA),
+        api.runs.getKpis(tenantId, runIdB),
+      ]);
+      setRunKpisA(Array.isArray(kA) ? kA : []);
+      setRunKpisB(Array.isArray(kB) ? kB : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRunComparing(false);
+    }
+  }
+
   const comparedEntities = Array.from(entityKpis.values()).filter(
     (e) => !e.loading
   );
@@ -160,9 +191,17 @@ export default function ComparePage() {
     <div className="min-h-screen bg-va-midnight">
       <Nav />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="font-brand mb-6 text-2xl font-semibold tracking-tight text-va-text">
-          Entity Comparison
+        <h1 className="font-brand mb-4 text-2xl font-semibold tracking-tight text-va-text">
+          Comparison
         </h1>
+        <div className="mb-6 flex gap-2">
+          <VAButton type="button" variant={mode === "entity" ? "primary" : "ghost"} onClick={() => setMode("entity")}>
+            Entity comparison
+          </VAButton>
+          <VAButton type="button" variant={mode === "run" ? "primary" : "ghost"} onClick={() => setMode("run")}>
+            Run comparison
+          </VAButton>
+        </div>
 
         {error && (
           <div className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger">
@@ -170,9 +209,10 @@ export default function ComparePage() {
           </div>
         )}
 
-        {loadingEntities ? (
-          <VASpinner label="Loading entities\u2026" />
-        ) : (
+        {mode === "entity" && (
+          loadingEntities ? (
+            <VASpinner label="Loading entities\u2026" />
+          ) : (
           <>
             {/* Entity selector */}
             <VACard className="mb-6 p-4">
@@ -286,8 +326,101 @@ export default function ComparePage() {
               </VACard>
             )}
           </>
+          )
+        )}
+
+        {mode === "run" && (
+          <>
+            <VACard className="mb-6 p-4">
+              <h2 className="mb-3 text-sm font-medium text-va-text">Select two runs to compare</h2>
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="min-w-[200px]">
+                  <label className="mb-1 block text-sm text-va-text2">Run A</label>
+                  <VASelect value={runIdA} onChange={(e) => setRunIdA(e.target.value)}>
+                    <option value="">Select run…</option>
+                    {availableRuns.map((r) => (
+                      <option key={r.run_id} value={r.run_id}>{r.run_id}</option>
+                    ))}
+                  </VASelect>
+                </div>
+                <div className="min-w-[200px]">
+                  <label className="mb-1 block text-sm text-va-text2">Run B</label>
+                  <VASelect value={runIdB} onChange={(e) => setRunIdB(e.target.value)}>
+                    <option value="">Select run…</option>
+                    {availableRuns.map((r) => (
+                      <option key={r.run_id} value={r.run_id}>{r.run_id}</option>
+                    ))}
+                  </VASelect>
+                </div>
+                <VAButton
+                  type="button"
+                  variant="primary"
+                  onClick={compareRuns}
+                  disabled={!runIdA || !runIdB || runIdA === runIdB || runComparing}
+                >
+                  {runComparing ? "Comparing…" : "Compare runs"}
+                </VAButton>
+              </div>
+            </VACard>
+
+            {runKpisA.length > 0 && runKpisB.length > 0 && (
+              <VACard className="overflow-x-auto p-4">
+                <h2 className="mb-3 text-sm font-medium text-va-text">KPI comparison (terminal period)</h2>
+                <RunKpiComparisonTable
+                  runIdA={runIdA}
+                  runIdB={runIdB}
+                  kpisA={runKpisA[runKpisA.length - 1]}
+                  kpisB={runKpisB[runKpisB.length - 1]}
+                />
+              </VACard>
+            )}
+          </>
         )}
       </main>
     </div>
+  );
+}
+
+function RunKpiComparisonTable({
+  runIdA, runIdB, kpisA, kpisB,
+}: {
+  runIdA: string; runIdB: string;
+  kpisA: KpiItem; kpisB: KpiItem;
+}) {
+  const { period: _pA, ...restA } = kpisA;
+  const { period: _pB, ...restB } = kpisB;
+  const allKeys = Array.from(new Set([...Object.keys(restA), ...Object.keys(restB)]));
+
+  return (
+    <table className="w-full min-w-[500px] text-sm text-va-text">
+      <thead>
+        <tr className="border-b border-va-border">
+          <th className="px-3 py-2 text-left font-medium">Metric</th>
+          <th className="px-3 py-2 text-right font-medium font-mono">{runIdA.slice(0, 12)}</th>
+          <th className="px-3 py-2 text-right font-medium font-mono">{runIdB.slice(0, 12)}</th>
+          <th className="px-3 py-2 text-right font-medium">Variance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {allKeys.map((key) => {
+          const valA = typeof restA[key] === "number" ? (restA[key] as number) : null;
+          const valB = typeof restB[key] === "number" ? (restB[key] as number) : null;
+          const variance = valA != null && valB != null ? valB - valA : null;
+          const pct = valA != null && valA !== 0 && variance != null ? (variance / Math.abs(valA)) * 100 : null;
+          return (
+            <tr key={key} className="border-b border-va-border/50">
+              <td className="px-3 py-2 capitalize">{key.replace(/_/g, " ")}</td>
+              <td className="px-3 py-2 text-right font-mono">{valA != null ? valA.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}</td>
+              <td className="px-3 py-2 text-right font-mono">{valB != null ? valB.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}</td>
+              <td className={`px-3 py-2 text-right font-mono text-xs ${variance != null && variance > 0 ? "text-green-400" : variance != null && variance < 0 ? "text-va-danger" : ""}`}>
+                {variance != null
+                  ? `${variance > 0 ? "+" : ""}${variance.toLocaleString(undefined, { maximumFractionDigits: 0 })}${pct != null ? ` (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)` : ""}`
+                  : "—"}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }

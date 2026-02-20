@@ -18,6 +18,11 @@ export function setAccessToken(token: string | null): void {
   _accessToken = token;
 }
 
+/** Read the current access token (needed for direct fetch calls like Excel export). */
+export function getAccessToken(): string | null {
+  return _accessToken;
+}
+
 export interface ApiOptions {
   tenantId: string;
   userId?: string;
@@ -298,6 +303,16 @@ export const api = {
         "/api/v1/baselines",
         { tenantId, method: "POST", body: { model_config: modelConfig } }
       ),
+    listVersions: (tenantId: string, baselineId: string) =>
+      request<{ items: { baseline_id: string; baseline_version: string; status: string; is_active: boolean; created_at: string | null }[]; total: number }>(
+        `/api/v1/baselines/${encodeURIComponent(baselineId)}/versions`,
+        { tenantId }
+      ),
+    getVersion: (tenantId: string, baselineId: string, version: string) =>
+      request<{ model_config: unknown; baseline_version: string; is_active: boolean; created_at: string | null }>(
+        `/api/v1/baselines/${encodeURIComponent(baselineId)}/versions/${encodeURIComponent(version)}`,
+        { tenantId }
+      ),
   },
   runs: {
     list: (tenantId: string, opts?: { limit?: number; offset?: number; status?: string; baseline_id?: string }) =>
@@ -317,7 +332,7 @@ export const api = {
     create: (
       tenantId: string,
       baselineId: string,
-      opts?: { scenarioId?: string; mcEnabled?: boolean; numSimulations?: number; seed?: number }
+      opts?: { scenarioId?: string; mcEnabled?: boolean; numSimulations?: number; seed?: number; valuationConfig?: { wacc?: number; terminal_growth_rate?: number; comparables?: string[] } }
     ) =>
       request<{ run_id: string; status: string; task_id?: string } & Record<string, unknown>>("/api/v1/runs", {
         tenantId,
@@ -326,6 +341,7 @@ export const api = {
           baseline_id: baselineId,
           ...(opts?.scenarioId && { scenario_id: opts.scenarioId }),
           ...(opts?.mcEnabled && { mode: "monte_carlo", num_simulations: opts.numSimulations ?? 1000, seed: opts.seed ?? 42 }),
+          ...(opts?.valuationConfig && { valuation_config: opts.valuationConfig }),
         },
       }),
     getMc: (tenantId: string, runId: string) =>

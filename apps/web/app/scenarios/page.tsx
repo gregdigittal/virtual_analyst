@@ -25,6 +25,56 @@ export default function ScenariosPage() {
   const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
   const { toast } = useToast();
 
+  // Create form state
+  const [showCreate, setShowCreate] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newBaselineId, setNewBaselineId] = useState("");
+  const [overrides, setOverrides] = useState<{ ref: string; field: string; value: string }[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  function addOverride() {
+    setOverrides((prev) => [...prev, { ref: "", field: "", value: "" }]);
+  }
+
+  function removeOverride(index: number) {
+    setOverrides((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateOverride(index: number, key: "ref" | "field" | "value", val: string) {
+    setOverrides((prev) => prev.map((o, i) => (i === index ? { ...o, [key]: val } : o)));
+  }
+
+  async function handleCreate() {
+    if (!tenantId || !newLabel || !newBaselineId) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const parsedOverrides = overrides
+        .filter((o) => o.ref && o.field && o.value)
+        .map((o) => ({ ref: o.ref, field: o.field, value: Number(o.value) }));
+      await api.scenarios.create(tenantId, {
+        baseline_id: newBaselineId,
+        label: newLabel,
+        description: newDescription || undefined,
+        overrides: parsedOverrides.length > 0 ? parsedOverrides : undefined,
+      });
+      toast.success("Scenario created");
+      setNewLabel("");
+      setNewDescription("");
+      setNewBaselineId("");
+      setOverrides([]);
+      setShowCreate(false);
+      load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg);
+      setError(msg);
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
@@ -126,6 +176,7 @@ export default function ScenariosPage() {
                           <th className="px-3 py-2 text-left font-medium">
                             Overrides
                           </th>
+                          <th className="px-3 py-2 text-right font-medium" />
                         </tr>
                       </thead>
                       <tbody>
@@ -146,6 +197,24 @@ export default function ScenariosPage() {
                                 : 0}{" "}
                               override(s)
                             </td>
+                            <td className="px-3 py-2 text-right">
+                              <VAButton
+                                type="button"
+                                variant="ghost"
+                                onClick={async () => {
+                                  if (!tenantId) return;
+                                  try {
+                                    await api.scenarios.delete(tenantId, s.scenario_id);
+                                    toast.success("Scenario deleted");
+                                    load();
+                                  } catch (e) {
+                                    toast.error(e instanceof Error ? e.message : String(e));
+                                  }
+                                }}
+                              >
+                                Delete
+                              </VAButton>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -158,6 +227,62 @@ export default function ScenariosPage() {
                     onPageChange={setPage}
                   />
                 </>
+              )}
+            </section>
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="font-brand text-lg font-medium text-va-text">
+                  Create scenario
+                </h2>
+                <VAButton
+                  type="button"
+                  variant={showCreate ? "ghost" : "primary"}
+                  onClick={() => setShowCreate((v) => !v)}
+                >
+                  {showCreate ? "Cancel" : "New scenario"}
+                </VAButton>
+              </div>
+              {showCreate && (
+                <VACard className="space-y-4 p-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-va-text">Label *</label>
+                      <VAInput value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Downside stress" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-va-text">Baseline *</label>
+                      <VASelect value={newBaselineId} onChange={(e) => setNewBaselineId(e.target.value)}>
+                        <option value="">Select a baseline</option>
+                        {baselines.map((b) => (
+                          <option key={b.baseline_id} value={b.baseline_id}>
+                            {b.baseline_id} ({b.baseline_version})
+                          </option>
+                        ))}
+                      </VASelect>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-va-text">Description</label>
+                    <VAInput value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optional description" />
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="text-sm font-medium text-va-text">Driver overrides ({overrides.length})</label>
+                      <VAButton type="button" variant="ghost" onClick={addOverride}>+ Add override</VAButton>
+                    </div>
+                    {overrides.map((o, i) => (
+                      <div key={i} className="mb-2 flex items-center gap-2">
+                        <VAInput placeholder="Driver ref" value={o.ref} onChange={(e) => updateOverride(i, "ref", e.target.value)} className="flex-1" />
+                        <VAInput placeholder="Field" value={o.field} onChange={(e) => updateOverride(i, "field", e.target.value)} className="w-32" />
+                        <VAInput type="number" placeholder="Value" value={o.value} onChange={(e) => updateOverride(i, "value", e.target.value)} className="w-28" />
+                        <VAButton type="button" variant="ghost" onClick={() => removeOverride(i)}>✕</VAButton>
+                      </div>
+                    ))}
+                  </div>
+                  <VAButton type="button" variant="primary" onClick={handleCreate} disabled={creating || !newLabel || !newBaselineId}>
+                    {creating ? "Creating..." : "Create scenario"}
+                  </VAButton>
+                </VACard>
               )}
             </section>
             <section>

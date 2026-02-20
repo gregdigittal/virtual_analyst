@@ -164,6 +164,71 @@ async def get_baseline(
             raise
 
 
+@router.get("/{baseline_id}/versions")
+async def list_baseline_versions(
+    baseline_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    _: None = require_role(*ROLES_ANY),
+) -> dict[str, Any]:
+    """Return all versions of a baseline (active and inactive)."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        rows = await conn.fetch(
+            """SELECT baseline_id, baseline_version, status, is_active, created_at
+               FROM model_baselines
+               WHERE tenant_id = $1 AND baseline_id = $2
+               ORDER BY created_at DESC""",
+            x_tenant_id,
+            baseline_id,
+        )
+        items = [
+            {
+                "baseline_id": r["baseline_id"],
+                "baseline_version": r["baseline_version"],
+                "status": r["status"],
+                "is_active": r["is_active"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+        return {"items": items, "total": len(items)}
+
+
+@router.get("/{baseline_id}/versions/{version}")
+async def get_baseline_version(
+    baseline_id: str,
+    version: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+    _: None = require_role(*ROLES_ANY),
+) -> dict[str, Any]:
+    """Return the model_config for a specific version of a baseline."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """SELECT baseline_id, baseline_version, status, storage_path, is_active, created_at
+               FROM model_baselines
+               WHERE tenant_id = $1 AND baseline_id = $2 AND baseline_version = $3""",
+            x_tenant_id,
+            baseline_id,
+            version,
+        )
+        if not row:
+            raise HTTPException(404, "Version not found")
+        artifact_id = f"{row['baseline_id']}_{row['baseline_version']}"
+        config = store.load(x_tenant_id, "model_config_v1", artifact_id)
+        return {
+            "baseline_id": row["baseline_id"],
+            "baseline_version": row["baseline_version"],
+            "status": row["status"],
+            "is_active": row["is_active"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "model_config": config,
+        }
+
+
 class PatchBaselineBody(BaseModel):
     status: Literal["active", "archived"]
 

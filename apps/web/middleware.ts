@@ -7,7 +7,7 @@ const protectedPaths = [
   "/budgets", "/memos", "/documents", "/activity",
   "/excel-connections", "/excel-import", "/covenants",
   "/org-structures", "/ventures", "/board-packs",
-  "/import", "/benchmark", "/marketplace", "/compare",
+  "/import", "/benchmark", "/marketplace", "/compare", "/workflows",
 ];
 
 function isProtected(pathname: string): boolean {
@@ -79,5 +79,6 @@ export const config = {
     "/benchmark/:path*",
     "/marketplace/:path*",
     "/compare/:path*",
+    "/workflows/:path*",
   ],
 };

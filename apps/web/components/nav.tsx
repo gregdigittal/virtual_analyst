@@ -18,6 +18,7 @@ const navLinks = [
   { href: "/scenarios", label: "Scenarios" },
   { href: "/changesets", label: "Changesets" },
   { href: "/budgets", label: "Budgets" },
+  { href: "/workflows", label: "Workflows" },
   { href: "/covenants", label: "Covenants" },
   { href: "/memos", label: "Memos" },
   { href: "/documents", label: "Documents" },

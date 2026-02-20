@@ -1,6 +1,6 @@
 "use client";
 
-import { api, type StatementsData, type KpiItem } from "@/lib/api";
+import { api, API_URL, getAccessToken, type StatementsData, type KpiItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { Nav } from "@/components/nav";
@@ -156,6 +156,38 @@ export default function RunDetailPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("statements");
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExcelExport() {
+    if (!tenantId) return;
+    setExporting(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch(
+        `${API_URL}/api/v1/runs/${encodeURIComponent(runId)}/export/excel`,
+        {
+          headers: {
+            "X-Tenant-ID": tenantId,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
+      if (!res.ok) throw new Error(`Export failed: ${res.statusText}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `run_${runId}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -265,6 +297,17 @@ export default function RunDetailPage() {
             >
               Sensitivity
             </Link>
+            {run?.status === "completed" && (
+              <VAButton
+                type="button"
+                variant="secondary"
+                onClick={handleExcelExport}
+                disabled={exporting}
+                className="!py-1.5"
+              >
+                {exporting ? "Exporting..." : "Export Excel"}
+              </VAButton>
+            )}
           </div>
         </div>
         {error && (
