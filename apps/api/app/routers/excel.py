@@ -50,7 +50,13 @@ def _get_by_path(data: dict | list, path: str) -> Any:
     obj: Any = data
     for p in parts:
         if isinstance(obj, list):
-            obj = obj[int(p)]
+            try:
+                idx = int(p)
+                if idx < 0 or idx >= len(obj):
+                    return None
+                obj = obj[idx]
+            except (ValueError, IndexError):
+                return None
         else:
             obj = obj.get(p)
         if obj is None:

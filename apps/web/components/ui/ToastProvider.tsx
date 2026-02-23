@@ -31,9 +31,22 @@ const AUTO_DISMISS_MS = 4000;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const nextId = useRef(0);
+  const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current.clear();
+    };
+  }, []);
 
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
   }, []);
 
   const push = useCallback(
@@ -43,7 +56,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         const next = [...prev, { id, message, variant }];
         return next.length > MAX_TOASTS ? next.slice(-MAX_TOASTS) : next;
       });
-      setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
+      const timer = setTimeout(() => {
+        dismiss(id);
+        timersRef.current.delete(id);
+      }, AUTO_DISMISS_MS);
+      timersRef.current.set(id, timer);
     },
     [dismiss]
   );

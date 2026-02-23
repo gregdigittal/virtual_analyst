@@ -39,7 +39,7 @@ def _sign_oauth_state(tenant_id: str, provider: str, secret: str) -> str:
     """Create signed state: timestamp.tenant_id.provider.signature"""
     ts = str(int(time.time()))
     payload = f"{ts}.{tenant_id}.{provider}"
-    sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+    sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{payload}.{sig}"
 
 
@@ -49,7 +49,7 @@ def _verify_oauth_state(state: str, secret: str, max_age_seconds: int = 600) -> 
     if len(parts) != 2:
         return None
     payload, sig = parts
-    expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+    expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
     if not hmac.compare_digest(sig, expected):
         return None
     payload_parts = payload.split(".", 2)
@@ -111,7 +111,9 @@ async def oauth_callback(
     try:
         result = await adapter.exchange_code(code, redirect_uri)
     except Exception as e:
-        raise HTTPException(400, f"OAuth exchange failed: {e}") from e
+        import structlog
+        structlog.get_logger().error("oauth_exchange_failed", provider=provider, error=str(e))
+        raise HTTPException(400, "OAuth exchange failed") from e
     connection_id = f"conn_{uuid.uuid4().hex[:16]}"
     oauth_data = {
         "access_token": result.access_token,

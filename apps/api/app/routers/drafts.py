@@ -111,7 +111,7 @@ def _build_draft_assumptions_prompt(workspace: dict[str, Any]) -> str:
 
 
 _UNSAFE_CONTENT_PATTERN = re.compile(
-    r"(https?://|<script|javascript:|eval\(|exec\()", re.IGNORECASE
+    r"(https?://|<script|javascript:|data:|vbscript:|eval\(|exec\(|on\w+=)", re.IGNORECASE
 )
 
 

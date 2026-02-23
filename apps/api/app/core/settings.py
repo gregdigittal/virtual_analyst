@@ -98,11 +98,14 @@ class Settings(BaseSettings):
                     "Set ENVIRONMENT=development to disable auth."
                 )
             if self.oauth_state_secret == "change-me-in-production":
-                import warnings
-                warnings.warn("OAUTH_STATE_SECRET is still default — change it for production!", stacklevel=2)
+                raise ValueError(
+                    "OAUTH_STATE_SECRET is still default — set a secure random value for production!"
+                )
             if not self.oauth_encryption_key:
-                import warnings
-                warnings.warn("OAUTH_ENCRYPTION_KEY is empty — OAuth tokens will NOT be encrypted!", stacklevel=2)
+                raise ValueError(
+                    "OAUTH_ENCRYPTION_KEY is required in production — generate with: "
+                    "python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+                )
             cors_origins = self.cors_allowed_origins_list()
             for origin in cors_origins:
                 if not origin.startswith("https://"):

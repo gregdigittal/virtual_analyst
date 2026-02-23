@@ -62,7 +62,10 @@ class QuickBooksAdapter(ERPAdapter):
             data = r.json()
         access = data["access_token"]
         refresh = data.get("refresh_token", "")
-        expires_in = int(data.get("expires_in", 3600))
+        try:
+            expires_in = int(data.get("expires_in", 3600))
+        except (ValueError, TypeError):
+            expires_in = 3600
         expires_at = str(int(datetime.now(UTC).timestamp()) + expires_in)
         realm_id = data.get("realmId", "")
         return ConnectionResult(

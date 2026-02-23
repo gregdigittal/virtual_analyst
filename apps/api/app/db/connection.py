@@ -24,8 +24,9 @@ async def tenant_conn(tenant_id: str):
     finally:
         try:
             await conn.execute("SET app.tenant_id = ''")
-        except Exception:
-            pass  # Connection may be broken; cleanup below will handle it
+        except Exception as exc:
+            import structlog
+            structlog.get_logger().warning("tenant_conn_cleanup_failed", error=str(exc))
         if _pool is not None:
             await _pool.release(conn)
         else:

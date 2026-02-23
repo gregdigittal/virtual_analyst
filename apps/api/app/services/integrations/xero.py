@@ -64,7 +64,10 @@ class XeroAdapter(ERPAdapter):
             r.raise_for_status()
             data = r.json()
 
-            expires_in = int(data.get("expires_in", 1800))
+            try:
+                expires_in = int(data.get("expires_in", 1800))
+            except (ValueError, TypeError):
+                expires_in = 1800
             expires_at = datetime.now(UTC).timestamp() + expires_in
             access_token = data["access_token"]
             refresh_token_val = data["refresh_token"]
