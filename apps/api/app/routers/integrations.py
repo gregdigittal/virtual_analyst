@@ -9,6 +9,8 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
+import structlog
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
@@ -111,7 +113,6 @@ async def oauth_callback(
     try:
         result = await adapter.exchange_code(code, redirect_uri)
     except Exception as e:
-        import structlog
         structlog.get_logger().error("oauth_exchange_failed", provider=provider, error=str(e))
         raise HTTPException(400, "OAuth exchange failed") from e
     connection_id = f"conn_{uuid.uuid4().hex[:16]}"

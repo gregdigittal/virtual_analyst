@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 import asyncpg
+import structlog
 
 from apps.api.app.core.settings import get_settings
 
@@ -25,7 +26,6 @@ async def tenant_conn(tenant_id: str):
         try:
             await conn.execute("SET app.tenant_id = ''")
         except Exception as exc:
-            import structlog
             structlog.get_logger().warning("tenant_conn_cleanup_failed", error=str(exc))
         if _pool is not None:
             await _pool.release(conn)

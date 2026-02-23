@@ -13,6 +13,8 @@ import time
 from io import BytesIO
 from typing import Any
 
+import structlog
+
 MAX_SHEETS = 30
 MAX_COLS = 500
 MAX_ROWS = 10_000
@@ -111,7 +113,6 @@ def _extract_named_ranges(wb: Any) -> list[dict[str, str]]:
                 if name and attr:
                     out.append({"name": str(name), "sheet": "", "range": str(attr)})
     except Exception as exc:
-        import structlog
         structlog.get_logger().warning("named_ranges_extraction_failed", error=str(exc))
     return out
 
