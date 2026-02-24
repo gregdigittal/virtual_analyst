@@ -403,74 +403,69 @@ async def patch_board_pack(
         raise HTTPException(400, "No fields to update")
 
     async with tenant_conn(x_tenant_id) as conn:
-        # Build column-level updates
-        if has_column_updates:
-            updates: list[str] = []
-            args: list[Any] = []
-            pos = 1
+        async with conn.transaction():
+            # Build column-level updates
+            if has_column_updates:
+                updates: list[str] = []
+                args: list[Any] = []
+                pos = 1
+                if body.label is not None:
+                    updates.append(f"label = ${pos}")
+                    args.append(body.label)
+                    pos += 1
+                if body.section_order is not None:
+                    updates.append(f"section_order = ${pos}::jsonb")
+                    args.append(json.dumps(body.section_order))
+                    pos += 1
+                if body.branding_json is not None:
+                    updates.append(f"branding_json = ${pos}::jsonb")
+                    args.append(json.dumps(body.branding_json))
+                    pos += 1
+                args.extend([x_tenant_id, pack_id])
+                result = await conn.execute(
+                    f"UPDATE board_packs SET {', '.join(updates)} WHERE tenant_id = ${pos} AND pack_id = ${pos + 1}",
+                    *args,
+                )
+                if result == "UPDATE 0":
+                    raise HTTPException(404, "Board pack not found")
+
+            # Merge narrative sections atomically (avoids read-modify-write race)
+            if has_section_updates:
+                assert body.sections is not None
+                merge_patch: dict[str, str] = {}
+                for section in body.sections:
+                    merge_patch[section.section_key] = section.content
+                result = await conn.execute(
+                    """UPDATE board_packs
+                       SET narrative_json = COALESCE(narrative_json, '{}'::jsonb) || $1::jsonb
+                       WHERE tenant_id = $2 AND pack_id = $3""",
+                    json.dumps(merge_patch),
+                    x_tenant_id,
+                    pack_id,
+                )
+                if result == "UPDATE 0":
+                    raise HTTPException(404, "Board pack not found")
+
+            # Audit event
+            changed_fields = []
             if body.label is not None:
-                updates.append(f"label = ${pos}")
-                args.append(body.label)
-                pos += 1
+                changed_fields.append("label")
             if body.section_order is not None:
-                updates.append(f"section_order = ${pos}::jsonb")
-                args.append(json.dumps(body.section_order))
-                pos += 1
+                changed_fields.append("section_order")
             if body.branding_json is not None:
-                updates.append(f"branding_json = ${pos}::jsonb")
-                args.append(json.dumps(body.branding_json))
-                pos += 1
-            args.extend([x_tenant_id, pack_id])
-            result = await conn.execute(
-                f"UPDATE board_packs SET {', '.join(updates)} WHERE tenant_id = ${pos} AND pack_id = ${pos + 1}",
-                *args,
-            )
-            if result == "UPDATE 0":
-                raise HTTPException(404, "Board pack not found")
-
-        # Update individual narrative sections (merge into narrative_json)
-        if has_section_updates:
-            row = await conn.fetchrow(
-                "SELECT narrative_json FROM board_packs WHERE tenant_id = $1 AND pack_id = $2",
+                changed_fields.append("branding_json")
+            if has_section_updates:
+                changed_fields.append("narrative_sections")
+            await create_audit_event(
+                conn,
                 x_tenant_id,
+                "board_pack.updated",
+                "board_pack",
+                "board_pack",
                 pack_id,
+                user_id=x_user_id or None,
+                event_data={"changed_fields": changed_fields},
             )
-            if not row:
-                raise HTTPException(404, "Board pack not found")
-            narrative = row["narrative_json"]
-            if narrative is None:
-                narrative = {}
-            elif isinstance(narrative, str):
-                narrative = json.loads(narrative)
-            for section in body.sections:  # type: ignore[union-attr]
-                narrative[section.section_key] = section.content
-            await conn.execute(
-                "UPDATE board_packs SET narrative_json = $1::jsonb WHERE tenant_id = $2 AND pack_id = $3",
-                json.dumps(narrative),
-                x_tenant_id,
-                pack_id,
-            )
-
-        # Audit event
-        changed_fields = []
-        if body.label is not None:
-            changed_fields.append("label")
-        if body.section_order is not None:
-            changed_fields.append("section_order")
-        if body.branding_json is not None:
-            changed_fields.append("branding_json")
-        if has_section_updates:
-            changed_fields.append("narrative_sections")
-        await create_audit_event(
-            conn,
-            x_tenant_id,
-            "board_pack.updated",
-            "board_pack",
-            "board_pack",
-            pack_id,
-            user_id=x_user_id or None,
-            event_data={"changed_fields": changed_fields},
-        )
 
     return {"pack_id": pack_id, "updated": True}
 

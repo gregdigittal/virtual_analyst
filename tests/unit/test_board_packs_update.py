@@ -1,7 +1,6 @@
 """H-04: Board pack PATCH endpoint tests — label, section_order, branding, narrative sections, audit."""
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -14,11 +13,21 @@ USER = "user-h04"
 HEADERS = {"X-Tenant-ID": TENANT, "X-User-ID": USER}
 
 
-def _mock_tenant_conn(_tenant_id: str):
+def _make_conn(**overrides):
+    """Create a mock asyncpg connection with transaction support."""
     conn = MagicMock()
-    conn.execute = AsyncMock(return_value="UPDATE 1")
-    conn.fetchrow = AsyncMock(return_value={"narrative_json": '{"executive_summary": "Old text."}'})
-    # Also mock create_audit_event (it uses conn)
+    conn.execute = AsyncMock(return_value=overrides.get("execute_return", "UPDATE 1"))
+    conn.fetchrow = AsyncMock(return_value=overrides.get("fetchrow_return", None))
+    # Mock async with conn.transaction()
+    tx = MagicMock()
+    tx.__aenter__ = AsyncMock(return_value=tx)
+    tx.__aexit__ = AsyncMock(return_value=None)
+    conn.transaction = MagicMock(return_value=tx)
+    return conn
+
+
+def _mock_tenant_conn(_tenant_id: str):
+    conn = _make_conn()
     cm = MagicMock()
     cm.__aenter__ = AsyncMock(return_value=conn)
     cm.__aexit__ = AsyncMock(return_value=None)
@@ -59,8 +68,7 @@ def test_patch_label_success() -> None:
 
 def test_patch_not_found_returns_404() -> None:
     def _conn_update_0(_tid: str):
-        conn = MagicMock()
-        conn.execute = AsyncMock(return_value="UPDATE 0")
+        conn = _make_conn(execute_return="UPDATE 0")
         cm = MagicMock()
         cm.__aenter__ = AsyncMock(return_value=conn)
         cm.__aexit__ = AsyncMock(return_value=None)
@@ -135,19 +143,9 @@ def test_patch_section_order_empty_string_rejected() -> None:
 # ---------------------------------------------------------------------------
 
 def test_patch_narrative_sections() -> None:
-    def _conn_with_narrative(_tid: str):
-        conn = MagicMock()
-        conn.execute = AsyncMock(return_value="UPDATE 1")
-        conn.fetchrow = AsyncMock(return_value={
-            "narrative_json": json.dumps({"executive_summary": "Old text.", "strategic_commentary": "Old strat."}),
-        })
-        cm = MagicMock()
-        cm.__aenter__ = AsyncMock(return_value=conn)
-        cm.__aexit__ = AsyncMock(return_value=None)
-        return cm
-
+    """Narrative section merge uses atomic JSONB || operator."""
     with (
-        patch("apps.api.app.routers.board_packs.tenant_conn", side_effect=_conn_with_narrative),
+        patch("apps.api.app.routers.board_packs.tenant_conn", side_effect=_mock_tenant_conn),
         patch("apps.api.app.routers.board_packs.create_audit_event", new_callable=AsyncMock) as mock_audit,
     ):
         r = client.patch(
@@ -160,22 +158,19 @@ def test_patch_narrative_sections() -> None:
     assert r.status_code == 200
     assert r.json()["updated"] is True
 
-    # Verify the narrative was updated with merged content
     mock_audit.assert_called_once()
     assert "narrative_sections" in mock_audit.call_args[1]["event_data"]["changed_fields"]
 
 
 def test_patch_narrative_sections_pack_not_found() -> None:
-    def _conn_no_pack(_tid: str):
-        conn = MagicMock()
-        conn.execute = AsyncMock(return_value="UPDATE 1")
-        conn.fetchrow = AsyncMock(return_value=None)
+    def _conn_update_0(_tid: str):
+        conn = _make_conn(execute_return="UPDATE 0")
         cm = MagicMock()
         cm.__aenter__ = AsyncMock(return_value=conn)
         cm.__aexit__ = AsyncMock(return_value=None)
         return cm
 
-    with patch("apps.api.app.routers.board_packs.tenant_conn", side_effect=_conn_no_pack):
+    with patch("apps.api.app.routers.board_packs.tenant_conn", side_effect=_conn_update_0):
         r = client.patch(
             "/api/v1/board-packs/pk-999",
             json={"sections": [
@@ -186,19 +181,10 @@ def test_patch_narrative_sections_pack_not_found() -> None:
     assert r.status_code == 404
 
 
-def test_patch_narrative_with_null_narrative_json() -> None:
-    """When narrative_json is null, sections update should create a new dict."""
-    def _conn_null_narrative(_tid: str):
-        conn = MagicMock()
-        conn.execute = AsyncMock(return_value="UPDATE 1")
-        conn.fetchrow = AsyncMock(return_value={"narrative_json": None})
-        cm = MagicMock()
-        cm.__aenter__ = AsyncMock(return_value=conn)
-        cm.__aexit__ = AsyncMock(return_value=None)
-        return cm
-
+def test_patch_narrative_sections_atomic_merge() -> None:
+    """Verify the atomic JSONB merge SQL is used (no SELECT + rewrite)."""
     with (
-        patch("apps.api.app.routers.board_packs.tenant_conn", side_effect=_conn_null_narrative),
+        patch("apps.api.app.routers.board_packs.tenant_conn", side_effect=_mock_tenant_conn),
         patch("apps.api.app.routers.board_packs.create_audit_event", new_callable=AsyncMock),
     ):
         r = client.patch(
