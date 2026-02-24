@@ -80,18 +80,37 @@ jobs:
       postgres:
         image: postgres:15
         env:
+          POSTGRES_DB: finmodel_test
           POSTGRES_PASSWORD: postgres
         ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d finmodel_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finmodel_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -e ".[dev]"
-      - run: pytest tests/integration/ -v --tb=short
+
+      - name: Apply migrations
+        run: |
+          psql "$DATABASE_URL" -f apps/api/app/db/migrations/0001_init.sql -q
+          psql "$DATABASE_URL" -f apps/api/app/db/migrations/0002_functions_and_rls.sql -q
+          for f in apps/api/app/db/migrations/00[0-9][0-9]_*.sql; do
+            num="$(basename "$f" | cut -d_ -f1)"
+            if [ "$num" -le 2 ]; then continue; fi
+            psql "$DATABASE_URL" -f "$f" -q
+          done
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --tb=short
         env:
           INTEGRATION_TESTS: '1'
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
 
   build:
     needs: [test, frontend-tests]
