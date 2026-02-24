@@ -82,6 +82,7 @@ EVENT_CSV_IMPORTED = "csv.imported"
 EVENT_GDPR_EXPORT = "gdpr.export"
 EVENT_GDPR_ANONYMIZE = "gdpr.anonymize"
 EVENT_MARKETPLACE_TEMPLATE_USED = "marketplace.template_used"
+EVENT_BOARD_PACK_UPDATED = "board_pack.updated"
 
 # Full event catalog for export and filtering (VA-P4-03)
 AUDIT_EVENT_CATALOG = [
@@ -105,6 +106,7 @@ AUDIT_EVENT_CATALOG = [
     {"event_type": EVENT_GDPR_EXPORT, "event_category": "compliance", "description": "GDPR data export requested"},
     {"event_type": EVENT_GDPR_ANONYMIZE, "event_category": "compliance", "description": "GDPR user anonymization executed"},
     {"event_type": EVENT_MARKETPLACE_TEMPLATE_USED, "event_category": "marketplace", "description": "Marketplace template applied (budget or baseline)"},
+    {"event_type": EVENT_BOARD_PACK_UPDATED, "event_category": "board_pack", "description": "Board pack updated (label, sections, branding, or narrative)"},
 ]
 
 
