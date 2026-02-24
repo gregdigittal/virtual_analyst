@@ -116,16 +116,29 @@ export default function ComparePage() {
     await Promise.all(
       selectedEntities.map(async (entity) => {
         try {
-          // TODO: scope runs per entity once baseline_id is exposed on OrgStructureItem
-          const runsRes = await api.runs.list(tenantId, { status: "completed", limit: 1 });
-          const latestRun = runsRes.items?.[0];
+          // Fetch entity details to get baseline_ids for scoping runs
+          const orgDetail = await api.orgStructures.get(tenantId, entity.org_id);
+          const entityBaselines = (orgDetail.entities as { baseline_id?: string | null }[])
+            .map((e) => e.baseline_id)
+            .filter((id): id is string => !!id);
+
+          let latestRun: RunSummary | undefined;
+          if (entityBaselines.length > 0) {
+            const runsRes = await api.runs.list(tenantId, { status: "completed", limit: 50 });
+            latestRun = (runsRes.items ?? []).find((r) =>
+              entityBaselines.includes(r.baseline_id)
+            );
+          }
+
           if (!latestRun) {
             results.set(entity.org_id, {
               entity,
               kpis: null,
               runId: null,
               loading: false,
-              error: "No runs found",
+              error: entityBaselines.length === 0
+                ? "No baselines linked to entity"
+                : "No completed runs for this entity",
             });
             return;
           }
