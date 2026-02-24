@@ -1,4 +1,4 @@
-"""Board pack scheduling & distribution (VA-P7-09): CRUD schedules, run-now, history, distribute stub."""
+"""Board pack scheduling & distribution (VA-P7-09): CRUD schedules, run-now, history, distribute via SendGrid."""
 
 from __future__ import annotations
 
@@ -248,6 +248,8 @@ async def distribute_pack(
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     emails = body.emails
+
+    # Fetch history + narrative (release connection before HTTP call)
     async with tenant_conn(x_tenant_id) as conn:
         row = await conn.fetchrow(
             """SELECT h.history_id, h.pack_id, h.label,
@@ -258,28 +260,33 @@ async def distribute_pack(
             x_tenant_id,
             history_id,
         )
-        if not row:
-            raise HTTPException(404, "History not found")
+    if not row:
+        raise HTTPException(404, "History not found")
 
-        pack_label = row["label"] or "Board Pack"
-        narrative_json = row["narrative_json"]
-        if narrative_json and isinstance(narrative_json, str):
-            narrative_json = json.loads(narrative_json)
+    pack_label = row["label"] or "Board Pack"
+    narrative_json = row["narrative_json"]
+    if narrative_json and isinstance(narrative_json, str):
+        narrative_json = json.loads(narrative_json)
 
-        # Send emails via SendGrid (or log in dev mode)
-        try:
-            email_result = await send_board_pack_email(emails, pack_label, narrative_json)
-        except EmailError as e:
-            raise HTTPException(502, f"Email delivery failed: {e}") from e
+    # Send emails via SendGrid (or log in dev mode)
+    try:
+        email_result = await send_board_pack_email(emails, pack_label, narrative_json)
+    except EmailError as e:
+        raise HTTPException(502, f"Email delivery failed: {e}") from e
 
-        await conn.execute(
-            """UPDATE pack_generation_history SET distributed_at = now(), status = 'distributed' WHERE tenant_id = $1 AND history_id = $2""",
-            x_tenant_id,
-            history_id,
-        )
+    # Only mark as distributed if emails were actually sent
+    distributed = email_result.get("sent", False)
+    if distributed:
+        async with tenant_conn(x_tenant_id) as conn:
+            await conn.execute(
+                """UPDATE pack_generation_history SET distributed_at = now(), status = 'distributed' WHERE tenant_id = $1 AND history_id = $2""",
+                x_tenant_id,
+                history_id,
+            )
+
     return {
         "history_id": history_id,
-        "distributed": True,
+        "distributed": distributed,
         "emails_sent_to": emails,
         "email_result": email_result,
     }

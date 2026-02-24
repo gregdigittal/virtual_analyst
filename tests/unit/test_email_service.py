@@ -88,6 +88,18 @@ async def test_send_skips_when_no_recipients() -> None:
 
 
 @pytest.mark.asyncio
+async def test_send_no_recipients_takes_precedence_over_no_api_key() -> None:
+    """Empty recipients should return no_recipients even without an API key."""
+    mock_settings = MagicMock()
+    mock_settings.sendgrid_api_key = None
+
+    with patch("apps.api.app.services.email.get_settings", return_value=mock_settings):
+        result = await send_board_pack_email([], "Q1 Pack", None)
+    assert result["sent"] is False
+    assert result["reason"] == "no_recipients"
+
+
+@pytest.mark.asyncio
 async def test_send_success_via_sendgrid() -> None:
     mock_settings = MagicMock()
     mock_settings.sendgrid_api_key = "SG.test_key"

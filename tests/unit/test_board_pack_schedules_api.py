@@ -113,13 +113,47 @@ def test_distribute_success() -> None:
             headers=HEADERS,
         )
     assert r.status_code == 200
-    assert r.json()["distributed"] is True
+    # In dev mode (sent=False), distributed should be False
+    assert r.json()["distributed"] is False
     assert r.json()["emails_sent_to"] == ["cfo@example.com"]
     mock_send.assert_called_once_with(
         ["cfo@example.com"],
         "Q1 Pack",
         {"executive_summary": "Good quarter."},
     )
+
+
+def test_distribute_emails_sent_marks_distributed() -> None:
+    """When SendGrid succeeds, the endpoint marks distributed=True and updates DB."""
+    def _conn_with_history(_tid: str):
+        conn = MagicMock()
+        conn.fetchrow = AsyncMock(return_value={
+            "history_id": "hist-1",
+            "pack_id": "pk-1",
+            "label": "Q1 Pack",
+            "narrative_json": '{"executive_summary": "Good quarter."}',
+        })
+        conn.execute = AsyncMock()
+        cm = MagicMock()
+        cm.__aenter__ = AsyncMock(return_value=conn)
+        cm.__aexit__ = AsyncMock(return_value=None)
+        return cm
+
+    with (
+        patch("apps.api.app.routers.board_pack_schedules.tenant_conn", side_effect=_conn_with_history),
+        patch(
+            "apps.api.app.routers.board_pack_schedules.send_board_pack_email",
+            new_callable=AsyncMock,
+            return_value={"sent": True, "recipients": ["cfo@example.com"]},
+        ),
+    ):
+        r = client.post(
+            "/api/v1/board-packs/schedules/history/hist-1/distribute",
+            json={"emails": ["cfo@example.com"]},
+            headers=HEADERS,
+        )
+    assert r.status_code == 200
+    assert r.json()["distributed"] is True
 
 
 def test_distribute_email_failure_returns_502() -> None:

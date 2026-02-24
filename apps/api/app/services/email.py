@@ -6,6 +6,7 @@ Falls back to logging when SENDGRID_API_KEY is not configured (development mode)
 
 from __future__ import annotations
 
+import html as html_mod
 import json
 import logging
 from typing import Any
@@ -33,6 +34,9 @@ async def send_board_pack_email(
     """
     settings = get_settings()
 
+    if not to_emails:
+        return {"sent": False, "recipients": [], "reason": "no_recipients"}
+
     if not settings.sendgrid_api_key:
         logger.warning(
             "SENDGRID_API_KEY not configured — skipping email delivery (dev mode). "
@@ -41,9 +45,6 @@ async def send_board_pack_email(
             to_emails,
         )
         return {"sent": False, "recipients": to_emails, "reason": "sendgrid_not_configured"}
-
-    if not to_emails:
-        return {"sent": False, "recipients": [], "reason": "no_recipients"}
 
     # Build readable narrative from JSON
     narrative = _format_narrative(narrative_json)
@@ -141,5 +142,5 @@ def _build_plain(pack_label: str, sections: dict[str, str]) -> str:
 
 
 def _esc(text: str) -> str:
-    """Minimal HTML escaping for email content."""
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    """HTML-escape text for safe inclusion in email markup."""
+    return html_mod.escape(text, quote=True)
