@@ -83,7 +83,7 @@ async def test_reforecast_budget_fallback_when_agent_disabled() -> None:
     conn = MagicMock()
     conn.fetch = AsyncMock(side_effect=[
         [{"period_ordinal": 1}],
-        [{"line_item_id": "li1", "account_ref": "acct1", "notes": ""}],
+        [{"line_item_id": "li1", "account_ref": "acct1", "notes": "", "is_revenue": False}],
         [{"line_item_id": "li1", "account_ref": "acct1", "period_ordinal": 1, "amount": 1000.0}, {"line_item_id": "li1", "account_ref": "acct1", "period_ordinal": 2, "amount": 2000.0}],
         [{"period_ordinal": 1, "account_ref": "acct1", "total": 1000.0}],
         [{"line_item_id": "li1", "account_ref": "acct1", "period_ordinal": 2, "amount": 2000.0}],

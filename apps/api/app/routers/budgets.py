@@ -73,11 +73,13 @@ class AddLineItemBody(BaseModel):
     account_ref: str = Field(..., min_length=1, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
     amounts: list[LineItemAmount] = Field(default_factory=list)
+    is_revenue: bool = Field(default=False, description="True if this line item is a revenue/income account")
 
 
 class UpdateLineItemBody(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
     amounts: list[LineItemAmount] | None = Field(default=None)
+    is_revenue: bool | None = Field(default=None, description="True if this line item is a revenue/income account")
 
 
 class DepartmentAllocationItem(BaseModel):
@@ -306,8 +308,8 @@ async def create_budget_from_template_impl(
                 if confidence is not None:
                     confidence = max(0.0, min(1.0, float(confidence)))
                 await conn.execute(
-                    """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, confidence_score)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                    """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, confidence_score, is_revenue)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                     tenant_id,
                     line_item_id,
                     budget_id,
@@ -315,6 +317,7 @@ async def create_budget_from_template_impl(
                     li.get("account_ref", ""),
                     li.get("notes"),
                     confidence,
+                    bool(li.get("is_revenue", False)),
                 )
                 for amt in li.get("amounts") or []:
                     await conn.execute(
@@ -331,6 +334,7 @@ async def create_budget_from_template_impl(
                     "account_ref": li.get("account_ref", ""),
                     "notes": li.get("notes"),
                     "confidence_score": confidence,
+                    "is_revenue": bool(li.get("is_revenue", False)),
                     "amounts": li.get("amounts", []),
                 })
     return {
@@ -973,14 +977,15 @@ async def add_line_item(
         async with conn.transaction():
             _, version_id = await _resolve_current_version(conn, x_tenant_id, budget_id)
             await conn.execute(
-                """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes)
-                   VALUES ($1, $2, $3, $4, $5, $6)""",
+                """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, is_revenue)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
                 x_tenant_id,
                 line_item_id,
                 budget_id,
                 version_id,
                 body.account_ref,
                 body.notes,
+                body.is_revenue,
             )
             for a in body.amounts:
                 await conn.execute(
@@ -996,6 +1001,7 @@ async def add_line_item(
         "line_item_id": line_item_id,
         "account_ref": body.account_ref,
         "notes": body.notes,
+        "is_revenue": body.is_revenue,
         "amounts": [{"period_ordinal": a.period_ordinal, "amount": a.amount} for a in body.amounts],
     }
 
@@ -1013,7 +1019,7 @@ async def update_line_item(
     async with tenant_conn(x_tenant_id) as conn:
         _, version_id = await _resolve_current_version(conn, x_tenant_id, budget_id)
         row = await conn.fetchrow(
-            """SELECT line_item_id, account_ref, notes FROM budget_line_items
+            """SELECT line_item_id, account_ref, notes, is_revenue FROM budget_line_items
                WHERE tenant_id = $1 AND budget_id = $2 AND version_id = $3 AND line_item_id = $4""",
             x_tenant_id,
             budget_id,
@@ -1029,6 +1035,13 @@ async def update_line_item(
                 x_tenant_id,
                 line_item_id,
             )
+        if body.is_revenue is not None:
+            await conn.execute(
+                "UPDATE budget_line_items SET is_revenue = $1 WHERE tenant_id = $2 AND line_item_id = $3",
+                body.is_revenue,
+                x_tenant_id,
+                line_item_id,
+            )
         if body.amounts is not None:
             for a in body.amounts:
                 await conn.execute(
@@ -1041,7 +1054,7 @@ async def update_line_item(
                     a.amount,
                 )
         row = await conn.fetchrow(
-            "SELECT account_ref, notes FROM budget_line_items WHERE tenant_id = $1 AND line_item_id = $2",
+            "SELECT account_ref, notes, is_revenue FROM budget_line_items WHERE tenant_id = $1 AND line_item_id = $2",
             x_tenant_id,
             line_item_id,
         )
@@ -1054,6 +1067,7 @@ async def update_line_item(
         "line_item_id": line_item_id,
         "account_ref": row["account_ref"],
         "notes": row["notes"],
+        "is_revenue": row["is_revenue"],
         "amounts": [{"period_ordinal": r["period_ordinal"], "amount": float(r["amount"])} for r in amounts_rows],
     }
 
@@ -1208,7 +1222,7 @@ async def clone_budget(
                     pr["label"],
                 )
             rows = await conn.fetch(
-                """SELECT line_item_id, account_ref, notes FROM budget_line_items
+                """SELECT line_item_id, account_ref, notes, is_revenue FROM budget_line_items
                    WHERE tenant_id = $1 AND budget_id = $2 AND version_id = $3""",
                 x_tenant_id,
                 budget_id,
@@ -1231,14 +1245,15 @@ async def clone_budget(
             for r in rows:
                 new_li_id = _line_item_id()
                 await conn.execute(
-                    """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes)
-                       VALUES ($1, $2, $3, $4, $5, $6)""",
+                    """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, is_revenue)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
                     x_tenant_id,
                     new_li_id,
                     new_budget_id,
                     new_version_id,
                     r["account_ref"],
                     r["notes"],
+                    r["is_revenue"],
                 )
                 for period_ordinal, amount in amounts_by_item.get(r["line_item_id"], []):
                     await conn.execute(
@@ -1340,7 +1355,7 @@ async def get_budget_variance(
             raise HTTPException(409, "Budget has no current version")
         # Fetch budget amounts per (line_item, period)
         budget_rows = await conn.fetch(
-            """SELECT bli.account_ref, blia.period_ordinal, blia.amount AS budget_amount
+            """SELECT bli.account_ref, bli.is_revenue, blia.period_ordinal, blia.amount AS budget_amount
                FROM budget_line_items bli
                JOIN budget_line_item_amounts blia ON blia.tenant_id = bli.tenant_id AND blia.line_item_id = bli.line_item_id
                WHERE bli.tenant_id = $1 AND bli.budget_id = $2 AND bli.version_id = $3""",
@@ -1366,9 +1381,11 @@ async def get_budget_variance(
                 budget_id,
             )
         budget_by_key: dict[tuple[str, int], float] = {}
+        revenue_flags: dict[str, bool] = {}
         for r in budget_rows:
             key = (r["account_ref"], r["period_ordinal"])
             budget_by_key[key] = float(r["budget_amount"])
+            revenue_flags[r["account_ref"]] = r["is_revenue"]
         actual_by_key: dict[tuple[str, int], float] = {}
         for r in actual_rows:
             key = (r["account_ref"], r["period_ordinal"])
@@ -1383,10 +1400,10 @@ async def get_budget_variance(
             var_abs = act - bud
             var_pct = (var_abs / bud * 100.0) if bud != 0 else (100.0 if var_abs != 0 else 0.0)
             is_material = abs(var_pct) >= materiality_pct
-            # Heuristic: accounts starting with revenue/income/subscription treat positive variance as favourable.
-            # All other accounts treat negative variance (under budget) as favourable.
-            # TODO(VA-P7): add explicit is_revenue flag to budget_line_items for accuracy.
-            is_revenue_line = acc.lower().startswith(("revenue", "income", "subscription", "fee", "gain"))
+            # Use explicit is_revenue flag; fall back to name heuristic for legacy line items.
+            is_revenue_line = revenue_flags.get(acc, False) or acc.lower().startswith(
+                ("revenue", "income", "subscription", "fee", "gain")
+            )
             favourable = (var_abs > 0 and is_revenue_line) or (var_abs < 0 and not is_revenue_line)
             variances.append({
                 "account_ref": acc,
@@ -1431,7 +1448,7 @@ async def reforecast_budget(
             periods_with_actuals = {r["period_ordinal"] for r in actual_periods}
             # Current line items and amounts
             line_rows = await conn.fetch(
-                """SELECT line_item_id, account_ref, notes FROM budget_line_items
+                """SELECT line_item_id, account_ref, notes, is_revenue FROM budget_line_items
                    WHERE tenant_id = $1 AND budget_id = $2 AND version_id = $3""",
                 x_tenant_id,
                 budget_id,
@@ -1526,8 +1543,8 @@ async def reforecast_budget(
                 account_ref = li["account_ref"]
                 rev = next((r for r in revisions if r.get("account_ref") == account_ref), None)
                 await conn.execute(
-                    """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, confidence_score)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                    """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, confidence_score, is_revenue)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                     x_tenant_id,
                     new_li_id,
                     budget_id,
@@ -1535,6 +1552,7 @@ async def reforecast_budget(
                     account_ref,
                     li["notes"],
                     (rev.get("confidence") if rev else None),
+                    li["is_revenue"],
                 )
                 # Periods with actuals: use summed actual from pre-fetched actuals_map
                 for ap in actual_periods:
