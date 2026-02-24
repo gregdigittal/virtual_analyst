@@ -82,6 +82,9 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 addopts = "-v --cov=apps --cov=shared --cov-report=html --cov-report=term"
+markers = [
+    "performance: marks tests as performance benchmarks (deselect with '-m \"not performance\"')",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
