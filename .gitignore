@@ -43,6 +43,9 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .tox/
+playwright-report/
+test-results/
+blob-report/
 
 # Secrets
 *.pem
