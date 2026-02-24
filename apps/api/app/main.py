@@ -50,6 +50,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+if settings.sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        integrations=[FastApiIntegration()],
+        traces_sample_rate=0.1,
+        environment=settings.environment,
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allowed_origins_list(),

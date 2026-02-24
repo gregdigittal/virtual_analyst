@@ -94,6 +94,8 @@ class Settings(BaseSettings):
         alias="EMAIL_FROM_NAME",
     )
 
+    sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")
+
     stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
     stripe_price_id_professional: str | None = Field(default=None, alias="STRIPE_PRICE_ID_PROFESSIONAL")
