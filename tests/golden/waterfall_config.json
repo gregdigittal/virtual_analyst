@@ -1,0 +1,100 @@
+{
+  "artifact_type": "model_config_v1",
+  "artifact_version": "1.0.0",
+  "tenant_id": "t_golden",
+  "baseline_id": "bl_waterfall",
+  "baseline_version": "v1",
+  "created_at": "2026-01-01T00:00:00Z",
+  "metadata": {
+    "entity_name": "Waterfall Golden",
+    "currency": "USD",
+    "start_date": "2026-01-01",
+    "horizon_months": 12,
+    "tax_rate": 0.0,
+    "initial_cash": 10000,
+    "initial_equity": 50000
+  },
+  "assumptions": {
+    "revenue_streams": [
+      {
+        "stream_id": "rs1",
+        "label": "Revenue",
+        "stream_type": "unit_sale",
+        "drivers": {
+          "volume": [
+            {"ref": "drv:units", "value_type": "constant", "value": 5000},
+            {"ref": "drv:price", "value_type": "constant", "value": 10}
+          ],
+          "pricing": [],
+          "direct_costs": []
+        }
+      }
+    ],
+    "cost_structure": {"variable_costs": [], "fixed_costs": []},
+    "working_capital": {
+      "ar_days": {"ref": "drv:ar_days", "value_type": "constant", "value": 30},
+      "ap_days": {"ref": "drv:ap_days", "value_type": "constant", "value": 30},
+      "inv_days": {"ref": "drv:inv_days", "value_type": "constant", "value": 30},
+      "minimum_cash": 5000
+    },
+    "capex": {
+      "items": [
+        {
+          "capex_id": "capex_1",
+          "label": "Large Capex",
+          "amount": 500000,
+          "month": 0,
+          "useful_life_months": 60,
+          "residual_value": 0
+        }
+      ]
+    },
+    "funding": {
+      "equity_raises": [],
+      "debt_facilities": [
+        {
+          "facility_id": "rev_plug",
+          "label": "Revolver",
+          "type": "revolver",
+          "limit": 300000,
+          "interest_rate": 0.06,
+          "draw_schedule": null,
+          "repayment_schedule": null,
+          "is_cash_plug": true
+        },
+        {
+          "facility_id": "od_plug",
+          "label": "Overdraft",
+          "type": "overdraft",
+          "limit": 200000,
+          "interest_rate": 0.12,
+          "draw_schedule": null,
+          "repayment_schedule": null,
+          "is_cash_plug": true
+        }
+      ],
+      "dividends": {"policy": "fixed_amount", "value": 2000}
+    }
+  },
+  "driver_blueprint": {
+    "nodes": [
+      {"node_id": "n_units", "type": "driver", "label": "Units", "ref": "drv:units"},
+      {"node_id": "n_price", "type": "driver", "label": "Price", "ref": "drv:price"},
+      {"node_id": "n_revenue", "type": "output", "label": "Revenue"}
+    ],
+    "edges": [
+      {"from": "n_units", "to": "n_revenue"},
+      {"from": "n_price", "to": "n_revenue"}
+    ],
+    "formulas": [
+      {
+        "formula_id": "f_rev",
+        "output_node_id": "n_revenue",
+        "expression": "units * price",
+        "inputs": ["drv:units", "drv:price"]
+      }
+    ]
+  },
+  "scenarios": [],
+  "integrity": {"status": "passed", "checks": []}
+}

@@ -11,6 +11,7 @@ from typing import Any
 from shared.fm_shared.errors import EngineError
 from shared.fm_shared.model.debt import calculate_debt_schedule, empty_debt_result
 from shared.fm_shared.model.engine import _resolve_driver
+from shared.fm_shared.model.funding_waterfall import apply_funding_waterfall
 from shared.fm_shared.model.schemas import ModelConfig
 
 
@@ -120,6 +121,13 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
             debt_result = calculate_debt_schedule(non_plug, horizon)
     interest = debt_result.interest_per_period
 
+    # Equity raises per period
+    equity_raises_per_period = [0.0] * horizon
+    if config.assumptions.funding and config.assumptions.funding.equity_raises:
+        for er in config.assumptions.funding.equity_raises:
+            if 0 <= er.month < horizon:
+                equity_raises_per_period[er.month] += er.amount
+
     # Income statement per period
     is_list: list[dict[str, Any]] = []
     for t in range(horizon):
@@ -131,6 +139,13 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
         ebt = ebit - interest[t]
         tax = max(0.0, ebt * tax_rate)
         ni = ebt - tax
+        dividend = 0.0
+        if config.assumptions.funding and config.assumptions.funding.dividends:
+            policy = config.assumptions.funding.dividends
+            if policy.policy == "fixed_amount":
+                dividend = policy.value or 0.0
+            elif policy.policy == "payout_ratio":
+                dividend = max(0.0, ni * (policy.value or 0.0))
         is_list.append(
             {
                 "period_index": t,
@@ -145,8 +160,12 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 "ebt": ebt,
                 "tax": tax,
                 "net_income": ni,
+                "dividends": dividend,
             }
         )
+
+    def _get_dividends(t: int) -> float:
+        return is_list[t].get("dividends", 0.0)
 
     # Balance sheet: AR, Inv, AP from working capital; cash plug
     ar_days, ap_days, inv_days = (
@@ -173,10 +192,15 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
     for t in range(horizon):
         acc_depr[t] = acc_depr[t - 1] + da_per_month[t] if t > 0 else da_per_month[0]
 
-    # Equity: initial + retained earnings (no dividends for now)
+    # Equity: initial + retained earnings - dividends + equity raises
     re = [initial_equity]
     for t in range(horizon):
-        re.append(re[-1] + is_list[t]["net_income"])
+        re.append(
+            re[-1]
+            + is_list[t]["net_income"]
+            - _get_dividends(t)
+            + equity_raises_per_period[t]
+        )
 
     # Total assets (ex cash) and total L&E (ex cash) to compute cash plug
     bs_list: list[dict[str, Any]] = []
@@ -236,6 +260,8 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 "investing": investing,
                 "debt_draws": debt_draws,
                 "debt_repayments": debt_repayments,
+                "dividends_paid": _get_dividends(t),
+                "equity_raised": equity_raises_per_period[t],
                 "financing": financing,
                 "net_cf": net_cf,
                 "opening_cash": opening_cash[t],
@@ -247,6 +273,122 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 f"CF closing cash {closing} != BS cash {bs_list[t]['cash']} at period {t}",
                 details={"period": t, "cf_closing": closing, "bs_cash": bs_list[t]["cash"]},
             )
+
+    # Funding waterfall: cover shortfalls with cash-plug facilities, then recalc
+    plug_facilities: list = []
+    minimum_cash = getattr(
+        config.assumptions.working_capital, "minimum_cash", 0.0
+    ) or 0.0
+    if config.assumptions.funding and config.assumptions.funding.debt_facilities:
+        plug_facilities = [
+            f for f in config.assumptions.funding.debt_facilities if f.is_cash_plug
+        ]
+
+    if plug_facilities and minimum_cash > 0:
+        original_interest = [is_list[t]["interest_expense"] for t in range(horizon)]
+        cumul_waterfall_debt = [0.0] * horizon
+        cumul_waterfall_interest = [0.0] * horizon
+        dividend_policy = (
+            config.assumptions.funding.dividends
+            if config.assumptions.funding and config.assumptions.funding.dividends
+            else None
+        )
+
+        for _ in range(5):
+            closing_cash = [bs_list[t]["cash"] for t in range(horizon)]
+            waterfall = apply_funding_waterfall(
+                closing_cash, plug_facilities, minimum_cash, horizon
+            )
+            any_injection = any(
+                waterfall.additional_draws.get(f.facility_id, [0.0] * horizon)[t] > 0
+                for f in plug_facilities
+                for t in range(horizon)
+            )
+            any_waterfall_interest = any(v > 0 for v in waterfall.waterfall_interest)
+            if not any_injection and not any_waterfall_interest:
+                break
+
+            for t in range(horizon):
+                cumul_waterfall_debt[t] += waterfall.waterfall_debt_per_period[t]
+                cumul_waterfall_interest[t] += waterfall.waterfall_interest[t]
+
+            for t in range(horizon):
+                is_list[t]["interest_expense"] = (
+                    original_interest[t] + cumul_waterfall_interest[t]
+                )
+                is_list[t]["ebt"] = (
+                    is_list[t]["ebit"] - is_list[t]["interest_expense"]
+                )
+                is_list[t]["tax"] = max(
+                    0.0, is_list[t]["ebt"] * tax_rate
+                )
+                is_list[t]["net_income"] = (
+                    is_list[t]["ebt"] - is_list[t]["tax"]
+                )
+                if (
+                    dividend_policy
+                    and dividend_policy.policy == "payout_ratio"
+                ):
+                    is_list[t]["dividends"] = max(
+                        0.0,
+                        is_list[t]["net_income"]
+                        * (dividend_policy.value or 0.0),
+                    )
+
+            re = [initial_equity]
+            for t in range(horizon):
+                re.append(
+                    re[-1]
+                    + is_list[t]["net_income"]
+                    - _get_dividends(t)
+                    + equity_raises_per_period[t]
+                )
+
+            total_assets_ex_cash_per_t = [
+                ar[t] + inv[t] + (ppe_gross[t] - acc_depr[t]) for t in range(horizon)
+            ]
+            for t in range(horizon):
+                total_liab = (
+                    ap[t]
+                    + debt_result.current_debt_per_period[t]
+                    + debt_result.non_current_debt_per_period[t]
+                    + cumul_waterfall_debt[t]
+                )
+                total_equity = re[t + 1]
+                cash_plug = (
+                    total_liab + total_equity - total_assets_ex_cash_per_t[t]
+                )
+                bs_list[t]["cash"] = cash_plug
+                bs_list[t]["total_liabilities"] = total_liab
+                bs_list[t]["total_equity"] = total_equity
+                bs_list[t]["total_assets"] = (
+                    total_assets_ex_cash_per_t[t] + cash_plug
+                )
+                bs_list[t]["total_current_assets"] = cash_plug + ar[t] + inv[t]
+                bs_list[t]["total_liabilities_equity"] = total_liab + total_equity
+
+            opening_cash = [initial_cash] + [
+                bs_list[t]["cash"] for t in range(horizon - 1)
+            ]
+            for t in range(horizon):
+                ni_t = is_list[t]["net_income"]
+                da_t = da_per_month[t]
+                delta_ar = ar[t] - (ar[t - 1] if t > 0 else 0)
+                delta_inv = inv[t] - (inv[t - 1] if t > 0 else 0)
+                delta_ap = ap[t] - (ap[t - 1] if t > 0 else 0)
+                operating = ni_t + da_t - delta_ar - delta_inv + delta_ap
+                investing = -(
+                    ppe_gross[t] - (ppe_gross[t - 1] if t > 0 else 0)
+                )
+                closing = bs_list[t]["cash"]
+                financing = (
+                    closing - opening_cash[t] - operating - investing
+                )
+                cf_list[t]["operating"] = operating
+                cf_list[t]["financing"] = financing
+                cf_list[t]["closing_cash"] = closing
+                cf_list[t]["opening_cash"] = opening_cash[t]
+                cf_list[t]["net_cf"] = operating + investing + financing
 
     periods = [f"P{t}" for t in range(horizon)]
     return Statements(
