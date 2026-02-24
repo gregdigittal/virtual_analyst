@@ -1,8 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { getAuthContext } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/client";
+import { getAuthContext, signOut } from "@/lib/auth";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -75,8 +74,7 @@ export function Nav() {
   async function handleSignOut() {
     setMenuOpen(false);
     api.setAccessToken(null);
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut();
     router.push("/");
     router.refresh();
   }

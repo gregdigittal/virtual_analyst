@@ -83,12 +83,12 @@ async def query_budget_line_items(
             return {"error": f"Budget {budget_id} not found"}
         if account_ref:
             rows = await conn.fetch(
-                """SELECT li.line_item_id, li.account_ref, li.notes,
+                """SELECT li.line_item_id, li.account_ref, li.notes, li.is_revenue,
                           json_agg(json_build_object('period', a.period_ordinal, 'amount', a.amount) ORDER BY a.period_ordinal) AS amounts
                    FROM budget_line_items li
                    LEFT JOIN budget_line_item_amounts a ON a.tenant_id = li.tenant_id AND a.line_item_id = li.line_item_id
                    WHERE li.tenant_id = $1 AND li.budget_id = $2 AND li.version_id = $3 AND li.account_ref = $4
-                   GROUP BY li.line_item_id, li.account_ref, li.notes LIMIT $5""",
+                   GROUP BY li.line_item_id, li.account_ref, li.notes, li.is_revenue LIMIT $5""",
                 tenant_id,
                 budget_id,
                 version_id,
@@ -97,12 +97,12 @@ async def query_budget_line_items(
             )
         else:
             rows = await conn.fetch(
-                """SELECT li.line_item_id, li.account_ref, li.notes,
+                """SELECT li.line_item_id, li.account_ref, li.notes, li.is_revenue,
                           json_agg(json_build_object('period', a.period_ordinal, 'amount', a.amount) ORDER BY a.period_ordinal) AS amounts
                    FROM budget_line_items li
                    LEFT JOIN budget_line_item_amounts a ON a.tenant_id = li.tenant_id AND a.line_item_id = li.line_item_id
                    WHERE li.tenant_id = $1 AND li.budget_id = $2 AND li.version_id = $3
-                   GROUP BY li.line_item_id, li.account_ref, li.notes LIMIT $4""",
+                   GROUP BY li.line_item_id, li.account_ref, li.notes, li.is_revenue LIMIT $4""",
                 tenant_id,
                 budget_id,
                 version_id,
@@ -114,6 +114,7 @@ async def query_budget_line_items(
                 "line_item_id": r["line_item_id"],
                 "account_ref": r["account_ref"],
                 "notes": r["notes"],
+                "is_revenue": r["is_revenue"],
                 "amounts": json.loads(r["amounts"]) if isinstance(r["amounts"], str) else (r["amounts"] or []),
             }
             for r in rows

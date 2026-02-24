@@ -89,3 +89,9 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     tenantIdIsFallback: false,
   };
 }
+
+/** Sign out the current user via the shared Supabase client. */
+export async function signOut(): Promise<void> {
+  const supabase = createClient();
+  await supabase.auth.signOut();
+}

@@ -920,7 +920,7 @@ async def list_line_items(
     async with tenant_conn(x_tenant_id) as conn:
         _, version_id = await _resolve_current_version(conn, x_tenant_id, budget_id)
         rows = await conn.fetch(
-            """SELECT bli.line_item_id, bli.account_ref, bli.notes, bli.confidence_score,
+            """SELECT bli.line_item_id, bli.account_ref, bli.notes, bli.confidence_score, bli.is_revenue,
                       blia.period_ordinal, blia.amount
                FROM budget_line_items bli
                LEFT JOIN budget_line_item_amounts blia
@@ -940,6 +940,7 @@ async def list_line_items(
                     "account_ref": r["account_ref"],
                     "notes": r["notes"],
                     "confidence_score": float(r["confidence_score"]) if r.get("confidence_score") is not None else None,
+                    "is_revenue": r["is_revenue"],
                     "amounts": [],
                 }
             if r["period_ordinal"] is not None:
@@ -1400,10 +1401,8 @@ async def get_budget_variance(
             var_abs = act - bud
             var_pct = (var_abs / bud * 100.0) if bud != 0 else (100.0 if var_abs != 0 else 0.0)
             is_material = abs(var_pct) >= materiality_pct
-            # Use explicit is_revenue flag; fall back to name heuristic for legacy line items.
-            is_revenue_line = revenue_flags.get(acc, False) or acc.lower().startswith(
-                ("revenue", "income", "subscription", "fee", "gain")
-            )
+            # Use explicit is_revenue flag (legacy items backfilled by migration 0049).
+            is_revenue_line = revenue_flags.get(acc, False)
             favourable = (var_abs > 0 and is_revenue_line) or (var_abs < 0 and not is_revenue_line)
             variances.append({
                 "account_ref": acc,
