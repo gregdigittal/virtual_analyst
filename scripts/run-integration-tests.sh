@@ -38,21 +38,8 @@ if $MANAGE_DB; then
     docker compose -f "$COMPOSE_FILE" up -d --wait
 fi
 
-# Run migrations in order: 0001, 0002, then all numbered files 0008+
-echo "--- Applying migrations ---"
-psql "$DATABASE_URL" -f "$MIGRATIONS_DIR/0001_init.sql" -q
-psql "$DATABASE_URL" -f "$MIGRATIONS_DIR/0002_functions_and_rls.sql" -q
-
-# Apply remaining numbered migrations (0008+) in sorted order, skip non-numbered files
-for f in "$MIGRATIONS_DIR"/00[0-9][0-9]_*.sql; do
-    basename_f="$(basename "$f")"
-    num="${basename_f%%_*}"
-    # Skip 0001 and 0002 (already applied)
-    if [[ "$num" -le 2 ]]; then
-        continue
-    fi
-    psql "$DATABASE_URL" -f "$f" -q
-done
+# Apply migrations via shared script
+"$SCRIPT_DIR/apply-migrations.sh" "$MIGRATIONS_DIR"
 
 echo "--- Running integration tests ---"
 cd "$PROJECT_DIR"

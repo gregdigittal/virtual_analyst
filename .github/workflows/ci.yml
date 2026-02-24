@@ -97,20 +97,19 @@ jobs:
           python-version: '3.12'
       - run: pip install -e ".[dev]"
 
-      - name: Apply migrations
+      - name: Install psql
         run: |
-          psql "$DATABASE_URL" -f apps/api/app/db/migrations/0001_init.sql -q
-          psql "$DATABASE_URL" -f apps/api/app/db/migrations/0002_functions_and_rls.sql -q
-          for f in apps/api/app/db/migrations/00[0-9][0-9]_*.sql; do
-            num="$(basename "$f" | cut -d_ -f1)"
-            if [ "$num" -le 2 ]; then continue; fi
-            psql "$DATABASE_URL" -f "$f" -q
-          done
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Apply migrations
+        run: ./scripts/apply-migrations.sh apps/api/app/db/migrations
 
       - name: Run integration tests
         run: pytest tests/integration/ -v --tb=short
         env:
           INTEGRATION_TESTS: '1'
+          ENVIRONMENT: test
 
   build:
     needs: [test, frontend-tests]
