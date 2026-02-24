@@ -14,6 +14,9 @@ Phase 2 is complete. The three-statement model now supports:
 distribution independently. Digital Genius uses Cholesky decomposition for
 correlated sampling (e.g., volume and price move together).
 
+**Dependency note:** `scipy>=1.12.0` has already been added to `pyproject.toml`
+and is installed. You can `from scipy.stats import norm` directly.
+
 ## In-Scope Files (ONLY modify these)
 
 | # | File | Action |
@@ -224,7 +227,7 @@ def test_run_monte_carlo_with_correlation() -> None:
 1. **Do NOT modify any file not listed in the scope table.**
 2. **Do NOT create a git worktree.**
 3. **Do NOT refactor existing tests** — only add new test functions.
-4. **Use `scipy.stats.norm` for CDF/PPF** — scipy is already a project dependency.
+4. **Use `scipy.stats.norm` for CDF/PPF** — scipy is installed (`pyproject.toml`).
 5. **Backward compatibility**: when `correlation_matrix` is empty (default),
    the MC runner must behave identically to the current implementation.
 6. **All existing tests must still pass** (`python -m pytest tests/ -x`).
