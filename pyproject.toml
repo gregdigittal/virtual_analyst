@@ -41,6 +41,7 @@ dependencies = [
     "signxml>=4.0.0",
     "lxml>=5.0.0",
     "defusedxml>=0.7.1",
+    "sendgrid>=6.11.0",
 ]
 
 [project.optional-dependencies]

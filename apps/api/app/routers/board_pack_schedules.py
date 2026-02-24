@@ -11,13 +11,13 @@ from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
 from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.services.email import EmailError, send_board_pack_email
 from apps.api.app.routers.board_packs import (
     DEFAULT_SECTION_ORDER,
     create_board_pack_impl,
     generate_board_pack_impl,
 )
 from apps.api.app.services.llm.router import LLMRouter
-from shared.fm_shared.errors import LLMError, StorageError
 from shared.fm_shared.storage import ArtifactStore
 
 router = APIRouter(prefix="/board-packs/schedules", tags=["board-packs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
@@ -244,24 +244,45 @@ async def distribute_pack(
     body: DistributeBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
 ) -> dict[str, Any]:
-    """Mark pack as distributed and stub email (VA-P7-09). In production wire to SendGrid/SES."""
+    """Distribute a board pack via email (VA-P7-09). Sends narrative to recipients via SendGrid."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     emails = body.emails
     async with tenant_conn(x_tenant_id) as conn:
         row = await conn.fetchrow(
-            """SELECT history_id, pack_id FROM pack_generation_history WHERE tenant_id = $1 AND history_id = $2""",
+            """SELECT h.history_id, h.pack_id, h.label,
+                      bp.narrative_json
+               FROM pack_generation_history h
+               LEFT JOIN board_packs bp ON bp.tenant_id = $1 AND bp.pack_id = h.pack_id
+               WHERE h.tenant_id = $1 AND h.history_id = $2""",
             x_tenant_id,
             history_id,
         )
         if not row:
             raise HTTPException(404, "History not found")
+
+        pack_label = row["label"] or "Board Pack"
+        narrative_json = row["narrative_json"]
+        if narrative_json and isinstance(narrative_json, str):
+            narrative_json = json.loads(narrative_json)
+
+        # Send emails via SendGrid (or log in dev mode)
+        try:
+            email_result = await send_board_pack_email(emails, pack_label, narrative_json)
+        except EmailError as e:
+            raise HTTPException(502, f"Email delivery failed: {e}") from e
+
         await conn.execute(
             """UPDATE pack_generation_history SET distributed_at = now(), status = 'distributed' WHERE tenant_id = $1 AND history_id = $2""",
             x_tenant_id,
             history_id,
         )
-    return {"history_id": history_id, "distributed": True, "emails_sent_to": emails}
+    return {
+        "history_id": history_id,
+        "distributed": True,
+        "emails_sent_to": emails,
+        "email_result": email_result,
+    }
 
 
 @router.patch("/{schedule_id}")
