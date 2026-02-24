@@ -1,8 +1,10 @@
 """Unit tests for three-statement generator."""
 
-from shared.fm_shared.model import generate_statements, run_engine
+from __future__ import annotations
+
+from shared.fm_shared.model import ModelConfig, generate_statements, run_engine
 from shared.fm_shared.model.statements import Statements
-from tests.conftest import minimal_model_config
+from tests.conftest import minimal_model_config, minimal_model_config_dict
 
 
 def test_generate_statements_returns_three_lists() -> None:
@@ -77,3 +79,52 @@ def test_generate_statements_periods() -> None:
     time_series = run_engine(config)
     st = generate_statements(config, time_series)
     assert len(st.periods) == 4
+
+
+def test_generate_statements_with_debt_facilities() -> None:
+    """With funding.debt_facilities: IS has interest_expense > 0, BS has debt lines, CF has debt_draws/repayments, BS balances."""
+    config_dict = minimal_model_config_dict(horizon_months=12, initial_equity=500_000.0)
+    config_dict["assumptions"]["funding"] = {
+        "equity_raises": [],
+        "debt_facilities": [
+            {
+                "facility_id": "term_1",
+                "label": "Term Loan",
+                "type": "term_loan",
+                "limit": 1_000_000.0,
+                "interest_rate": 0.08,
+                "draw_schedule": [{"month": 0, "amount": 400_000.0}],
+                "repayment_schedule": [{"month": m, "amount": 33_333.0} for m in range(1, 13)],
+                "is_cash_plug": False,
+            }
+        ],
+        "dividends": None,
+    }
+    config = ModelConfig.model_validate(config_dict)
+    time_series = run_engine(config)
+    st = generate_statements(config, time_series)
+    assert st.income_statement[0]["interest_expense"] > 0
+    row_bs = st.balance_sheet[0]
+    assert "debt_current" in row_bs
+    assert "debt_non_current" in row_bs
+    assert "total_current_liabilities" in row_bs
+    row_cf = st.cash_flow[0]
+    assert "debt_draws" in row_cf
+    assert "debt_repayments" in row_cf
+    for t in range(len(st.balance_sheet)):
+        tot_assets = st.balance_sheet[t]["total_assets"]
+        tot_liab_equity = st.balance_sheet[t]["total_liabilities_equity"]
+        assert abs(tot_assets - tot_liab_equity) < 0.02, f"BS balance at period {t}"
+
+
+def test_generate_statements_no_funding_backward_compat() -> None:
+    """No funding config: statements still generate; debt lines present and zero."""
+    config = minimal_model_config(horizon_months=3)
+    time_series = run_engine(config)
+    st = generate_statements(config, time_series)
+    for row in st.balance_sheet:
+        assert row.get("debt_current", 0.0) == 0.0
+        assert row.get("debt_non_current", 0.0) == 0.0
+    for row in st.cash_flow:
+        assert row.get("debt_draws", 0.0) == 0.0
+        assert row.get("debt_repayments", 0.0) == 0.0

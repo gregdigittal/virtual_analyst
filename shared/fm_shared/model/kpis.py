@@ -37,13 +37,14 @@ def calculate_kpis(statements: Statements) -> list[dict[str, Any]]:
         cl_current = bs_list[t].get("total_current_liabilities") or bs_list[t].get("accounts_payable") or 0.0
         current_ratio = (ca / cl_current) if cl_current else 0.0
 
-        # Debt not yet modeled; debt_equity and dscr are N/A (None) until total_debt/principal exist
-        total_debt = 0.0
+        debt_current = bs_list[t].get("debt_current", 0.0)
+        debt_non_current = bs_list[t].get("debt_non_current", 0.0)
+        total_debt = debt_current + debt_non_current
         total_equity = bs_list[t]["total_equity"]
         debt_equity = (total_debt / total_equity) if (total_equity and total_debt) else None
 
         interest = is_list[t]["interest_expense"]
-        principal = 0.0
+        principal = cf_list[t].get("debt_repayments", 0.0)
         debt_service = interest + principal
         dscr = (ebitda / debt_service) if debt_service else None
 

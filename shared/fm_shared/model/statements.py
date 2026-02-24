@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from shared.fm_shared.errors import EngineError
+from shared.fm_shared.model.debt import calculate_debt_schedule, empty_debt_result
 from shared.fm_shared.model.engine import _resolve_driver
 from shared.fm_shared.model.schemas import ModelConfig
 
@@ -109,8 +110,15 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
             for t in range(item.month, min(item.month + item.useful_life_months, horizon)):
                 da_per_month[t] += monthly_da
 
-    # Interest (simplified: no debt schedule yet)
-    interest = [0.0] * horizon
+    # Debt schedule (interest, draws, repayments, current/non-current)
+    debt_result = empty_debt_result(horizon)
+    if config.assumptions.funding and config.assumptions.funding.debt_facilities:
+        non_plug = [
+            f for f in config.assumptions.funding.debt_facilities if not f.is_cash_plug
+        ]
+        if non_plug:
+            debt_result = calculate_debt_schedule(non_plug, horizon)
+    interest = debt_result.interest_per_period
 
     # Income statement per period
     is_list: list[dict[str, Any]] = []
@@ -176,7 +184,11 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
         current_assets_ex_cash = ar[t] + inv[t]
         ppe_net = ppe_gross[t] - acc_depr[t]
         total_assets_ex_cash = current_assets_ex_cash + ppe_net
-        total_liab = ap[t]
+        total_liab = (
+            ap[t]
+            + debt_result.current_debt_per_period[t]
+            + debt_result.non_current_debt_per_period[t]
+        )
         total_equity = re[t + 1]
         cash_plug = total_liab + total_equity - total_assets_ex_cash
         bs_list.append(
@@ -191,6 +203,10 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 "ppe_net": ppe_net,
                 "total_assets": total_assets_ex_cash + cash_plug,
                 "accounts_payable": ap[t],
+                "debt_current": debt_result.current_debt_per_period[t],
+                "debt_non_current": debt_result.non_current_debt_per_period[t],
+                "total_current_liabilities": ap[t]
+                + debt_result.current_debt_per_period[t],
                 "total_liabilities": total_liab,
                 "total_equity": total_equity,
                 "total_liabilities_equity": total_liab + total_equity,
@@ -208,6 +224,8 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
         delta_ap = ap[t] - (ap[t - 1] if t > 0 else 0)
         operating = ni_t + da_t - delta_ar - delta_inv + delta_ap
         investing = -(ppe_gross[t] - (ppe_gross[t - 1] if t > 0 else 0))
+        debt_draws = debt_result.draws_per_period[t]
+        debt_repayments = debt_result.repayments_per_period[t]
         closing = bs_list[t]["cash"]
         financing = closing - opening_cash[t] - operating - investing
         net_cf = operating + investing + financing
@@ -216,6 +234,8 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 "period_index": t,
                 "operating": operating,
                 "investing": investing,
+                "debt_draws": debt_draws,
+                "debt_repayments": debt_repayments,
                 "financing": financing,
                 "net_cf": net_cf,
                 "opening_cash": opening_cash[t],
