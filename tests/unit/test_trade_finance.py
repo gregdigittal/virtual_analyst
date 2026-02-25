@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from shared.fm_shared.model import ModelConfig, generate_statements, run_engine
+from shared.fm_shared.model.funding_waterfall import apply_funding_waterfall
 from shared.fm_shared.model.schemas import DebtFacility, DrawRepayPoint
 
 GOLDEN_DIR = Path(__file__).resolve().parent.parent / "golden"
@@ -56,16 +57,42 @@ def test_debtor_finance_capped_at_ar_advance() -> None:
     ts = run_engine(config)
     stmts = generate_statements(config, ts)
 
-    # The waterfall should respect the AR cap.
-    # We can't easily isolate the trade finance draw from the BS directly,
-    # but we verify the model runs without error and produces valid statements.
-    assert len(stmts.income_statement) == config.metadata.horizon_months
-    assert len(stmts.balance_sheet) == config.metadata.horizon_months
-    assert len(stmts.cash_flow) == config.metadata.horizon_months
+    horizon = config.metadata.horizon_months
+
+    # Basic statement length checks
+    assert len(stmts.income_statement) == horizon
+    assert len(stmts.balance_sheet) == horizon
+    assert len(stmts.cash_flow) == horizon
 
     # BS should balance every period
-    for t in range(config.metadata.horizon_months):
+    for t in range(horizon):
         bs = stmts.balance_sheet[t]
         assert bs["total_assets"] == pytest.approx(
             bs["total_liabilities_equity"], abs=1.0
         ), f"BS imbalance at period {t}"
+
+    # Direct AR cap assertion: run waterfall on the final BS closing cash
+    # and verify the trade finance balance never exceeds advance_rate * AR.
+    closing_cash = [stmts.balance_sheet[t]["cash"] for t in range(horizon)]
+    asset_values = {
+        "ar": [stmts.balance_sheet[t]["accounts_receivable"] for t in range(horizon)],
+        "inventory": [stmts.balance_sheet[t]["inventory"] for t in range(horizon)],
+    }
+    plug_facilities = [
+        f for f in config.assumptions.funding.debt_facilities if f.is_cash_plug
+    ]
+    minimum_cash = config.assumptions.working_capital.minimum_cash or 0.0
+
+    waterfall = apply_funding_waterfall(
+        closing_cash, plug_facilities, minimum_cash, horizon, asset_values
+    )
+
+    advance_rate = tf.advance_rate
+    for t in range(horizon):
+        ar_balance = stmts.balance_sheet[t]["accounts_receivable"]
+        cap = advance_rate * ar_balance
+        wf_debt = waterfall.waterfall_debt_per_period[t]
+        assert wf_debt <= cap + 0.01, (
+            f"Period {t}: waterfall debt {wf_debt:.2f} exceeds "
+            f"AR cap ({advance_rate} * {ar_balance:.2f} = {cap:.2f})"
+        )
