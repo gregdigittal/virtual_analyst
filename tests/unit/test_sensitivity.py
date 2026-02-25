@@ -7,6 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from shared.fm_shared.analysis.sensitivity import (
+    HeatMapResult,
+    SensitivityResult,
+    run_heatmap,
+    run_sensitivity,
+)
 from shared.fm_shared.model import ModelConfig
 
 GOLDEN_DIR = Path(__file__).resolve().parent.parent / "golden"
@@ -20,11 +26,6 @@ def _load_config() -> ModelConfig:
 
 def test_sensitivity_tax_rate_sweep_monotonic() -> None:
     """Sweeping tax_rate 0.15->0.35 should monotonically decrease net_income."""
-    from shared.fm_shared.analysis.sensitivity import (
-        SensitivityResult,
-        run_sensitivity,
-    )
-
     config = _load_config()
     result = run_sensitivity(
         config=config,
@@ -48,8 +49,6 @@ def test_sensitivity_tax_rate_sweep_monotonic() -> None:
 
 def test_sensitivity_returns_base_value() -> None:
     """base_value should reflect the config's current value of the parameter."""
-    from shared.fm_shared.analysis.sensitivity import run_sensitivity
-
     config = _load_config()
     result = run_sensitivity(
         config=config,
@@ -64,8 +63,6 @@ def test_sensitivity_returns_base_value() -> None:
 
 def test_heatmap_tax_rate_vs_initial_cash() -> None:
     """2D sweep: tax_rate x initial_cash -> net_income matrix."""
-    from shared.fm_shared.analysis.sensitivity import HeatMapResult, run_heatmap
-
     config = _load_config()
     result = run_heatmap(
         config=config,
