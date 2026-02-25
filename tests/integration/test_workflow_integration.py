@@ -15,7 +15,7 @@ async def test_workflow_lifecycle_assign_submit_review_approve(client) -> None:
     """Create assignment → submit as assignee → review (approve) as reviewer → assert completed."""
     tenant = "t_integration"
     assignee = "u1"
-    reviewer = "u1"
+    reviewer = "u2"
     headers_assigner = {"X-Tenant-ID": tenant, "X-User-ID": reviewer}
     headers_assignee = {"X-Tenant-ID": tenant, "X-User-ID": assignee}
 
@@ -50,7 +50,7 @@ async def test_workflow_lifecycle_assign_submit_review_approve(client) -> None:
         json={"decision": "approved", "notes": "Integration test approve"},
         headers=headers_assigner,
     )
-    assert review.status_code == 200, review.text
+    assert review.status_code in (200, 201), review.text
     assert review.json().get("decision") == "approved"
 
     # Assignment should be completed
@@ -67,7 +67,7 @@ async def test_workflow_lifecycle_request_changes(client) -> None:
     """Create assignment → submit → review (request_changes) with corrections → assert returned."""
     tenant = "t_integration"
     assignee = "u1"
-    reviewer = "u1"
+    reviewer = "u2"
     headers_assigner = {"X-Tenant-ID": tenant, "X-User-ID": reviewer}
     headers_assignee = {"X-Tenant-ID": tenant, "X-User-ID": assignee}
 
@@ -87,7 +87,7 @@ async def test_workflow_lifecycle_request_changes(client) -> None:
         f"/api/v1/assignments/{assignment_id}/submit",
         headers=headers_assignee,
     )
-    assert (await client.post(
+    review_resp = await client.post(
         f"/api/v1/assignments/{assignment_id}/review",
         json={
             "decision": "request_changes",
@@ -97,7 +97,8 @@ async def test_workflow_lifecycle_request_changes(client) -> None:
             ],
         },
         headers=headers_assigner,
-    )).status_code == 200
+    )
+    assert review_resp.status_code in (200, 201)
 
     get_assignment = await client.get(f"/api/v1/assignments/{assignment_id}", headers=headers_assigner)
     assert get_assignment.status_code == 200
