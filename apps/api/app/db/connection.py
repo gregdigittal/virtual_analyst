@@ -20,11 +20,11 @@ async def tenant_conn(tenant_id: str):
         settings = get_settings()
         conn = await asyncpg.connect(settings.database_url)
     try:
-        await conn.execute("SET app.tenant_id = $1", tenant_id)
+        await conn.execute("SELECT set_config('app.tenant_id', $1, false)", tenant_id)
         yield conn
     finally:
         try:
-            await conn.execute("SET app.tenant_id = ''")
+            await conn.execute("SELECT set_config('app.tenant_id', '', false)")
         except Exception as exc:
             structlog.get_logger().warning("tenant_conn_cleanup_failed", error=str(exc))
         if _pool is not None:

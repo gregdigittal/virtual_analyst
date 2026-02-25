@@ -2,11 +2,32 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
+
+_HTML_TAG_RE = re.compile(r"<\s*/?[a-zA-Z][^>]*>")
+
+
+def _contains_html(obj: Any, path: str = "") -> str | None:
+    """Walk a JSON-like object and return the path of the first HTML tag found."""
+    if isinstance(obj, str):
+        if _HTML_TAG_RE.search(obj):
+            return path or "(root)"
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            result = _contains_html(v, f"{path}.{k}" if path else k)
+            if result:
+                return result
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            result = _contains_html(v, f"{path}[{i}]")
+            if result:
+                return result
+    return None
 
 from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import (
@@ -37,6 +58,9 @@ async def create_baseline(
 ) -> dict[str, Any]:
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
+    html_path = _contains_html(body.model_config_payload)
+    if html_path:
+        raise HTTPException(400, f"HTML content not allowed in payload field: {html_path}")
     try:
         ModelConfig.model_validate(body.model_config_payload)
     except Exception as e:
