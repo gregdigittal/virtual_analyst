@@ -359,6 +359,30 @@ export const api = {
       request<
         { base_fcf: number; pct: number; drivers: { ref: string; impact_low: number; impact_high: number }[] } & Record<string, unknown>
       >(`/api/v1/runs/${encodeURIComponent(runId)}/sensitivity?pct=${pct ?? 0.1}`, { tenantId }),
+    postSensitivitySweep: (
+      tenantId: string,
+      runId: string,
+      body: { parameter_path: string; low: number; high: number; steps: number; metric: string },
+    ) =>
+      request<{ parameter: string; base_value: number; values: number[]; metric_values: number[]; metric: string }>(
+        `/api/v1/runs/${encodeURIComponent(runId)}/sensitivity/sweep`,
+        { tenantId, method: "POST", body },
+      ),
+    postSensitivityHeatmap: (
+      tenantId: string,
+      runId: string,
+      body: {
+        param_a_path: string;
+        param_a_range: [number, number, number];
+        param_b_path: string;
+        param_b_range: [number, number, number];
+        metric: string;
+      },
+    ) =>
+      request<{ param_a: string; param_b: string; values_a: number[]; values_b: number[]; matrix: number[][]; metric: string }>(
+        `/api/v1/runs/${encodeURIComponent(runId)}/sensitivity/heatmap`,
+        { tenantId, method: "POST", body },
+      ),
     getStatements: (tenantId: string, runId: string) =>
       request<StatementsData>(
         `/api/v1/runs/${encodeURIComponent(runId)}/statements`,

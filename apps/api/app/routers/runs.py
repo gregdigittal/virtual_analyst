@@ -27,6 +27,7 @@ from shared.fm_shared.model import (
 )
 from shared.fm_shared.model.schemas import ScenarioOverride
 from shared.fm_shared.storage import ArtifactStore
+from shared.fm_shared.analysis.sensitivity import run_sensitivity as _run_sens, run_heatmap as _run_hm
 from shared.fm_shared.analysis.valuation import dcf_valuation, multiples_valuation
 
 from apps.api.app.services.excel_export import build_run_excel
@@ -457,6 +458,28 @@ async def get_run_mc(
     return data
 
 
+async def _load_run_config(
+    run_id: str, tenant_id: str, store: ArtifactStore
+) -> ModelConfig:
+    """Load the ModelConfig for a given run (shared by sensitivity endpoints)."""
+    async with tenant_conn(tenant_id) as conn:
+        row = await conn.fetchrow(
+            "SELECT baseline_id, baseline_version FROM runs WHERE tenant_id = $1 AND run_id = $2",
+            tenant_id,
+            run_id,
+        )
+        if not row:
+            raise HTTPException(404, "Run not found")
+    baseline_id, baseline_version = row["baseline_id"], row["baseline_version"]
+    try:
+        config_dict = store.load(tenant_id, "model_config_v1", f"{baseline_id}_{baseline_version}")
+    except StorageError as e:
+        if e.code == "ERR_STOR_NOT_FOUND":
+            raise HTTPException(404, "Baseline not found") from e
+        raise
+    return ModelConfig.model_validate(config_dict)
+
+
 @router.get("/{run_id}/sensitivity")
 async def get_run_sensitivity(
     run_id: str,
@@ -474,23 +497,7 @@ async def get_run_sensitivity(
         if e.code == "ERR_STOR_NOT_FOUND":
             raise HTTPException(404, "Run results not found") from e
         raise
-    # We need config to run engine with overrides; get baseline from run
-    async with tenant_conn(x_tenant_id) as conn:
-        row = await conn.fetchrow(
-            "SELECT baseline_id, baseline_version FROM runs WHERE tenant_id = $1 AND run_id = $2",
-            x_tenant_id,
-            run_id,
-        )
-        if not row:
-            raise HTTPException(404, "Run not found")
-    baseline_id, baseline_version = row["baseline_id"], row["baseline_version"]
-    try:
-        config_dict = store.load(x_tenant_id, "model_config_v1", f"{baseline_id}_{baseline_version}")
-    except StorageError as e:
-        if e.code == "ERR_STOR_NOT_FOUND":
-            raise HTTPException(404, "Baseline not found") from e
-        raise
-    config = ModelConfig.model_validate(config_dict)
+    config = await _load_run_config(run_id, x_tenant_id, store)
     kpis = data.get("kpis", [])
     base_fcf = kpis[-1].get("fcf", 0) if kpis else 0.0
     # Drivers to vary: from config.distributions or blueprint driver refs
@@ -527,6 +534,87 @@ async def get_run_sensitivity(
         "pct": pct,
         "target_metric": "terminal_fcf",
         "drivers": drivers_data,
+    }
+
+
+class SensitivitySweepBody(BaseModel):
+    parameter_path: str = PydField(..., description="Dot-path into config, e.g. 'metadata.tax_rate'")
+    low: float = PydField(...)
+    high: float = PydField(...)
+    steps: int = PydField(5, ge=2, le=20)
+    metric: str = PydField("net_income", description="revenue, ebitda, net_income, fcf")
+
+
+class HeatMapBody(BaseModel):
+    param_a_path: str = PydField(...)
+    param_a_range: tuple[float, float, int] = PydField(...)
+    param_b_path: str = PydField(...)
+    param_b_range: tuple[float, float, int] = PydField(...)
+    metric: str = PydField("net_income")
+
+
+@router.post("/{run_id}/sensitivity/sweep")
+async def run_sensitivity_sweep(
+    run_id: str,
+    body: SensitivitySweepBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+    _: None = require_role(*ROLES_ANY),
+) -> dict[str, Any]:
+    """Custom parameter sweep: vary one parameter over a range, return metric values."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    config = await _load_run_config(run_id, x_tenant_id, store)
+    try:
+        result = _run_sens(
+            config=config,
+            parameter_path=body.parameter_path,
+            low=body.low,
+            high=body.high,
+            steps=body.steps,
+            metric=body.metric,
+        )
+    except (ValueError, AttributeError, KeyError) as e:
+        raise HTTPException(400, str(e)) from e
+    return {
+        "parameter": result.parameter,
+        "base_value": result.base_value,
+        "values": result.values,
+        "metric_values": result.metric_values,
+        "metric": body.metric,
+    }
+
+
+@router.post("/{run_id}/sensitivity/heatmap")
+async def run_sensitivity_heatmap(
+    run_id: str,
+    body: HeatMapBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+    _: None = require_role(*ROLES_ANY),
+) -> dict[str, Any]:
+    """Two-variable heat map: sweep two parameters, return metric matrix."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    config = await _load_run_config(run_id, x_tenant_id, store)
+    try:
+        result = _run_hm(
+            config=config,
+            param_a_path=body.param_a_path,
+            param_a_range=body.param_a_range,
+            param_b_path=body.param_b_path,
+            param_b_range=body.param_b_range,
+            metric=body.metric,
+        )
+    except (ValueError, AttributeError, KeyError) as e:
+        raise HTTPException(400, str(e)) from e
+    return {
+        "param_a": result.param_a,
+        "param_b": result.param_b,
+        "values_a": result.values_a,
+        "values_b": result.values_b,
+        "matrix": result.matrix,
+        "metric": body.metric,
     }
 
 
