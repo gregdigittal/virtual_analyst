@@ -338,8 +338,12 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
 
         for _ in range(5):
             closing_cash = [bs_list[t]["cash"] for t in range(horizon)]
+            asset_values = {
+                "ar": [bs_list[t]["accounts_receivable"] for t in range(horizon)],
+                "inventory": [bs_list[t]["inventory"] for t in range(horizon)],
+            }
             waterfall = apply_funding_waterfall(
-                closing_cash, plug_facilities, minimum_cash, horizon
+                closing_cash, plug_facilities, minimum_cash, horizon, asset_values
             )
             any_injection = any(
                 waterfall.additional_draws.get(f.facility_id, [0.0] * horizon)[t] > 0

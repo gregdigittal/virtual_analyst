@@ -127,7 +127,7 @@ class DrawRepayPoint(BaseModel):
 class DebtFacility(BaseModel):
     facility_id: str = Field(...)
     label: str = Field(...)
-    type: Literal["term_loan", "revolver", "overdraft"] = Field(...)
+    type: Literal["term_loan", "revolver", "overdraft", "trade_finance"] = Field(...)
     limit: float = Field(..., ge=0)
     interest_rate: float = Field(..., ge=0, le=1)
     draw_schedule: list[DrawRepayPoint] | None = None
@@ -136,6 +136,8 @@ class DebtFacility(BaseModel):
     pik_rate: float = Field(0.0, ge=0, le=1, description="Fraction of interest that capitalizes (0=all cash, 1=all PIK)")
     grace_period_months: int = Field(0, ge=0, description="Months during which principal repayment is deferred")
     converts_to_equity_month: int | None = Field(None, ge=0, description="Month when debt converts to equity (None=never)")
+    asset_linked: Literal["ar", "inventory"] | None = Field(None, description="BS asset to link draw limit to")
+    advance_rate: float = Field(1.0, ge=0, le=1, description="Fraction of linked asset available as draw limit")
 
 
 class DividendsPolicy(BaseModel):

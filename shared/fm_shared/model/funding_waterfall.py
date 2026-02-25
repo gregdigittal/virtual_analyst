@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 from shared.fm_shared.model.schemas import DebtFacility
 
-# Draw order: revolver first, then term_loan, then overdraft last
-_TYPE_ORDER = {"revolver": 0, "term_loan": 1, "overdraft": 2}
+# Draw order: revolver first, trade_finance, then term_loan, then overdraft last
+_TYPE_ORDER = {"revolver": 0, "trade_finance": 1, "term_loan": 2, "overdraft": 3}
 
 
 def _sort_draw_order(facilities: list[DebtFacility]) -> list[DebtFacility]:
@@ -45,6 +45,7 @@ def apply_funding_waterfall(
     facilities: list[DebtFacility],
     minimum_cash: float,
     horizon: int,
+    asset_values: dict[str, list[float]] | None = None,
 ) -> WaterfallResult:
     """
     Cover shortfalls by drawing from facilities (revolver first, overdraft last).
@@ -70,7 +71,11 @@ def apply_funding_waterfall(
         if cash_t < minimum_cash:
             shortfall = minimum_cash - cash_t
             for fac in draw_order:
-                available = fac.limit - balance[fac.facility_id]
+                effective_limit = fac.limit
+                if fac.asset_linked and asset_values:
+                    asset_bal = asset_values.get(fac.asset_linked, [0.0] * horizon)
+                    effective_limit = min(fac.limit, asset_bal[t] * fac.advance_rate)
+                available = effective_limit - balance[fac.facility_id]
                 draw = min(shortfall, max(0.0, available))
                 if draw > 0:
                     result.additional_draws[fac.facility_id][t] = draw
