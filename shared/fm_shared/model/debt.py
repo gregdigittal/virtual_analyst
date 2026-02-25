@@ -78,12 +78,28 @@ def calculate_debt_schedule(
         balance = 0.0
         balances: list[float] = []
         for t in range(horizon):
+            # Convertible: zero-out at and after conversion month
+            if fac.converts_to_equity_month is not None and t >= fac.converts_to_equity_month:
+                if t == fac.converts_to_equity_month:
+                    result.repayments_per_period[t] += balance  # "repay" via conversion
+                balances.append(0.0)
+                balance = 0.0
+                continue
+
             draw_t = _draws_at_month(fac.draw_schedule, t)
-            repay_t = _repays_at_month(fac.repayment_schedule, t)
+            if t < fac.grace_period_months:
+                repay_t = 0.0  # Grace period: defer principal
+            else:
+                repay_t = _repays_at_month(fac.repayment_schedule, t)
             balance = balance + draw_t - repay_t
             balance = max(0.0, min(fac.limit, balance))
+            total_interest = balance * fac.interest_rate / 12
+            pik_portion = total_interest * fac.pik_rate
+            cash_interest = total_interest - pik_portion
+            balance += pik_portion  # PIK capitalizes onto principal
+            balance = max(0.0, min(fac.limit, balance))
             balances.append(balance)
-            result.interest_per_period[t] += balance * fac.interest_rate / 12
+            result.interest_per_period[t] += cash_interest
             result.draws_per_period[t] += draw_t
             result.repayments_per_period[t] += repay_t
         result.balance_per_period[fac.facility_id] = balances

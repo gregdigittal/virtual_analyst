@@ -133,6 +133,9 @@ class DebtFacility(BaseModel):
     draw_schedule: list[DrawRepayPoint] | None = None
     repayment_schedule: list[DrawRepayPoint] | None = None
     is_cash_plug: bool = False
+    pik_rate: float = Field(0.0, ge=0, le=1, description="Fraction of interest that capitalizes (0=all cash, 1=all PIK)")
+    grace_period_months: int = Field(0, ge=0, description="Months during which principal repayment is deferred")
+    converts_to_equity_month: int | None = Field(None, ge=0, description="Month when debt converts to equity (None=never)")
 
 
 class DividendsPolicy(BaseModel):

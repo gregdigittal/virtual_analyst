@@ -157,6 +157,19 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
             if 0 <= er.month < horizon:
                 equity_raises_per_period[er.month] += er.amount
 
+    # Convertible debt -> equity injections
+    if config.assumptions.funding and config.assumptions.funding.debt_facilities:
+        for fac in config.assumptions.funding.debt_facilities:
+            if fac.converts_to_equity_month is not None and 0 <= fac.converts_to_equity_month < horizon:
+                bal_list = debt_result.balance_per_period.get(fac.facility_id, [0.0] * horizon)
+                if fac.converts_to_equity_month > 0:
+                    conversion_amount = bal_list[fac.converts_to_equity_month - 1]
+                else:
+                    conversion_amount = sum(
+                        d.amount for d in (fac.draw_schedule or []) if d.month == 0
+                    )
+                equity_raises_per_period[fac.converts_to_equity_month] += conversion_amount
+
     # Income statement per period
     is_list: list[dict[str, Any]] = []
     for t in range(horizon):
