@@ -139,6 +139,12 @@ class DebtFacility(BaseModel):
     asset_linked: Literal["ar", "inventory"] | None = Field(None, description="BS asset to link draw limit to")
     advance_rate: float = Field(1.0, ge=0, le=1, description="Fraction of linked asset available as draw limit")
 
+    @model_validator(mode="after")
+    def check_convertible_not_cash_plug(self) -> "DebtFacility":
+        if self.is_cash_plug and self.converts_to_equity_month is not None:
+            raise ValueError("Convertible debt cannot be a cash-plug facility")
+        return self
+
 
 class DividendsPolicy(BaseModel):
     policy: Literal["none", "fixed_amount", "payout_ratio"] = "none"

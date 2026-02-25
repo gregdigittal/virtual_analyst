@@ -90,14 +90,14 @@ def calculate_debt_schedule(
             if t < fac.grace_period_months:
                 repay_t = 0.0  # Grace period: defer principal
             else:
-                repay_t = _repays_at_month(fac.repayment_schedule, t)
+                # Shift schedule: month t looks up the schedule entry for t - grace
+                repay_t = _repays_at_month(fac.repayment_schedule, t - fac.grace_period_months)
             balance = balance + draw_t - repay_t
             balance = max(0.0, min(fac.limit, balance))
             total_interest = balance * fac.interest_rate / 12
             pik_portion = total_interest * fac.pik_rate
             cash_interest = total_interest - pik_portion
-            balance += pik_portion  # PIK capitalizes onto principal
-            balance = max(0.0, min(fac.limit, balance))
+            balance += pik_portion  # PIK capitalizes onto principal (not capped by limit)
             balances.append(balance)
             result.interest_per_period[t] += cash_interest
             result.draws_per_period[t] += draw_t

@@ -292,6 +292,8 @@ export default function SensitivityPage() {
                   onChange={(e) => setHmRangeA({ ...hmRangeA, steps: Number(e.target.value) })}
                   placeholder="Steps"
                   className="w-16"
+                  min={2}
+                  max={20}
                 />
               </div>
             </div>
@@ -323,6 +325,8 @@ export default function SensitivityPage() {
                   onChange={(e) => setHmRangeB({ ...hmRangeB, steps: Number(e.target.value) })}
                   placeholder="Steps"
                   className="w-16"
+                  min={2}
+                  max={20}
                 />
               </div>
             </div>

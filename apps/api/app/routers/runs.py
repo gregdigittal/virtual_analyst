@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import Response
-from pydantic import BaseModel, Field as PydField
+from pydantic import BaseModel, Field as PydField, model_validator
 
 from apps.api.app.db import ensure_tenant, tenant_conn
 from apps.api.app.db.audit import EVENT_RUN_ACCESSED, EVENT_RUN_CREATED, create_audit_event
@@ -537,12 +537,15 @@ async def get_run_sensitivity(
     }
 
 
+_VALID_METRICS = Literal["revenue", "ebitda", "net_income", "fcf"]
+
+
 class SensitivitySweepBody(BaseModel):
     parameter_path: str = PydField(..., description="Dot-path into config, e.g. 'metadata.tax_rate'")
     low: float = PydField(...)
     high: float = PydField(...)
     steps: int = PydField(5, ge=2, le=20)
-    metric: str = PydField("net_income", description="revenue, ebitda, net_income, fcf")
+    metric: _VALID_METRICS = PydField("net_income")
 
 
 class HeatMapBody(BaseModel):
@@ -550,7 +553,19 @@ class HeatMapBody(BaseModel):
     param_a_range: tuple[float, float, int] = PydField(...)
     param_b_path: str = PydField(...)
     param_b_range: tuple[float, float, int] = PydField(...)
-    metric: str = PydField("net_income")
+    metric: _VALID_METRICS = PydField("net_income")
+
+    @model_validator(mode="after")
+    def validate_ranges(self) -> "HeatMapBody":
+        _, _, a_steps = self.param_a_range
+        _, _, b_steps = self.param_b_range
+        if a_steps < 2 or b_steps < 2:
+            raise ValueError("steps must be >= 2 for both parameters")
+        if a_steps > 20 or b_steps > 20:
+            raise ValueError("steps must be <= 20 for both parameters")
+        if a_steps * b_steps > 200:
+            raise ValueError("total cells (steps_a * steps_b) must be <= 200")
+        return self
 
 
 @router.post("/{run_id}/sensitivity/sweep")
@@ -559,7 +574,7 @@ async def run_sensitivity_sweep(
     body: SensitivitySweepBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
-    _: None = require_role(*ROLES_ANY),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """Custom parameter sweep: vary one parameter over a range, return metric values."""
     if not x_tenant_id:
@@ -591,7 +606,7 @@ async def run_sensitivity_heatmap(
     body: HeatMapBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
-    _: None = require_role(*ROLES_ANY),
+    _: None = require_role(*ROLES_CAN_WRITE),
 ) -> dict[str, Any]:
     """Two-variable heat map: sweep two parameters, return metric matrix."""
     if not x_tenant_id:

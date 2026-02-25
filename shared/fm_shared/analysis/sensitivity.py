@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
 from shared.fm_shared.model import ModelConfig, generate_statements, run_engine
 from shared.fm_shared.model.kpis import calculate_kpis
 
@@ -25,8 +27,21 @@ class HeatMapResult:
     matrix: list[list[float]]  # matrix[i][j] = metric at (values_a[i], values_b[j])
 
 
+def _validate_path(path: str) -> None:
+    """Reject paths that could access private/dunder attributes."""
+    segments = path.split(".")
+    if not segments or not all(segments):
+        raise ValueError(f"Invalid parameter path: '{path}'")
+    for segment in segments:
+        if segment.startswith("_"):
+            raise ValueError(f"Invalid path segment: '{segment}'")
+        if not segment.isidentifier():
+            raise ValueError(f"Invalid path segment: '{segment}'")
+
+
 def _get_nested(obj: object, path: str) -> float:
     """Resolve a dot-path like 'metadata.tax_rate' on a Pydantic model."""
+    _validate_path(path)
     parts = path.split(".")
     cur: object = obj
     for p in parts:
@@ -39,6 +54,7 @@ def _get_nested(obj: object, path: str) -> float:
 
 def _set_nested(obj: object, path: str, value: float) -> None:
     """Set a value at a dot-path on a Pydantic model (mutates in place)."""
+    _validate_path(path)
     parts = path.split(".")
     cur: object = obj
     for p in parts[:-1]:
@@ -49,7 +65,12 @@ def _set_nested(obj: object, path: str, value: float) -> None:
     if isinstance(cur, dict):
         cur[parts[-1]] = value
     else:
-        setattr(cur, parts[-1], value)
+        try:
+            setattr(cur, parts[-1], value)
+        except (ValidationError, AttributeError, TypeError) as e:
+            raise ValueError(
+                f"Cannot set '{path}' to {value}: field may be frozen or read-only"
+            ) from e
 
 
 _TERMINAL_METRICS = {
