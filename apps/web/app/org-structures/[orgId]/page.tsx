@@ -3,6 +3,7 @@
 import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner, VATabs } from "@/components/ui";
+import { ConsolidatedResults } from "@/components/ConsolidatedResults";
 import { formatDateTime } from "@/lib/format";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
@@ -86,6 +87,8 @@ export default function OrgStructureDetailPage() {
   const [hierarchy, setHierarchy] = useState<{ roots: HierarchyNode[] } | null>(null);
   const [validation, setValidation] = useState<{ status: string; checks: { check: string; status: string; message: string }[] } | null>(null);
   const [runs, setRuns] = useState<{ consolidated_run_id: string; status: string; created_at: string | null }[]>([]);
+  const [selectedRunResult, setSelectedRunResult] = useState<Record<string, unknown> | null>(null);
+  const [loadingRunResult, setLoadingRunResult] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -163,6 +166,20 @@ export default function OrgStructureDetailPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRunTriggering(false);
+    }
+  }
+
+  async function handleViewRun(runId: string) {
+    if (!tenantId) return;
+    setLoadingRunResult(true);
+    setError(null);
+    try {
+      const res = await api.orgStructures.getRun(tenantId, orgId, runId);
+      setSelectedRunResult((res.result as Record<string, unknown>) ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingRunResult(false);
     }
   }
 
@@ -404,11 +421,27 @@ export default function OrgStructureDetailPage() {
                               {r.created_at && (
                                 <span className="text-va-text2">{formatDateTime(r.created_at)}</span>
                               )}
+                              {r.status === "succeeded" && (
+                                <VAButton
+                                  type="button"
+                                  variant="secondary"
+                                  onClick={() => handleViewRun(r.consolidated_run_id)}
+                                  disabled={loadingRunResult}
+                                >
+                                  {loadingRunResult ? "Loading…" : "View"}
+                                </VAButton>
+                              )}
                             </li>
                           ))}
                         </ul>
                       )}
                     </div>
+                    {selectedRunResult && (
+                      <VACard className="mt-4 p-4">
+                        <h3 className="mb-3 font-brand text-lg font-medium text-va-text">Consolidated Results</h3>
+                        <ConsolidatedResults result={selectedRunResult} />
+                      </VACard>
+                    )}
                   </div>
                 ),
               },

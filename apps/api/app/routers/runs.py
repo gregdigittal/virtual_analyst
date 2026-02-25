@@ -195,6 +195,7 @@ async def create_run(
                 "balance_sheet": statements.balance_sheet,
                 "cash_flow": statements.cash_flow,
                 "periods": statements.periods,
+                "revenue_by_segment": statements.revenue_by_segment,
             },
             "kpis": kpis,
             "time_series": time_series,

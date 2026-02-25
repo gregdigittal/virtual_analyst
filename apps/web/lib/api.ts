@@ -138,6 +138,7 @@ export interface StatementsData {
   balance_sheet?: Record<string, unknown>[] | unknown;
   cash_flow?: Record<string, unknown>[] | unknown;
   periods?: string[];
+  revenue_by_segment?: Record<string, number[]>;
 }
 
 export interface KpiItem {

@@ -2,6 +2,8 @@
 
 import { api, type ScenarioItem } from "@/lib/api";
 import { ConfigViewer } from "@/components/ConfigViewer";
+import { FundingPanel } from "@/components/FundingPanel";
+import { CorrelationMatrixEditor } from "@/components/CorrelationMatrixEditor";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import { Nav } from "@/components/nav";
@@ -220,6 +222,75 @@ export default function BaselineDetailPage() {
               Model config loaded. Use &quot;Run model&quot; to execute and view
               statements and KPIs.
             </p>
+
+            {/* Funding panel */}
+            {!!(config as Record<string, unknown>).assumptions && (
+              <VACard className="mb-6 p-4">
+                <h2 className="mb-3 font-brand text-lg font-medium text-va-text">Funding</h2>
+                <FundingPanel
+                  funding={
+                    ((config as Record<string, unknown>).assumptions as Record<string, unknown>)
+                      ?.funding as Record<string, unknown> | null | undefined
+                  }
+                />
+              </VACard>
+            )}
+
+            {/* Correlation matrix */}
+            {Array.isArray((config as Record<string, unknown>).distributions) &&
+              ((config as Record<string, unknown>).distributions as unknown[]).length >= 2 && (
+              <VACard className="mb-6 p-4">
+                <h2 className="mb-3 font-brand text-lg font-medium text-va-text">Driver Correlations</h2>
+                <CorrelationMatrixEditor
+                  distributions={(config as Record<string, unknown>).distributions as { ref: string; family: string }[]}
+                  correlationMatrix={
+                    ((config as Record<string, unknown>).correlation_matrix as { ref_a: string; ref_b: string; rho: number }[]) ?? []
+                  }
+                />
+              </VACard>
+            )}
+
+            {/* Revenue streams with business line info */}
+            {!!(config as Record<string, unknown>).assumptions && (() => {
+              const assumptions = (config as Record<string, unknown>).assumptions as Record<string, unknown>;
+              const streams = (assumptions?.revenue_streams ?? []) as Record<string, unknown>[];
+              const hasSegments = streams.some((s) => s.business_line || s.launch_month != null);
+              if (!hasSegments) return null;
+              return (
+                <VACard className="mb-6 p-4">
+                  <h2 className="mb-3 font-brand text-lg font-medium text-va-text">Revenue Streams</h2>
+                  <div className="overflow-x-auto rounded-va-lg border border-va-border">
+                    <table className="w-full text-sm text-va-text">
+                      <thead>
+                        <tr className="border-b border-va-border bg-va-surface">
+                          <th className="px-3 py-2 text-left font-medium">Label</th>
+                          <th className="px-3 py-2 text-left font-medium">Type</th>
+                          <th className="px-3 py-2 text-left font-medium">Business Line</th>
+                          <th className="px-3 py-2 text-left font-medium">Market</th>
+                          <th className="px-3 py-2 text-right font-medium">Launch</th>
+                          <th className="px-3 py-2 text-right font-medium">Ramp</th>
+                          <th className="px-3 py-2 text-left font-medium">Curve</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {streams.map((s, i) => (
+                          <tr key={i} className="border-b border-va-border/50">
+                            <td className="px-3 py-2 font-medium">{String(s.label ?? "")}</td>
+                            <td className="px-3 py-2 text-va-text2">{String(s.stream_type ?? "").replace(/_/g, " ")}</td>
+                            <td className="px-3 py-2">{String(s.business_line ?? "—")}</td>
+                            <td className="px-3 py-2 text-va-text2">{String(s.market ?? "—")}</td>
+                            <td className="px-3 py-2 text-right font-mono">{s.launch_month != null ? `M${s.launch_month}` : "—"}</td>
+                            <td className="px-3 py-2 text-right font-mono">{s.ramp_up_months != null ? `${s.ramp_up_months}mo` : "—"}</td>
+                            <td className="px-3 py-2 text-va-text2">{s.ramp_curve ? String(s.ramp_curve).replace(/_/g, " ") : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </VACard>
+              );
+            })()}
+
             <ConfigViewer config={config as Record<string, unknown>} />
           </div>
         ) : (

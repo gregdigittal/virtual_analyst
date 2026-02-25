@@ -343,6 +343,42 @@ export default function RunDetailPage() {
                 periods={periods}
               />
             )}
+            {/* Revenue by Segment */}
+            {statements?.revenue_by_segment &&
+              typeof statements.revenue_by_segment === "object" &&
+              Object.keys(statements.revenue_by_segment as Record<string, unknown>).length > 1 && (() => {
+                const segments = statements.revenue_by_segment as Record<string, number[]>;
+                const segNames = Object.keys(segments);
+                return (
+                  <div className="mb-8">
+                    <h3 className="font-brand mb-2 text-lg font-medium text-va-text">
+                      Revenue by Segment
+                    </h3>
+                    <div className="overflow-x-auto rounded-va-lg border border-va-border">
+                      <table className="w-full min-w-[600px] text-sm text-va-text">
+                        <thead>
+                          <tr className="border-b border-va-border bg-va-surface">
+                            <th className="px-3 py-2 text-left font-medium">Segment</th>
+                            {periods.map((p) => (
+                              <th key={p} className="px-3 py-2 text-right font-medium font-mono">{p}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {segNames.map((seg, i) => (
+                            <tr key={seg} className={i % 2 === 0 ? "border-b border-va-border/50" : "border-b border-va-border/50 bg-va-surface/50"}>
+                              <td className="px-3 py-2 font-medium capitalize">{seg.replace(/_/g, " ")}</td>
+                              {(segments[seg] ?? []).slice(0, periodCount).map((v, j) => (
+                                <td key={j} className="px-3 py-2 text-right font-mono">{formatNum(v)}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             {isRows.length === 0 &&
               bsRows.length === 0 &&
               cfRows.length === 0 && (
