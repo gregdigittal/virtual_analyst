@@ -1,13 +1,22 @@
-"""Sensitivity analysis — single-variable sweeps and two-variable heat maps."""
+"""Sensitivity analysis — single-variable sweeps and two-variable heat maps.
+
+Parallelises independent model runs across CPU cores using ProcessPoolExecutor.
+"""
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
 from pydantic import ValidationError
 
 from shared.fm_shared.model import ModelConfig, generate_statements, run_engine
 from shared.fm_shared.model.kpis import calculate_kpis
+
+# Minimum number of tasks before switching from sequential to parallel execution.
+# Below this threshold, process-spawn overhead outweighs the gains.
+_PARALLEL_THRESHOLD = 4
 
 
 @dataclass
@@ -89,6 +98,33 @@ def _extract_metric(config: ModelConfig, metric: str) -> float:
     return _TERMINAL_METRICS[metric](stmts.income_statement, kpis)
 
 
+# ---------------------------------------------------------------------------
+# Process-pool worker functions (must be module-level for pickling)
+# ---------------------------------------------------------------------------
+
+def _sweep_worker(args: tuple[dict, str, float, str]) -> float:
+    """Compute metric for a single parameter value in a child process."""
+    config_dict, parameter_path, value, metric = args
+    config = ModelConfig.model_validate(config_dict)
+    _set_nested(config, parameter_path, value)
+    return _extract_metric(config, metric)
+
+
+def _heatmap_worker(args: tuple[dict, str, float, str, float, str]) -> float:
+    """Compute metric for a single (param_a, param_b) cell in a child process."""
+    config_dict, param_a_path, val_a, param_b_path, val_b, metric = args
+    config = ModelConfig.model_validate(config_dict)
+    _set_nested(config, param_a_path, val_a)
+    _set_nested(config, param_b_path, val_b)
+    return _extract_metric(config, metric)
+
+
+def _max_workers(n_tasks: int) -> int:
+    """Cap worker count at CPU cores or task count, whichever is smaller."""
+    cpus = os.cpu_count() or 4
+    return min(n_tasks, cpus)
+
+
 def run_sensitivity(
     config: ModelConfig,
     parameter_path: str,
@@ -106,12 +142,18 @@ def run_sensitivity(
     base_value = _get_nested(config, parameter_path)
     step_size = (high - low) / (steps - 1)
     values: list[float] = [low + i * step_size for i in range(steps)]
-    metric_values: list[float] = []
 
-    for v in values:
-        cfg = config.model_copy(deep=True)
-        _set_nested(cfg, parameter_path, v)
-        metric_values.append(_extract_metric(cfg, metric))
+    if steps >= _PARALLEL_THRESHOLD:
+        config_dict = config.model_dump()
+        tasks = [(config_dict, parameter_path, v, metric) for v in values]
+        with ProcessPoolExecutor(max_workers=_max_workers(steps)) as pool:
+            metric_values = list(pool.map(_sweep_worker, tasks))
+    else:
+        metric_values = []
+        for v in values:
+            cfg = config.model_copy(deep=True)
+            _set_nested(cfg, parameter_path, v)
+            metric_values.append(_extract_metric(cfg, metric))
 
     return SensitivityResult(
         parameter=parameter_path,
@@ -143,15 +185,32 @@ def run_heatmap(
     values_a = [a_low + i * a_step for i in range(a_steps)]
     values_b = [b_low + j * b_step for j in range(b_steps)]
 
-    matrix: list[list[float]] = []
-    for va in values_a:
-        row: list[float] = []
-        for vb in values_b:
-            cfg = config.model_copy(deep=True)
-            _set_nested(cfg, param_a_path, va)
-            _set_nested(cfg, param_b_path, vb)
-            row.append(round(_extract_metric(cfg, metric), 2))
-        matrix.append(row)
+    n_cells = a_steps * b_steps
+    if n_cells >= _PARALLEL_THRESHOLD:
+        config_dict = config.model_dump()
+        tasks = [
+            (config_dict, param_a_path, va, param_b_path, vb, metric)
+            for va in values_a
+            for vb in values_b
+        ]
+        with ProcessPoolExecutor(max_workers=_max_workers(n_cells)) as pool:
+            flat_results = list(pool.map(_heatmap_worker, tasks))
+        # Reshape flat results into matrix[i][j]
+        matrix: list[list[float]] = []
+        idx = 0
+        for _ in values_a:
+            matrix.append([round(flat_results[idx + j], 2) for j in range(len(values_b))])
+            idx += len(values_b)
+    else:
+        matrix = []
+        for va in values_a:
+            row: list[float] = []
+            for vb in values_b:
+                cfg = config.model_copy(deep=True)
+                _set_nested(cfg, param_a_path, va)
+                _set_nested(cfg, param_b_path, vb)
+                row.append(round(_extract_metric(cfg, metric), 2))
+            matrix.append(row)
 
     return HeatMapResult(
         param_a=param_a_path,

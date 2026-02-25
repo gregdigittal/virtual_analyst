@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from shared.fm_shared.analysis import sensitivity as sens_mod
 from shared.fm_shared.analysis.sensitivity import (
     HeatMapResult,
     SensitivityResult,
@@ -82,3 +83,33 @@ def test_heatmap_tax_rate_vs_initial_cash() -> None:
         assert result.matrix[i][0] <= result.matrix[i - 1][0], (
             f"Expected row {i} (tax={result.values_a[i]}) <= row {i-1} (tax={result.values_a[i-1]})"
         )
+
+
+def test_parallel_and_sequential_produce_same_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify the parallel code path matches the sequential fallback."""
+    config = _load_config()
+
+    # Run with parallel enabled (threshold=4, steps=5 triggers it)
+    result_parallel = run_sensitivity(
+        config=config,
+        parameter_path="metadata.tax_rate",
+        low=0.15,
+        high=0.35,
+        steps=5,
+        metric="net_income",
+    )
+
+    # Force sequential by raising the threshold above our step count
+    monkeypatch.setattr(sens_mod, "_PARALLEL_THRESHOLD", 999)
+    result_sequential = run_sensitivity(
+        config=config,
+        parameter_path="metadata.tax_rate",
+        low=0.15,
+        high=0.35,
+        steps=5,
+        metric="net_income",
+    )
+
+    assert result_parallel.values == result_sequential.values
+    assert result_parallel.metric_values == result_sequential.metric_values
+    assert result_parallel.base_value == result_sequential.base_value
