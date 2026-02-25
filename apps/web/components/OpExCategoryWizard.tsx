@@ -64,13 +64,22 @@ export function OpExCategoryWizard({ totalOpex, onGenerate }: Props) {
   function handleGenerate() {
     const nodes: BlueprintNode[] = [];
     const formulas: BlueprintFormula[] = [];
+    const usedIds = new Set<string>();
 
     for (const cat of categories) {
-      const id = toNodeId(cat.name);
+      let id = toNodeId(cat.name);
+      // Deduplicate: append _2, _3, etc. if ID already used
+      if (usedIds.has(id)) {
+        let suffix = 2;
+        while (usedIds.has(`${id}_${suffix}`)) suffix++;
+        id = `${id}_${suffix}`;
+      }
+      usedIds.add(id);
+
       nodes.push({ id, type: "formula", ref: id, label: `OpEx: ${cat.name}` });
       formulas.push({
         output: id,
-        expression: `total_opex * ${cat.share_pct / 100} * (1 + ${cat.growth_rate})`,
+        expression: `total_opex * ${cat.share_pct / 100} * (1 + ${cat.growth_rate}) ^ t`,
         inputs: ["total_opex"],
       });
     }
