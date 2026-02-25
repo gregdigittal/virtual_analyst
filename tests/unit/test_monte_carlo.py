@@ -63,3 +63,23 @@ def test_run_monte_carlo_no_distributions_all_sims_identical() -> None:
         p95 = result.percentiles[metric]["p95"]
         np.testing.assert_array_almost_equal(p5, p50, err_msg=f"{metric} p5 vs p50")
         np.testing.assert_array_almost_equal(p50, p95, err_msg=f"{metric} p50 vs p95")
+
+
+def test_run_monte_carlo_with_correlation() -> None:
+    """MC with correlated distributions runs without error and respects seed."""
+    d = minimal_model_config(horizon_months=3).model_dump()
+    d["distributions"] = [
+        {"ref": "drv:units", "family": "normal", "params": {"mean": 100, "std": 10}},
+        {"ref": "drv:price", "family": "normal", "params": {"mean": 10, "std": 1}},
+    ]
+    d["correlation_matrix"] = [
+        {"ref_a": "drv:units", "ref_b": "drv:price", "rho": 0.8},
+    ]
+    config = ModelConfig.model_validate(d)
+    r1 = run_monte_carlo(config, num_simulations=20, seed=42)
+    r2 = run_monte_carlo(config, num_simulations=20, seed=42)
+    for metric in ("revenue", "ebitda"):
+        np.testing.assert_array_almost_equal(
+            r1.percentiles[metric]["p50"],
+            r2.percentiles[metric]["p50"],
+        )

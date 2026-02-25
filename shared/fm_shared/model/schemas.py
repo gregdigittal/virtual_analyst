@@ -14,14 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class Metadata(BaseModel):
     entity_name: str = Field(..., min_length=1)
     entity_description: str | None = None
-
-    @field_validator("entity_name")
-    @classmethod
-    def _reject_html_tags(cls, v: str) -> str:
-        import re
-        if re.search(r"<[^>]+>", v):
-            raise ValueError("entity_name must not contain HTML tags")
-        return v
     currency: str = Field(..., pattern=r"^[A-Z]{3}$")
     country_iso: str | None = Field(None, pattern=r"^[A-Z]{2}$")
     start_date: str = Field(..., description="YYYY-MM-DD")
@@ -234,6 +226,12 @@ class IntegrityBlock(BaseModel):
     checks: list[IntegrityCheck] = Field(default_factory=list)
 
 
+class CorrelationEntry(BaseModel):
+    ref_a: str = Field(..., description="First driver ref (e.g. 'drv:units')")
+    ref_b: str = Field(..., description="Second driver ref (e.g. 'drv:price')")
+    rho: float = Field(..., ge=-1, le=1, description="Pearson correlation coefficient")
+
+
 # --- Root: model_config_v1 ---
 class ModelConfig(BaseModel):
     artifact_type: Literal["model_config_v1"] = "model_config_v1"
@@ -250,6 +248,7 @@ class ModelConfig(BaseModel):
     assumptions: Assumptions = Field(...)
     driver_blueprint: DriverBlueprint = Field(...)
     distributions: list[DistributionConfig] = Field(default_factory=list)
+    correlation_matrix: list[CorrelationEntry] = Field(default_factory=list)
     scenarios: list[Scenario] = Field(default_factory=list)
     evidence_summary: list[EvidenceEntry] = Field(default_factory=list)
     integrity: IntegrityBlock = Field(...)

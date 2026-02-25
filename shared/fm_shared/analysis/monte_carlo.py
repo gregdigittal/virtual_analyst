@@ -9,7 +9,7 @@ from typing import Callable
 
 import numpy as np
 
-from shared.fm_shared.analysis.distributions import sample
+from shared.fm_shared.analysis.distributions import sample, sample_correlated
 from shared.fm_shared.model.engine import run_engine
 from shared.fm_shared.model.kpis import calculate_kpis
 from shared.fm_shared.model.schemas import ModelConfig, ScenarioOverride
@@ -69,11 +69,20 @@ def run_monte_carlo(
         if progress_callback and (sim_i + 1) % report_every == 0:
             progress_callback(sim_i + 1, num_simulations)
         overrides: list[ScenarioOverride] = []
-        for dist in config.distributions:
-            val = sample(dist, 1, rng)[0]
-            overrides.append(
-                ScenarioOverride(ref=dist.ref, field="value", value=float(val))
+        if config.correlation_matrix and len(config.distributions) > 1:
+            sampled = sample_correlated(
+                config.distributions, config.correlation_matrix, rng
             )
+            overrides = [
+                ScenarioOverride(ref=ref, field="value", value=val)
+                for ref, val in sampled.items()
+            ]
+        else:
+            for dist in config.distributions:
+                val = sample(dist, 1, rng)[0]
+                overrides.append(
+                    ScenarioOverride(ref=dist.ref, field="value", value=float(val))
+                )
         overrides.extend(scenario_overrides)
 
         time_series = run_engine(config, scenario_overrides=overrides or None)
