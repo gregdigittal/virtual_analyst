@@ -69,6 +69,11 @@ class RevenueStream(BaseModel):
         "fixed_fee",
     ] = Field(...)
     drivers: RevenueStreamDrivers = Field(default_factory=RevenueStreamDrivers)
+    business_line: str | None = None
+    market: str | None = None
+    launch_month: int | None = Field(None, ge=0, description="Month this stream activates (0-indexed)")
+    ramp_up_months: int | None = Field(None, ge=1, description="Months to reach full volume after launch")
+    ramp_curve: Literal["linear", "s_curve", "step"] = "linear"
 
 
 # --- Cost structure ---

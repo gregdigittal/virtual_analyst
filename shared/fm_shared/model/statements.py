@@ -5,7 +5,7 @@ Uses engine time_series output + config assumptions.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from shared.fm_shared.errors import EngineError
@@ -21,6 +21,7 @@ class Statements:
     balance_sheet: list[dict[str, Any]]
     cash_flow: list[dict[str, Any]]
     periods: list[str]
+    revenue_by_segment: dict[str, list[float]] = field(default_factory=dict)
 
 
 class StatementImbalanceError(EngineError):
@@ -100,6 +101,34 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
         n.model_dump() if hasattr(n, "model_dump") else n for n in config.driver_blueprint.nodes
     ]
     revenue, cogs = _revenue_and_cogs_from_timeseries(time_series, nodes, horizon)
+
+    revenue_by_segment: dict[str, list[float]] = {}
+    for rs in config.assumptions.revenue_streams:
+        seg = getattr(rs, "business_line", None) or "default"
+        if seg not in revenue_by_segment:
+            revenue_by_segment[seg] = [0.0] * horizon
+        stream_driver_refs = {d.ref for d in rs.drivers.volume + rs.drivers.pricing}
+        for node in nodes:
+            if node.get("type") != "output":
+                continue
+            nid = node["node_id"]
+            if nid not in time_series:
+                continue
+            classification = (node.get("classification") or "").lower()
+            if not classification:
+                label = (node.get("label") or "").lower()
+                nid_lower = nid.lower()
+                if any(k in label for k in _REVENUE_KEYWORDS) or any(k in nid_lower for k in _REVENUE_KEYWORDS):
+                    classification = "revenue"
+            if classification == "revenue":
+                formula = next(
+                    (f for f in config.driver_blueprint.formulas if f.output_node_id == nid),
+                    None,
+                )
+                if formula and stream_driver_refs & set(formula.inputs):
+                    for t in range(horizon):
+                        revenue_by_segment[seg][t] += time_series[nid][t]
+
     fixed_opex = _fixed_opex_per_period(config, horizon)
     wc_days = _ar_ap_inv_days_per_period(config, horizon)
 
@@ -392,5 +421,9 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
 
     periods = [f"P{t}" for t in range(horizon)]
     return Statements(
-        income_statement=is_list, balance_sheet=bs_list, cash_flow=cf_list, periods=periods
+        income_statement=is_list,
+        balance_sheet=bs_list,
+        cash_flow=cf_list,
+        periods=periods,
+        revenue_by_segment=revenue_by_segment,
     )

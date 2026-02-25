@@ -6,6 +6,7 @@ Given model_config + optional scenario overrides, produces time-series for all n
 from __future__ import annotations
 
 import copy
+import math
 
 import structlog
 
@@ -91,6 +92,42 @@ def _collect_driver_values_by_ref(assumptions: Assumptions) -> dict[str, DriverV
     return by_ref
 
 
+def _build_ramp_factors(
+    assumptions: Assumptions, horizon: int
+) -> dict[str, list[float]]:
+    """
+    For each volume driver ref that belongs to a stream with launch_month,
+    compute a per-period scaling factor [0.0 .. 1.0].
+    Returns {driver_ref: [factor_t0, factor_t1, ...]}.
+    """
+    factors: dict[str, list[float]] = {}
+    for rs in assumptions.revenue_streams:
+        if rs.launch_month is None:
+            continue
+        for dv in rs.drivers.volume:
+            scale = [0.0] * horizon
+            for t in range(horizon):
+                if t < rs.launch_month:
+                    scale[t] = 0.0
+                elif rs.ramp_up_months and t < rs.launch_month + rs.ramp_up_months:
+                    elapsed = t - rs.launch_month
+                    total = rs.ramp_up_months
+                    ramp_curve = rs.ramp_curve
+                    if ramp_curve == "linear":
+                        scale[t] = (elapsed + 1) / total
+                    elif ramp_curve == "s_curve":
+                        x = (elapsed + 0.5) / total
+                        scale[t] = 1.0 / (1.0 + math.exp(-6 * (2 * x - 1)))
+                    elif ramp_curve == "step":
+                        scale[t] = 0.0
+                    else:
+                        scale[t] = (elapsed + 1) / total
+                else:
+                    scale[t] = 1.0
+            factors[dv.ref] = scale
+    return factors
+
+
 def run_engine(
     config: ModelConfig,
     scenario_overrides: list[ScenarioOverride] | None = None,
@@ -117,6 +154,7 @@ def run_engine(
     graph = CalcGraph.from_blueprint(config.driver_blueprint)
     order = graph.topo_sort()
     drivers_by_ref = _collect_driver_values_by_ref(assumptions)
+    ramp_factors = _build_ramp_factors(assumptions, horizon)
     ref_to_node: dict[str, str] = {
         node.ref: node.node_id for node in graph.nodes.values() if getattr(node, "ref", None)
     }
@@ -147,6 +185,8 @@ def run_engine(
                 ref = node.ref
                 if ref and ref in drivers_by_ref:
                     val = _resolve_driver(drivers_by_ref[ref], t)
+                    if ref in ramp_factors:
+                        val *= ramp_factors[ref][t]
                 else:
                     val = 0.0
                 time_series[nid][t] = val

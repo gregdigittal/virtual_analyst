@@ -218,3 +218,81 @@ def test_generate_statements_combined_dividends_and_debt() -> None:
     assert st.income_statement[0]["interest_expense"] > 0
     for t in range(6):
         assert abs(st.balance_sheet[t]["total_assets"] - st.balance_sheet[t]["total_liabilities_equity"]) < 0.02
+
+
+def _config_with_segments() -> ModelConfig:
+    """Config with two revenue streams (business_line retail and wholesale) and two output nodes."""
+    d = minimal_model_config_dict(horizon_months=12)
+    d["assumptions"]["revenue_streams"] = [
+        {
+            "stream_id": "rs_retail",
+            "label": "Retail",
+            "stream_type": "unit_sale",
+            "business_line": "retail",
+            "drivers": {
+                "volume": [
+                    {"ref": "drv:units_retail", "value_type": "constant", "value": 50.0},
+                    {"ref": "drv:price_retail", "value_type": "constant", "value": 10.0},
+                ],
+                "pricing": [],
+                "direct_costs": [],
+            },
+        },
+        {
+            "stream_id": "rs_wholesale",
+            "label": "Wholesale",
+            "stream_type": "unit_sale",
+            "business_line": "wholesale",
+            "drivers": {
+                "volume": [
+                    {"ref": "drv:units_wholesale", "value_type": "constant", "value": 30.0},
+                    {"ref": "drv:price_wholesale", "value_type": "constant", "value": 20.0},
+                ],
+                "pricing": [],
+                "direct_costs": [],
+            },
+        },
+    ]
+    d["driver_blueprint"] = {
+        "nodes": [
+            {"node_id": "n_units_retail", "type": "driver", "label": "Units Retail", "ref": "drv:units_retail"},
+            {"node_id": "n_price_retail", "type": "driver", "label": "Price Retail", "ref": "drv:price_retail"},
+            {"node_id": "n_revenue_retail", "type": "output", "label": "Revenue"},
+            {"node_id": "n_units_wholesale", "type": "driver", "label": "Units Wholesale", "ref": "drv:units_wholesale"},
+            {"node_id": "n_price_wholesale", "type": "driver", "label": "Price Wholesale", "ref": "drv:price_wholesale"},
+            {"node_id": "n_revenue_wholesale", "type": "output", "label": "Revenue"},
+        ],
+        "edges": [
+            {"from": "n_units_retail", "to": "n_revenue_retail"},
+            {"from": "n_price_retail", "to": "n_revenue_retail"},
+            {"from": "n_units_wholesale", "to": "n_revenue_wholesale"},
+            {"from": "n_price_wholesale", "to": "n_revenue_wholesale"},
+        ],
+        "formulas": [
+            {
+                "formula_id": "f_rev_retail",
+                "output_node_id": "n_revenue_retail",
+                "expression": "units_retail * price_retail",
+                "inputs": ["drv:units_retail", "drv:price_retail"],
+            },
+            {
+                "formula_id": "f_rev_wholesale",
+                "output_node_id": "n_revenue_wholesale",
+                "expression": "units_wholesale * price_wholesale",
+                "inputs": ["drv:units_wholesale", "drv:price_wholesale"],
+            },
+        ],
+    }
+    return ModelConfig.model_validate(d)
+
+
+def test_revenue_by_segment() -> None:
+    """revenue_by_segment groups revenue by business_line."""
+    config = _config_with_segments()
+    ts = run_engine(config)
+    st = generate_statements(config, ts)
+    assert "retail" in st.revenue_by_segment
+    assert "wholesale" in st.revenue_by_segment
+    for t in range(config.metadata.horizon_months):
+        total = sum(st.revenue_by_segment[seg][t] for seg in st.revenue_by_segment)
+        assert abs(total - st.income_statement[t]["revenue"]) < 0.01
