@@ -113,3 +113,35 @@ def test_parallel_and_sequential_produce_same_results(monkeypatch: pytest.Monkey
     assert result_parallel.values == result_sequential.values
     assert result_parallel.metric_values == result_sequential.metric_values
     assert result_parallel.base_value == result_sequential.base_value
+
+
+def test_heatmap_parallel_and_sequential_produce_same_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify the heatmap parallel code path matches the sequential fallback."""
+    config = _load_config()
+    kwargs = dict(
+        config=config,
+        param_a_path="metadata.tax_rate",
+        param_a_range=(0.10, 0.30, 3),
+        param_b_path="metadata.initial_cash",
+        param_b_range=(50000, 150000, 3),
+        metric="net_income",
+    )
+
+    result_parallel = run_heatmap(**kwargs)
+
+    monkeypatch.setattr(sens_mod, "_PARALLEL_THRESHOLD", 999)
+    result_sequential = run_heatmap(**kwargs)
+
+    assert result_parallel.matrix == result_sequential.matrix
+    assert result_parallel.values_a == result_sequential.values_a
+    assert result_parallel.values_b == result_sequential.values_b
+
+
+def test_model_config_round_trip() -> None:
+    """model_dump -> model_validate round-trip preserves config (serialization safety)."""
+    config = _load_config()
+    dumped = config.model_dump()
+    restored = ModelConfig.model_validate(dumped)
+    assert restored.model_dump() == dumped

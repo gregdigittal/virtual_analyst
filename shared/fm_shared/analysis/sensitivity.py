@@ -5,9 +5,13 @@ Parallelises independent model runs across CPU cores using ProcessPoolExecutor.
 
 from __future__ import annotations
 
+import logging
 import os
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 from pydantic import ValidationError
 
@@ -125,6 +129,39 @@ def _max_workers(n_tasks: int) -> int:
     return min(n_tasks, cpus)
 
 
+def _run_sweep_sequential(
+    config: ModelConfig, parameter_path: str, values: list[float], metric: str,
+) -> list[float]:
+    """Run sweep sequentially (used as fallback and for small step counts)."""
+    metric_values: list[float] = []
+    for v in values:
+        cfg = config.model_copy(deep=True)
+        _set_nested(cfg, parameter_path, v)
+        metric_values.append(_extract_metric(cfg, metric))
+    return metric_values
+
+
+def _run_heatmap_sequential(
+    config: ModelConfig,
+    param_a_path: str,
+    values_a: list[float],
+    param_b_path: str,
+    values_b: list[float],
+    metric: str,
+) -> list[list[float]]:
+    """Run heatmap sequentially (used as fallback and for small cell counts)."""
+    matrix: list[list[float]] = []
+    for va in values_a:
+        row: list[float] = []
+        for vb in values_b:
+            cfg = config.model_copy(deep=True)
+            _set_nested(cfg, param_a_path, va)
+            _set_nested(cfg, param_b_path, vb)
+            row.append(round(_extract_metric(cfg, metric), 2))
+        matrix.append(row)
+    return matrix
+
+
 def run_sensitivity(
     config: ModelConfig,
     parameter_path: str,
@@ -144,16 +181,16 @@ def run_sensitivity(
     values: list[float] = [low + i * step_size for i in range(steps)]
 
     if steps >= _PARALLEL_THRESHOLD:
-        config_dict = config.model_dump()
-        tasks = [(config_dict, parameter_path, v, metric) for v in values]
-        with ProcessPoolExecutor(max_workers=_max_workers(steps)) as pool:
-            metric_values = list(pool.map(_sweep_worker, tasks))
+        try:
+            config_dict = config.model_dump()
+            tasks = [(config_dict, parameter_path, v, metric) for v in values]
+            with ProcessPoolExecutor(max_workers=_max_workers(steps)) as pool:
+                metric_values = list(pool.map(_sweep_worker, tasks))
+        except BrokenProcessPool:
+            logger.warning("Process pool crashed during sweep, falling back to sequential")
+            metric_values = _run_sweep_sequential(config, parameter_path, values, metric)
     else:
-        metric_values = []
-        for v in values:
-            cfg = config.model_copy(deep=True)
-            _set_nested(cfg, parameter_path, v)
-            metric_values.append(_extract_metric(cfg, metric))
+        metric_values = _run_sweep_sequential(config, parameter_path, values, metric)
 
     return SensitivityResult(
         parameter=parameter_path,
@@ -187,30 +224,30 @@ def run_heatmap(
 
     n_cells = a_steps * b_steps
     if n_cells >= _PARALLEL_THRESHOLD:
-        config_dict = config.model_dump()
-        tasks = [
-            (config_dict, param_a_path, va, param_b_path, vb, metric)
-            for va in values_a
-            for vb in values_b
-        ]
-        with ProcessPoolExecutor(max_workers=_max_workers(n_cells)) as pool:
-            flat_results = list(pool.map(_heatmap_worker, tasks))
-        # Reshape flat results into matrix[i][j]
-        matrix: list[list[float]] = []
-        idx = 0
-        for _ in values_a:
-            matrix.append([round(flat_results[idx + j], 2) for j in range(len(values_b))])
-            idx += len(values_b)
+        try:
+            config_dict = config.model_dump()
+            tasks = [
+                (config_dict, param_a_path, va, param_b_path, vb, metric)
+                for va in values_a
+                for vb in values_b
+            ]
+            with ProcessPoolExecutor(max_workers=_max_workers(n_cells)) as pool:
+                flat_results = list(pool.map(_heatmap_worker, tasks))
+            # Reshape flat results into matrix[i][j]
+            matrix: list[list[float]] = []
+            idx = 0
+            for _ in values_a:
+                matrix.append([round(flat_results[idx + j], 2) for j in range(len(values_b))])
+                idx += len(values_b)
+        except BrokenProcessPool:
+            logger.warning("Process pool crashed during heatmap, falling back to sequential")
+            matrix = _run_heatmap_sequential(
+                config, param_a_path, values_a, param_b_path, values_b, metric
+            )
     else:
-        matrix = []
-        for va in values_a:
-            row: list[float] = []
-            for vb in values_b:
-                cfg = config.model_copy(deep=True)
-                _set_nested(cfg, param_a_path, va)
-                _set_nested(cfg, param_b_path, vb)
-                row.append(round(_extract_metric(cfg, metric), 2))
-            matrix.append(row)
+        matrix = _run_heatmap_sequential(
+            config, param_a_path, values_a, param_b_path, values_b, metric
+        )
 
     return HeatMapResult(
         param_a=param_a_path,

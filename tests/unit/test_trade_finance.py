@@ -71,28 +71,25 @@ def test_debtor_finance_capped_at_ar_advance() -> None:
             bs["total_liabilities_equity"], abs=1.0
         ), f"BS imbalance at period {t}"
 
-    # Direct AR cap assertion: run waterfall on the final BS closing cash
-    # and verify the trade finance balance never exceeds advance_rate * AR.
+    # Direct AR cap assertion: run waterfall with ONLY the trade finance
+    # facility to isolate its balance from other plug facilities.
     closing_cash = [stmts.balance_sheet[t]["cash"] for t in range(horizon)]
     asset_values = {
         "ar": [stmts.balance_sheet[t]["accounts_receivable"] for t in range(horizon)],
         "inventory": [stmts.balance_sheet[t]["inventory"] for t in range(horizon)],
     }
-    plug_facilities = [
-        f for f in config.assumptions.funding.debt_facilities if f.is_cash_plug
-    ]
     minimum_cash = config.assumptions.working_capital.minimum_cash or 0.0
 
     waterfall = apply_funding_waterfall(
-        closing_cash, plug_facilities, minimum_cash, horizon, asset_values
+        closing_cash, [tf], minimum_cash, horizon, asset_values
     )
 
     advance_rate = tf.advance_rate
     for t in range(horizon):
         ar_balance = stmts.balance_sheet[t]["accounts_receivable"]
         cap = advance_rate * ar_balance
-        wf_debt = waterfall.waterfall_debt_per_period[t]
-        assert wf_debt <= cap + 0.01, (
-            f"Period {t}: waterfall debt {wf_debt:.2f} exceeds "
+        tf_debt = waterfall.waterfall_debt_per_period[t]
+        assert tf_debt <= cap + 0.01, (
+            f"Period {t}: trade finance debt {tf_debt:.2f} exceeds "
             f"AR cap ({advance_rate} * {ar_balance:.2f} = {cap:.2f})"
         )

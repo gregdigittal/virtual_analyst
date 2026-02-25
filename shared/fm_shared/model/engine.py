@@ -195,7 +195,7 @@ def run_engine(
                 if not formula:
                     time_series[nid][t] = 0.0
                     continue
-                variables: dict[str, float] = {}
+                variables: dict[str, float] = {"t": float(t)}
                 try:
                     for inp in formula.inputs:
                         var_name, key = input_to_var_and_key(inp)

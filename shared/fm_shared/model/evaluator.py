@@ -16,6 +16,7 @@ BINARY_OPS = {
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
     ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
 }
 
 UNARY_OPS = {

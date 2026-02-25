@@ -79,7 +79,7 @@ export function OpExCategoryWizard({ totalOpex, onGenerate }: Props) {
       nodes.push({ id, type: "formula", ref: id, label: `OpEx: ${cat.name}` });
       formulas.push({
         output: id,
-        expression: `total_opex * ${cat.share_pct / 100} * (1 + ${cat.growth_rate}) ^ t`,
+        expression: `total_opex * ${cat.share_pct / 100} * (1 + ${cat.growth_rate}) ** t`,
         inputs: ["total_opex"],
       });
     }
