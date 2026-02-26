@@ -160,6 +160,26 @@ export const mockApi = {
   comments: {
     list: vi.fn(async () => ({ comments: [] })),
   },
+  excelIngestion: {
+    upload: vi.fn(async () => ({
+      ingestion_id: "ing-1",
+      status: "parsed",
+      classification: { sheets: [], model_summary: {} },
+    })),
+    get: vi.fn(async () => ({
+      classification: { sheets: [] },
+      mapping: {},
+      unmapped_items: [],
+      questions: [],
+    })),
+    analyze: vi.fn(async () => ({ mapping: {}, questions: [] })),
+    answer: vi.fn(async () => ({ mapping: {}, questions: [] })),
+    createDraft: vi.fn(async () => ({ draft_session_id: "draft-1" })),
+    list: vi.fn(async () => ({ items: [], total: 0 })),
+    delete: vi.fn(async () => ({ ok: true })),
+    getUploadStreamUrl: vi.fn(() => "http://localhost:8000/api/v1/excel-ingestion/upload-stream"),
+    getAnswerStreamUrl: vi.fn(() => "http://localhost:8000/api/v1/excel-ingestion/test-id/answer-stream"),
+  },
 };
 
 vi.mock("@/lib/api", () => ({
