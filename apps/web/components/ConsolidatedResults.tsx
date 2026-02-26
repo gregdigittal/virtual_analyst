@@ -2,6 +2,8 @@
 
 import { VACard, VATabs } from "@/components/ui";
 import { useState } from "react";
+import Link from "next/link";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface PeriodRow {
   label: string;
@@ -28,7 +30,7 @@ interface ConsolidatedRunResult {
     link_type: string;
     amount_per_period: number[];
   }[];
-  fx_rates_used?: Record<string, number>;
+  fx_rates_used?: Record<string, number | { avg: number; closing: number }>;
   integrity?: {
     warnings?: string[];
     errors?: string[];
@@ -36,7 +38,7 @@ interface ConsolidatedRunResult {
 }
 
 function fmt(n: number): string {
-  if (Number.isNaN(n)) return "—";
+  if (Number.isNaN(n)) return "\u2014";
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
@@ -88,7 +90,13 @@ function ConsolidatedTable({ title, rows }: { title: string; rows: PeriodRow[] }
   );
 }
 
-export function ConsolidatedResults({ result }: { result: ConsolidatedRunResult }) {
+export function ConsolidatedResults({
+  result,
+  entityRunMap,
+}: {
+  result: ConsolidatedRunResult;
+  entityRunMap?: Record<string, string>;
+}) {
   const [activeTab, setActiveTab] = useState("statements");
 
   const isRows = result.consolidated_is?.income_statement ?? [];
@@ -99,6 +107,12 @@ export function ConsolidatedResults({ result }: { result: ConsolidatedRunResult 
   const elims = result.eliminations ?? [];
   const fxRates = result.fx_rates_used ?? {};
   const integrity = result.integrity ?? {};
+
+  const nciChartData = (nci?.nci_profit ?? []).map((v, i) => ({ period: `P${i}`, nci_profit: v }));
+
+  // Determine whether fx_rates_used values are objects with avg/closing or plain numbers
+  const fxEntries = Object.entries(fxRates);
+  const hasStructuredRates = fxEntries.length > 0 && typeof fxEntries[0][1] === "object" && fxEntries[0][1] !== null;
 
   return (
     <VATabs
@@ -137,13 +151,27 @@ export function ConsolidatedResults({ result }: { result: ConsolidatedRunResult 
                       </tr>
                     </thead>
                     <tbody>
-                      {entities.map((e) => (
-                        <tr key={e.entity_id} className="border-b border-va-border/50">
-                          <td className="px-3 py-2 font-medium">{e.entity_id}</td>
-                          <td className="px-3 py-2 text-va-text2">{e.currency}</td>
-                          <td className="px-3 py-2 text-right font-mono">{e.ownership_pct}%</td>
-                        </tr>
-                      ))}
+                      {entities.map((e) => {
+                        const runId = entityRunMap?.[e.entity_id];
+                        return (
+                          <tr
+                            key={e.entity_id}
+                            className={`border-b border-va-border/50${runId ? " cursor-pointer hover:bg-va-surface/50" : ""}`}
+                          >
+                            <td className="px-3 py-2 font-medium">
+                              {runId ? (
+                                <Link href={"/runs/" + runId} role="link">
+                                  {e.entity_id}
+                                </Link>
+                              ) : (
+                                e.entity_id
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-va-text2">{e.currency}</td>
+                            <td className="px-3 py-2 text-right font-mono">{e.ownership_pct}%</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -171,6 +199,18 @@ export function ConsolidatedResults({ result }: { result: ConsolidatedRunResult 
                           </VACard>
                         ))}
                       </div>
+                      {nciChartData.length > 1 && (
+                        <div className="mt-4">
+                          <ResponsiveContainer width="100%" height={200}>
+                            <LineChart data={nciChartData}>
+                              <XAxis dataKey="period" />
+                              <YAxis />
+                              <Tooltip />
+                              <Line type="monotone" dataKey="nci_profit" stroke="#6366f1" strokeWidth={2} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
                     </div>
                   )}
                   {nci?.nci_equity && nci.nci_equity.some((v) => v !== 0) && (
@@ -234,6 +274,14 @@ export function ConsolidatedResults({ result }: { result: ConsolidatedRunResult 
                         );
                       })}
                     </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-va-border bg-va-surface font-medium">
+                        <td colSpan={3} className="px-3 py-2">Total</td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {fmt(elims.reduce((s, e) => s + (e.amount_per_period ?? []).reduce((a, b) => a + b, 0), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}
@@ -247,7 +295,7 @@ export function ConsolidatedResults({ result }: { result: ConsolidatedRunResult 
             <div className="space-y-4">
               <div>
                 <h4 className="mb-1 text-sm font-medium text-va-text">FX Rates Used</h4>
-                {Object.keys(fxRates).length === 0 ? (
+                {fxEntries.length === 0 ? (
                   <p className="text-sm text-va-text2">No FX rates (single-currency group).</p>
                 ) : (
                   <div className="overflow-x-auto rounded-va-lg border border-va-border">
@@ -255,14 +303,34 @@ export function ConsolidatedResults({ result }: { result: ConsolidatedRunResult 
                       <thead>
                         <tr className="border-b border-va-border bg-va-surface">
                           <th className="px-3 py-2 text-left font-medium">Pair</th>
-                          <th className="px-3 py-2 text-right font-medium">Rate</th>
+                          {hasStructuredRates ? (
+                            <>
+                              <th className="px-3 py-2 text-right font-medium">Avg Rate</th>
+                              <th className="px-3 py-2 text-right font-medium">Closing Rate</th>
+                            </>
+                          ) : (
+                            <th className="px-3 py-2 text-right font-medium">Rate</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(fxRates).map(([pair, rate]) => (
+                        {fxEntries.map(([pair, rate]) => (
                           <tr key={pair} className="border-b border-va-border/50">
                             <td className="px-3 py-2 font-mono">{pair}</td>
-                            <td className="px-3 py-2 text-right font-mono">{typeof rate === "number" ? rate.toFixed(4) : String(rate)}</td>
+                            {hasStructuredRates && typeof rate === "object" && rate !== null ? (
+                              <>
+                                <td className="px-3 py-2 text-right font-mono">
+                                  {(rate as { avg: number; closing: number }).avg.toFixed(4)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono">
+                                  {(rate as { avg: number; closing: number }).closing.toFixed(4)}
+                                </td>
+                              </>
+                            ) : (
+                              <td className="px-3 py-2 text-right font-mono">
+                                {typeof rate === "number" ? rate.toFixed(4) : String(rate)}
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
