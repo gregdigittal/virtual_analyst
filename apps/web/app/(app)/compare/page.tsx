@@ -3,7 +3,6 @@
 import { api, type KpiItem, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASelect, VASpinner } from "@/components/ui";
-import { Nav } from "@/components/nav";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
@@ -201,9 +200,7 @@ export default function ComparePage() {
   }
 
   return (
-    <div className="min-h-screen bg-va-midnight">
-      <Nav />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="font-brand mb-4 text-2xl font-semibold tracking-tight text-va-text">
           Comparison
         </h1>
@@ -389,8 +386,7 @@ export default function ComparePage() {
             )}
           </>
         )}
-      </main>
-    </div>
+    </main>
   );
 }
 

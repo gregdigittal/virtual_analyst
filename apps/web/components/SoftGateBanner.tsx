@@ -8,7 +8,7 @@ interface SoftGateBannerProps {
 
 export function SoftGateBanner({ message, actionLabel, actionHref }: SoftGateBannerProps) {
   return (
-    <div className="mb-6 flex items-center justify-between rounded-va-sm border border-va-warning/40 bg-va-warning/10 px-4 py-3">
+    <div role="alert" className="mb-6 flex items-center justify-between rounded-va-sm border border-va-warning/40 bg-va-warning/10 px-4 py-3">
       <span className="text-sm text-va-warning">{message}</span>
       <Link
         href={actionHref}

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 function CheckIcon() {
   return (
     <svg
-      className="h-5 w-5 text-green-400"
+      className="h-5 w-5 text-va-success"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -30,7 +30,7 @@ function CheckIcon() {
 function XIcon() {
   return (
     <svg
-      className="h-5 w-5 text-red-400"
+      className="h-5 w-5 text-va-danger"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -44,7 +44,7 @@ function XIcon() {
 
 function TildeIcon() {
   return (
-    <span className="inline-flex h-5 w-5 items-center justify-center text-yellow-400 font-bold text-lg" aria-label="Partial">
+    <span className="inline-flex h-5 w-5 items-center justify-center text-va-warning font-bold text-lg" aria-label="Partial">
       ~
     </span>
   );
