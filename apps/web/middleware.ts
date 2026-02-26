@@ -5,7 +5,7 @@ const protectedPaths = [
   "/baselines", "/runs", "/dashboard", "/drafts", "/scenarios", "/changesets",
   "/notifications", "/settings", "/inbox", "/assignments",
   "/budgets", "/memos", "/documents", "/activity",
-  "/excel-connections", "/excel-import", "/covenants",
+  "/excel-connections", "/excel-import", "/afs", "/covenants",
   "/org-structures", "/ventures", "/board-packs",
   "/import", "/benchmark", "/marketplace", "/compare", "/workflows",
 ];
@@ -71,6 +71,7 @@ export const config = {
     "/activity/:path*",
     "/excel-connections/:path*",
     "/excel-import/:path*",
+    "/afs/:path*",
     "/covenants/:path*",
     "/org-structures/:path*",
     "/ventures/:path*",
