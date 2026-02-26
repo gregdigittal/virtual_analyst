@@ -25,6 +25,7 @@ describe("DraftDetailPage", () => {
       accessToken: "mock-token",
       tenantIdIsFallback: false,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockApi.drafts.get.mockResolvedValue({
       draft_session_id: "draft-1",
       parent_baseline_id: "b-1",
@@ -41,7 +42,7 @@ describe("DraftDetailPage", () => {
         chat_history: [],
         pending_proposals: [],
       },
-    });
+    } as any);
   });
 
   it("renders structured editor tabs", async () => {

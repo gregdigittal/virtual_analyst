@@ -22,12 +22,17 @@ describe("RunDetailPage - Revenue Segment Chart", () => {
       accessToken: "mock-token",
       tenantIdIsFallback: false,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockApi.runs.get.mockResolvedValue({
       run_id: "run-1",
       baseline_id: "b-1",
       status: "completed",
       created_at: "2026-01-01T00:00:00Z",
+      statements: null,
+      kpis: [],
+      mc_summary: null,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockApi.runs.getStatements.mockResolvedValue({
       income_statement: [{ label: "Revenue", P0: 100, P1: 200 }],
       balance_sheet: [],
@@ -37,7 +42,7 @@ describe("RunDetailPage - Revenue Segment Chart", () => {
         saas: [80, 150],
         services: [20, 50],
       },
-    });
+    } as any);
     mockApi.runs.getKpis.mockResolvedValue([]);
   });
 

@@ -88,6 +88,7 @@ export default function OrgStructureDetailPage() {
   const [validation, setValidation] = useState<{ status: string; checks: { check: string; status: string; message: string }[] } | null>(null);
   const [runs, setRuns] = useState<{ consolidated_run_id: string; status: string; created_at: string | null }[]>([]);
   const [selectedRunResult, setSelectedRunResult] = useState<Record<string, unknown> | null>(null);
+  const [entityRunMap, setEntityRunMap] = useState<Record<string, string> | undefined>(undefined);
   const [loadingRunResult, setLoadingRunResult] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +177,16 @@ export default function OrgStructureDetailPage() {
     try {
       const res = await api.orgStructures.getRun(tenantId, orgId, runId);
       setSelectedRunResult((res.result as Record<string, unknown>) ?? null);
+      const runIds = (res as Record<string, unknown>).entity_run_ids;
+      if (runIds && typeof runIds === "object" && !Array.isArray(runIds)) {
+        const map: Record<string, string> = {};
+        for (const [k, v] of Object.entries(runIds as Record<string, unknown>)) {
+          if (typeof v === "string") map[k] = v;
+        }
+        setEntityRunMap(Object.keys(map).length > 0 ? map : undefined);
+      } else {
+        setEntityRunMap(undefined);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -439,7 +450,7 @@ export default function OrgStructureDetailPage() {
                     {selectedRunResult && (
                       <VACard className="mt-4 p-4">
                         <h3 className="mb-3 font-brand text-lg font-medium text-va-text">Consolidated Results</h3>
-                        <ConsolidatedResults result={selectedRunResult} />
+                        <ConsolidatedResults result={selectedRunResult} entityRunMap={entityRunMap} />
                       </VACard>
                     )}
                   </div>

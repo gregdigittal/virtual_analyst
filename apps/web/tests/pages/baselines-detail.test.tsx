@@ -49,12 +49,8 @@ describe("BaselineDetailPage", () => {
   });
 
   it("navigates to existing active draft when Edit Configuration is clicked", async () => {
-    mockApi.drafts.list.mockResolvedValue({
-      items: [{ draft_session_id: "draft-existing", status: "active" }],
-      total: 1,
-      limit: 50,
-      offset: 0,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockApi.drafts.list.mockResolvedValue({ items: [{ draft_session_id: "draft-existing", status: "active" }], total: 1, limit: 50, offset: 0 } as any);
     renderPage();
     const btn = await waitFor(() => screen.getByRole("button", { name: /Edit Configuration/i }));
     await act(async () => {
