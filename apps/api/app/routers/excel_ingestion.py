@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
@@ -13,14 +16,18 @@ logger = structlog.get_logger()
 from apps.api.app.core.settings import get_settings
 from apps.api.app.db import tenant_conn
 from apps.api.app.deps import get_agent_service, get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.services.agent.session_manager import AgentSessionManager
 from apps.api.app.services.excel_ingestion import (
+    EXCEL_UPLOAD_TYPE,
     analyze_and_map,
     create_draft_from_mapping,
     parse_and_classify,
     parse_classify_and_map_agent,
     start_ingestion,
 )
+from apps.api.app.services.excel_parser import parse_workbook
 from apps.api.app.services.llm.router import LLMRouter
+from shared.fm_shared.errors import StorageError
 from shared.fm_shared.storage import ArtifactStore
 
 router = APIRouter(
@@ -30,6 +37,20 @@ router = APIRouter(
 )
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB
+
+_BUDGET_TEMPLATES_PATH = Path(__file__).resolve().parent.parent / "data" / "budget_templates.json"
+
+_budget_templates_cache: list[dict[str, Any]] | None = None
+
+
+def _load_budget_templates() -> list[dict[str, Any]]:
+    """Load budget templates from JSON file, cached after first read."""
+    global _budget_templates_cache  # noqa: PLW0603
+    if _budget_templates_cache is None:
+        raw = _BUDGET_TEMPLATES_PATH.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        _budget_templates_cache = data.get("templates", [])
+    return _budget_templates_cache
 
 
 class AnswerQuestionsBody(BaseModel):
@@ -297,3 +318,205 @@ async def delete_ingestion(
         )
     if result == "DELETE 0":
         raise HTTPException(404, "Ingestion not found")
+
+
+# ---------------------------------------------------------------------------
+# SSE streaming endpoints (agentic Excel import)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/upload-stream")
+async def upload_and_stream(
+    file: UploadFile,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+) -> StreamingResponse:
+    """Upload .xlsx and stream agentic ingestion events via SSE.
+
+    The response is a ``text/event-stream`` body.  Each frame is a JSON
+    object with a ``type`` field (``session_start``, ``message``,
+    ``classification``, ``question``, ``mapping``, ``complete``, ``error``).
+    """
+    settings = get_settings()
+    if not settings.agent_excel_ingestion_enabled:
+        raise HTTPException(501, "Agentic Excel ingestion is not enabled")
+
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(400, "Only .xlsx files are allowed")
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(400, f"File exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)}MB limit")
+
+    # 1. Persist file and create ingestion session
+    async with tenant_conn(x_tenant_id) as conn:
+        try:
+            ingestion_id = await start_ingestion(
+                x_tenant_id,
+                x_user_id or None,
+                file.filename or "upload.xlsx",
+                content,
+                store,
+                conn,
+            )
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+
+    # 2. Parse workbook into sheet metadata
+    parsed = parse_workbook(content, file.filename or "upload.xlsx")
+    sheets: dict[str, Any] = {
+        s.name: {
+            "name": s.name,
+            "headers": s.headers,
+            "sample_rows": s.sample_rows,
+            "row_count": s.row_count,
+            "col_count": s.col_count,
+            "formula_patterns": s.formula_patterns,
+            "referenced_sheets": s.referenced_sheets,
+        }
+        for s in parsed.sheets
+    }
+
+    # 3. Load budget templates
+    templates = _load_budget_templates()
+
+    # 4. Create session manager
+    session_mgr = AgentSessionManager(
+        api_key=settings.anthropic_api_key or "",
+        model=settings.agent_sdk_default_model,
+        max_turns=settings.agent_sdk_max_turns,
+        max_budget_usd=settings.agent_sdk_max_budget_usd,
+    )
+
+    # 5. Build initial prompt
+    sheet_names = ", ".join(sheets.keys())
+    initial_prompt = (
+        f"I have uploaded an Excel file named '{file.filename}' with the "
+        f"following sheets: {sheet_names}. Please classify and map this "
+        f"workbook into a budget model."
+    )
+
+    # 6. Return SSE stream
+    return StreamingResponse(
+        session_mgr.start_session(
+            ingestion_id=ingestion_id,
+            tenant_id=x_tenant_id,
+            sheets=sheets,
+            templates=templates,
+            initial_prompt=initial_prompt,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "X-Ingestion-Id": ingestion_id,
+        },
+    )
+
+
+@router.post("/{ingestion_id}/answer-stream")
+async def answer_and_stream(
+    ingestion_id: str,
+    body: AnswerQuestionsBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> StreamingResponse:
+    """Resume a paused agent session with user answers, streaming SSE events.
+
+    The agent must have previously paused (``agent_status = 'paused'``) after
+    emitting a ``question`` event.  The frontend collects answers and POSTs
+    them here to continue the session.
+    """
+    settings = get_settings()
+    if not settings.agent_excel_ingestion_enabled:
+        raise HTTPException(501, "Agentic Excel ingestion is not enabled")
+
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    # 1. Fetch session row and validate state
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """SELECT ingestion_id, filename, agent_status, agent_session_id,
+                      agent_messages, agent_state_json
+               FROM excel_ingestion_sessions
+              WHERE tenant_id = $1 AND ingestion_id = $2""",
+            x_tenant_id,
+            ingestion_id,
+        )
+
+    if not row:
+        raise HTTPException(404, "Ingestion not found")
+    if row["agent_status"] != "paused":
+        raise HTTPException(400, f"Session is not paused (status: {row['agent_status']})")
+    if not row["agent_session_id"]:
+        raise HTTPException(400, "No agent session ID found — cannot resume")
+
+    session_id: str = row["agent_session_id"]
+    prior_state: dict[str, Any] = row["agent_state_json"] or {}
+    filename: str = row["filename"] or "upload.xlsx"
+
+    # 2. Rebuild sheets data from artifact store (re-parse stored file)
+    store = get_artifact_store()
+    try:
+        raw = store.load(x_tenant_id, EXCEL_UPLOAD_TYPE, ingestion_id)
+    except StorageError as e:
+        raise HTTPException(404, "Stored file metadata not found — cannot resume session") from e
+
+    if "file_storage_path" in raw and store._client:
+        bucket = store._client.storage.from_("excel-uploads")
+        file_bytes: bytes = bucket.download(raw["file_storage_path"])
+    elif "content_base64" in raw:
+        import base64
+        file_bytes = base64.b64decode(raw["content_base64"])
+    elif "file_storage_path" in raw and not store._client:
+        file_bytes = store._memory.get(f"excel:{raw['file_storage_path']}", b"")
+    else:
+        raise HTTPException(404, "Stored file not found — cannot resume session")
+
+    if not file_bytes:
+        raise HTTPException(404, "Stored file is empty — cannot resume session")
+
+    parsed = parse_workbook(file_bytes, filename)
+    sheets: dict[str, Any] = {
+        s.name: {
+            "name": s.name,
+            "headers": s.headers,
+            "sample_rows": s.sample_rows,
+            "row_count": s.row_count,
+            "col_count": s.col_count,
+            "formula_patterns": s.formula_patterns,
+            "referenced_sheets": s.referenced_sheets,
+        }
+        for s in parsed.sheets
+    }
+
+    # 3. Load budget templates
+    templates = _load_budget_templates()
+
+    # 4. Create session manager
+    session_mgr = AgentSessionManager(
+        api_key=settings.anthropic_api_key or "",
+        model=settings.agent_sdk_default_model,
+        max_turns=settings.agent_sdk_max_turns,
+        max_budget_usd=settings.agent_sdk_max_budget_usd,
+    )
+
+    # 5. Return SSE stream for resumed session
+    return StreamingResponse(
+        session_mgr.resume_session(
+            ingestion_id=ingestion_id,
+            session_id=session_id,
+            answers=body.answers,
+            sheets=sheets,
+            templates=templates,
+            prior_state=prior_state,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
