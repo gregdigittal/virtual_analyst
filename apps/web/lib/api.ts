@@ -610,6 +610,11 @@ export const api = {
         ).toString()}`,
         { tenantId }
       ),
+    seedTemplates: (tenantId: string) =>
+      request<{ seeded: number }>("/api/v1/workflows/templates/seed", {
+        tenantId,
+        method: "POST",
+      }),
   },
   budgets: {
     list: (tenantId: string, opts?: { status?: string; limit?: number; offset?: number }) =>

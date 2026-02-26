@@ -76,6 +76,65 @@ async def get_template(
     }
 
 
+DEFAULT_TEMPLATES = [
+    (
+        "tpl_self_service",
+        "Self-Service",
+        "Single stage; any team member can claim",
+        json.dumps([{"stage_id": "s1", "name": "Complete", "assignee_rule": "team_pool", "assignee_config": {}}]),
+    ),
+    (
+        "tpl_standard_review",
+        "Standard Review",
+        "Assignee works; manager reviews",
+        json.dumps([
+            {"stage_id": "s1", "name": "Prepare", "assignee_rule": "explicit", "assignee_config": {}},
+            {"stage_id": "s2", "name": "Review", "assignee_rule": "reports_to", "assignee_config": {}},
+        ]),
+    ),
+    (
+        "tpl_full_approval",
+        "Full Approval",
+        "Analyst -> Manager -> Director/CFO",
+        json.dumps([
+            {"stage_id": "s1", "name": "Prepare", "assignee_rule": "explicit", "assignee_config": {}},
+            {"stage_id": "s2", "name": "Manager Review", "assignee_rule": "reports_to", "assignee_config": {}},
+            {"stage_id": "s3", "name": "Director Approval", "assignee_rule": "reports_to_chain", "assignee_config": {}},
+        ]),
+    ),
+]
+
+
+@router.post("/templates/seed")
+async def seed_default_templates(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict:
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        count = await conn.fetchval(
+            "SELECT count(*) FROM workflow_templates WHERE tenant_id = $1",
+            x_tenant_id,
+        )
+        if count > 0:
+            return {"seeded": 0}
+        seeded = 0
+        for tpl_id, name, desc, stages in DEFAULT_TEMPLATES:
+            result = await conn.execute(
+                """INSERT INTO workflow_templates (tenant_id, template_id, name, description, stages_json)
+                   VALUES ($1, $2, $3, $4, $5::jsonb)
+                   ON CONFLICT (tenant_id, template_id) DO NOTHING""",
+                x_tenant_id,
+                tpl_id,
+                name,
+                desc,
+                stages,
+            )
+            if result and result.endswith("1"):
+                seeded += 1
+    return {"seeded": seeded}
+
+
 class CreateInstanceBody(BaseModel):
     template_id: str = Field(..., min_length=1)
     entity_type: str = Field(..., min_length=1)

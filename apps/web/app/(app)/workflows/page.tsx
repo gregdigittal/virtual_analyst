@@ -30,10 +30,16 @@ export default function WorkflowsPage() {
       api.setAccessToken(ctx.accessToken);
       setTenantId(ctx.tenantId);
       try {
-        const [tRes, iRes] = await Promise.all([
+        let [tRes, iRes] = await Promise.all([
           api.workflows.listTemplates(ctx.tenantId),
           api.workflows.listInstances(ctx.tenantId),
         ]);
+        if (!cancelled && (tRes.templates ?? []).length === 0) {
+          try {
+            await api.workflows.seedTemplates(ctx.tenantId);
+            tRes = await api.workflows.listTemplates(ctx.tenantId);
+          } catch { /* best-effort */ }
+        }
         if (!cancelled) {
           setTemplates(tRes.templates ?? []);
           setInstances(iRes.instances ?? []);
