@@ -77,6 +77,218 @@
         ]}
       ],
       "default_account_refs": ["Revenue", "COGS", "Gross Profit", "Payroll", "Warehouse & Logistics", "Rent", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "consulting",
+      "label": "Consulting Services",
+      "industry": "consulting",
+      "question_plan": [
+        { "section": "Utilization & Capacity", "questions": [
+          { "id": "util_1", "q": "Target utilization rate for consulting staff (%). Seasonal variation?" },
+          { "id": "util_2", "q": "Billable headcount by level (junior, senior, principal). Hiring plan?" },
+          { "id": "util_3", "q": "Average bill rates by level. Expected rate increases?" }
+        ]},
+        { "section": "Project Mix & Revenue", "questions": [
+          { "id": "proj_1", "q": "Revenue split by engagement type (strategy, implementation, advisory). Changes expected?" },
+          { "id": "proj_2", "q": "Average project size and duration. Pipeline assumptions?" }
+        ]},
+        { "section": "Overhead & Growth", "questions": [
+          { "id": "oh_1", "q": "Non-billable overhead: recruiting, training, BD. Expected changes?" },
+          { "id": "oh_2", "q": "Office, travel, technology costs. Remote vs on-site mix?" }
+        ]}
+      ],
+      "default_account_refs": ["Consulting Revenue", "Subcontractor Costs", "Gross Profit", "Payroll", "Travel & Expenses", "Recruiting", "Rent", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "legal",
+      "label": "Legal Practice",
+      "industry": "legal",
+      "question_plan": [
+        { "section": "Billable Hours & Rates", "questions": [
+          { "id": "bill_1", "q": "Target billable hours per attorney (associates vs partners). Realization rate?" },
+          { "id": "bill_2", "q": "Average billing rates by level. Planned rate adjustments?" },
+          { "id": "bill_3", "q": "Collection rate and average days to collect?" }
+        ]},
+        { "section": "Practice Areas & Staffing", "questions": [
+          { "id": "prac_1", "q": "Revenue breakdown by practice area (litigation, corporate, IP, etc.)." },
+          { "id": "prac_2", "q": "Associate-to-partner ratio. Lateral hires or promotions planned?" },
+          { "id": "prac_3", "q": "Paralegal and support staff headcount. Outsourcing plans?" }
+        ]},
+        { "section": "Firm Overhead", "questions": [
+          { "id": "oh_1", "q": "Office lease, legal research tools, malpractice insurance costs?" },
+          { "id": "oh_2", "q": "Marketing, business development, and pro-bono allocation?" }
+        ]}
+      ],
+      "default_account_refs": ["Fee Revenue", "Reimbursable Costs", "Gross Revenue", "Attorney Compensation", "Staff Payroll", "Occupancy", "Technology & Research", "Insurance", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "software_dev",
+      "label": "Software Development",
+      "industry": "software",
+      "question_plan": [
+        { "section": "Capacity & Delivery", "questions": [
+          { "id": "cap_1", "q": "Engineering headcount by role (frontend, backend, QA, DevOps). Hiring ramp?" },
+          { "id": "cap_2", "q": "Sprint capacity and velocity assumptions. Utilization target?" },
+          { "id": "cap_3", "q": "Contractor vs full-time mix. Nearshore/offshore plans?" }
+        ]},
+        { "section": "Project Revenue", "questions": [
+          { "id": "rev_1", "q": "Revenue by engagement model (fixed-price, T&M, retainer). Mix changes?" },
+          { "id": "rev_2", "q": "Average project size and backlog depth. Pipeline conversion rate?" }
+        ]},
+        { "section": "Technology & Operations", "questions": [
+          { "id": "tech_1", "q": "Cloud infrastructure, CI/CD tooling, and licensing costs?" },
+          { "id": "tech_2", "q": "Office, equipment, and general overhead. Remote work policy impact?" }
+        ]}
+      ],
+      "default_account_refs": ["Project Revenue", "Retainer Revenue", "Total Revenue", "Engineering Payroll", "Contractor Costs", "Cloud & Infrastructure", "Tooling & Licenses", "G&A", "EBITDA"]
+    },
+    {
+      "template_id": "staffing",
+      "label": "Staffing Agency",
+      "industry": "staffing",
+      "question_plan": [
+        { "section": "Placement Volume & Fees", "questions": [
+          { "id": "plc_1", "q": "Placement volume targets (perm vs contract). Fill rate assumptions?" },
+          { "id": "plc_2", "q": "Average placement fee or bill/pay spread by segment?" },
+          { "id": "plc_3", "q": "Contract renewal rate and average assignment duration?" }
+        ]},
+        { "section": "Contractor Management", "questions": [
+          { "id": "con_1", "q": "Active contractor headcount and payroll burden (taxes, benefits, insurance)?" },
+          { "id": "con_2", "q": "Workers' comp and general liability rates by job category?" }
+        ]},
+        { "section": "Internal Operations", "questions": [
+          { "id": "ops_1", "q": "Internal recruiter and sales headcount. Productivity targets (placements per recruiter)?" },
+          { "id": "ops_2", "q": "Job-board spend, ATS licensing, office costs?" }
+        ]}
+      ],
+      "default_account_refs": ["Placement Fee Revenue", "Contract Billing Revenue", "Contractor Payroll", "Contractor Burden", "Gross Profit", "Internal Payroll", "Recruiting Costs", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "wholesale_import",
+      "label": "Wholesale (Import)",
+      "industry": "distribution",
+      "question_plan": [
+        { "section": "Sourcing & FX", "questions": [
+          { "id": "fx_1", "q": "Primary sourcing currencies and expected FX rates. Hedging strategy?" },
+          { "id": "fx_2", "q": "Tariff rates and duty exposure by product category. Expected policy changes?" },
+          { "id": "fx_3", "q": "Average shipping cost per container/unit. Freight rate assumptions?" }
+        ]},
+        { "section": "Inventory & Lead Times", "questions": [
+          { "id": "inv_1", "q": "Average lead time (order to warehouse). Safety stock policy?" },
+          { "id": "inv_2", "q": "Inventory turns target. Obsolescence and shrinkage rates?" }
+        ]},
+        { "section": "Revenue & Distribution", "questions": [
+          { "id": "rev_1", "q": "Revenue growth target. Customer concentration and channel mix?" },
+          { "id": "rev_2", "q": "Gross margin target by product line. Pricing strategy?" }
+        ]}
+      ],
+      "default_account_refs": ["Revenue", "COGS (Landed)", "Freight & Shipping", "Tariffs & Duties", "Gross Profit", "Payroll", "Warehouse & Logistics", "FX Gains/Losses", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "retail",
+      "label": "Retail",
+      "industry": "retail",
+      "question_plan": [
+        { "section": "Store Operations & Traffic", "questions": [
+          { "id": "store_1", "q": "Number of stores. New openings or closures planned?" },
+          { "id": "store_2", "q": "Average foot traffic and conversion rate by location. Seasonal patterns?" },
+          { "id": "store_3", "q": "E-commerce vs in-store revenue split. Channel growth targets?" }
+        ]},
+        { "section": "Inventory & Merchandising", "questions": [
+          { "id": "inv_1", "q": "Inventory turns target. Markdown and shrinkage assumptions?" },
+          { "id": "inv_2", "q": "Average basket size and SKU count. Category mix changes?" }
+        ]},
+        { "section": "Store-Level P&L", "questions": [
+          { "id": "pl_1", "q": "Occupancy costs (rent, CAM, utilities) per location?" },
+          { "id": "pl_2", "q": "Store labor model: full-time vs part-time mix, wages, and benefits?" }
+        ]}
+      ],
+      "default_account_refs": ["Retail Revenue", "E-commerce Revenue", "COGS", "Gross Profit", "Store Payroll", "Occupancy", "Marketing", "Corporate Overhead", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "construction_gc",
+      "label": "Construction (General Contractor)",
+      "industry": "construction",
+      "question_plan": [
+        { "section": "Project Pipeline & Backlog", "questions": [
+          { "id": "pipe_1", "q": "Current backlog value and expected new awards. Win rate on bids?" },
+          { "id": "pipe_2", "q": "Revenue recognition method (% completion vs completed contract). Schedule assumptions?" }
+        ]},
+        { "section": "Subcontractors & Materials", "questions": [
+          { "id": "sub_1", "q": "Subcontractor cost as % of project value. Key trade availability?" },
+          { "id": "sub_2", "q": "Materials cost inflation assumptions. Supply chain lead times?" },
+          { "id": "sub_3", "q": "Equipment rental vs owned fleet. Major equipment purchases planned?" }
+        ]},
+        { "section": "Overhead & Bonding", "questions": [
+          { "id": "oh_1", "q": "G&A headcount (PMs, estimators, admin). Overhead allocation method?" },
+          { "id": "oh_2", "q": "Bonding capacity, insurance, and warranty reserve rates?" }
+        ]}
+      ],
+      "default_account_refs": ["Contract Revenue", "Subcontractor Costs", "Materials", "Equipment", "Direct Labor", "Gross Profit", "G&A", "Insurance & Bonding", "EBITDA"]
+    },
+    {
+      "template_id": "construction_specialty",
+      "label": "Construction (Specialty Trade)",
+      "industry": "construction",
+      "question_plan": [
+        { "section": "Crew Capacity & Labor", "questions": [
+          { "id": "crew_1", "q": "Number of crews and crew size. Journeyman vs apprentice mix?" },
+          { "id": "crew_2", "q": "Labor rates (union/non-union), overtime assumptions, and seasonal availability?" },
+          { "id": "crew_3", "q": "Hiring or training plans? Expected wage increases?" }
+        ]},
+        { "section": "Materials & Equipment", "questions": [
+          { "id": "mat_1", "q": "Key material costs and price trend assumptions (copper, steel, lumber, etc.)?" },
+          { "id": "mat_2", "q": "Tool and vehicle fleet. Replacement or expansion capex?" }
+        ]},
+        { "section": "Project Backlog & Pricing", "questions": [
+          { "id": "bk_1", "q": "Backlog by project type. Average job size and duration?" },
+          { "id": "bk_2", "q": "Markup and margin targets. Warranty and callback reserve?" }
+        ]}
+      ],
+      "default_account_refs": ["Contract Revenue", "Direct Labor", "Materials", "Equipment & Tools", "Gross Profit", "Payroll (Overhead)", "Vehicle Costs", "Insurance", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "healthcare_practice",
+      "label": "Medical Practice",
+      "industry": "healthcare",
+      "question_plan": [
+        { "section": "Patient Volume & Reimbursement", "questions": [
+          { "id": "pt_1", "q": "Patient visit volume by provider. Growth targets?" },
+          { "id": "pt_2", "q": "Average reimbursement rate by CPT code mix. Expected rate changes?" },
+          { "id": "pt_3", "q": "Payer mix (commercial, Medicare, Medicaid, self-pay). Collection rates?" }
+        ]},
+        { "section": "Staffing & Clinical Operations", "questions": [
+          { "id": "staff_1", "q": "Physician, PA/NP, and clinical support headcount. Compensation models?" },
+          { "id": "staff_2", "q": "Administrative and billing staff. Revenue cycle outsourcing?" }
+        ]},
+        { "section": "Facility & Compliance", "questions": [
+          { "id": "fac_1", "q": "Facility lease, medical equipment, and EHR/technology costs?" },
+          { "id": "fac_2", "q": "Malpractice insurance, licensing, and compliance costs?" }
+        ]}
+      ],
+      "default_account_refs": ["Patient Revenue", "Ancillary Revenue", "Total Revenue", "Physician Compensation", "Clinical Staff Payroll", "Medical Supplies", "Occupancy", "Malpractice Insurance", "Technology & EHR", "EBITDA"]
+    },
+    {
+      "template_id": "healthcare_services",
+      "label": "Healthcare Services",
+      "industry": "healthcare",
+      "question_plan": [
+        { "section": "Facility Revenue & Capacity", "questions": [
+          { "id": "frev_1", "q": "Facility count and bed/chair/unit capacity. Occupancy or utilization targets?" },
+          { "id": "frev_2", "q": "Revenue per patient-day or per procedure. Volume growth assumptions?" },
+          { "id": "frev_3", "q": "Payer mix and contract renegotiation schedule. Rate change expectations?" }
+        ]},
+        { "section": "Staffing & Ratios", "questions": [
+          { "id": "stf_1", "q": "Clinical staffing ratios (nurse-to-patient, therapist-to-patient). Compliance minimums?" },
+          { "id": "stf_2", "q": "Agency/travel staff usage. Plans to reduce reliance?" },
+          { "id": "stf_3", "q": "Wage growth assumptions. Retention and turnover rates?" }
+        ]},
+        { "section": "Regulatory & Capital", "questions": [
+          { "id": "reg_1", "q": "Regulatory compliance costs (accreditation, audits, reporting)?" },
+          { "id": "reg_2", "q": "Capital expenditure plans (facility upgrades, medical equipment, IT systems)?" }
+        ]}
+      ],
+      "default_account_refs": ["Patient Service Revenue", "Other Operating Revenue", "Total Revenue", "Clinical Payroll", "Agency & Contract Labor", "Medical Supplies", "Facility Costs", "Regulatory & Compliance", "Depreciation", "EBITDA"]
     }
   ]
 }
