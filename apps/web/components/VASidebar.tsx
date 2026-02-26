@@ -138,8 +138,14 @@ function NavIcon({ name, className = "" }: { name: string; className?: string })
 export function VASidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("va-sidebar-collapsed") === "true";
+  });
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("va-sidebar-groups") ?? "{}"); } catch { return {}; }
+  });
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
   // Fetch notification count
@@ -178,7 +184,11 @@ export function VASidebar() {
   }
 
   function toggleGroup(key: string) {
-    setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem("va-sidebar-groups", JSON.stringify(next));
+      return next;
+    });
   }
 
   async function handleSignOut() {
@@ -299,7 +309,11 @@ export function VASidebar() {
         {/* Collapse / Expand toggle */}
         <button
           type="button"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => setCollapsed((c) => {
+            const next = !c;
+            localStorage.setItem("va-sidebar-collapsed", String(next));
+            return next;
+          })}
           className={[
             "flex items-center gap-3 rounded-va-xs px-3 py-1.5 text-sm font-medium text-va-text2",
             "hover:text-va-text hover:bg-white/5",

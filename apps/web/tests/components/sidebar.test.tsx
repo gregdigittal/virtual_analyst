@@ -59,6 +59,7 @@ import { VASidebar } from "@/components/VASidebar";
 
 describe("VASidebar", () => {
   beforeEach(() => {
+    localStorage.clear();
     mockPathname = "/baselines";
     mockPush.mockClear();
     mockRefresh.mockClear();
@@ -172,6 +173,32 @@ describe("VASidebar", () => {
     expect(
       screen.getByRole("button", { name: /sign out/i }),
     ).toBeInTheDocument();
+  });
+
+  it("persists collapse state to localStorage", async () => {
+    const user = userEvent.setup();
+    render(<VASidebar />);
+    await screen.findByRole("navigation");
+    const collapseBtn = screen.getByRole("button", { name: /collapse sidebar/i });
+    await user.click(collapseBtn);
+    expect(localStorage.getItem("va-sidebar-collapsed")).toBe("true");
+  });
+
+  it("restores collapse state from localStorage", async () => {
+    localStorage.setItem("va-sidebar-collapsed", "true");
+    render(<VASidebar />);
+    const nav = await screen.findByRole("navigation");
+    expect(nav.className).toMatch(/w-16/);
+  });
+
+  it("persists group collapse state to localStorage", async () => {
+    const user = userEvent.setup();
+    render(<VASidebar />);
+    await screen.findByRole("navigation");
+    const setupHeader = screen.getByRole("button", { name: /SETUP/i });
+    await user.click(setupHeader);
+    const stored = JSON.parse(localStorage.getItem("va-sidebar-groups") ?? "{}");
+    expect(stored.setup).toBe(true);
   });
 
   it("toggles rail mode when collapse button is clicked", async () => {
