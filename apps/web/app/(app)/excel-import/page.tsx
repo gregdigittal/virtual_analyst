@@ -3,6 +3,7 @@
 import { api, ApiError } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard } from "@/components/ui";
+import { EntityHierarchyEditor, type DetectedEntity } from "@/components/EntityHierarchyEditor";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -36,6 +37,7 @@ export default function ExcelImportPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detectedEntities, setDetectedEntities] = useState<DetectedEntity[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,6 +74,9 @@ export default function ExcelImportPage() {
           sheets: (res.classification?.sheets as SheetClassification[]) ?? [],
           model_summary: (res.model_summary as Record<string, unknown>) ?? {},
         });
+        if (res.model_summary?.detected_entities) {
+          setDetectedEntities(res.model_summary.detected_entities as DetectedEntity[]);
+        }
         setStep(2);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : String(e));
@@ -254,6 +259,15 @@ export default function ExcelImportPage() {
                 <p className="mt-1 text-sm text-va-text2">
                   Revenue drivers: {(classification.model_summary.detected_revenue_drivers as string[]).join(", ")}
                 </p>
+              )}
+              {detectedEntities.length > 0 && (
+                <div className="mt-4 border-t border-va-border pt-4">
+                  <h3 className="text-sm font-medium text-va-text mb-2">Detected entities</h3>
+                  <EntityHierarchyEditor
+                    entities={detectedEntities}
+                    onChange={setDetectedEntities}
+                  />
+                </div>
               )}
             </div>
           )}
