@@ -238,6 +238,25 @@ export default function ExcelImportPage() {
               </p>
             </div>
           )}
+          {classification?.model_summary?.matched_template_id && (
+            <div className="mt-4 rounded-va-sm border border-va-success/40 bg-va-success/10 p-4">
+              <p className="text-sm font-medium text-va-success">
+                Industry detected: {String(classification.model_summary.industry)}
+                {classification.model_summary.detection_confidence &&
+                  ` (${Math.round(Number(classification.model_summary.detection_confidence) * 100)}% confidence)`
+                }
+              </p>
+              <p className="mt-1 text-sm text-va-text2">
+                Suggested template: <strong>{String(classification.model_summary.matched_template_id)}</strong>
+              </p>
+              {Array.isArray(classification.model_summary.detected_revenue_drivers) &&
+                (classification.model_summary.detected_revenue_drivers as string[]).length > 0 && (
+                <p className="mt-1 text-sm text-va-text2">
+                  Revenue drivers: {(classification.model_summary.detected_revenue_drivers as string[]).join(", ")}
+                </p>
+              )}
+            </div>
+          )}
           <ul className="space-y-1 mb-6">
             {(classification?.sheets ?? []).map((s) => (
               <li key={s.sheet_name} className="flex items-center gap-2 text-sm">

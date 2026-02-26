@@ -77,6 +77,31 @@ SHEET_CLASSIFICATION_SCHEMA = {
                 "has_working_capital": {"type": "boolean"},
                 "has_funding_debt": {"type": "boolean"},
                 "external_data_warning": {"type": "string"},
+                "naics_code": {"type": "string", "description": "Best-guess 4-6 digit NAICS code for this business"},
+                "matched_template_id": {
+                    "type": "string",
+                    "description": "Best-matching template from catalog: manufacturing, saas, services, wholesale, consulting, legal, software_dev, staffing, wholesale_import, retail, construction_gc, construction_specialty, healthcare_practice, healthcare_services",
+                },
+                "detection_confidence": {"type": "number", "minimum": 0, "maximum": 1, "description": "Confidence 0-1 in industry detection"},
+                "detected_revenue_drivers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Key revenue drivers detected from year-over-year analysis",
+                },
+                "detected_entities": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["entity_name", "industry", "is_parent"],
+                        "properties": {
+                            "entity_name": {"type": "string"},
+                            "industry": {"type": "string"},
+                            "is_parent": {"type": "boolean"},
+                            "children": {"type": "array", "items": {"type": "string"}},
+                        },
+                    },
+                    "description": "If consolidated AFS with subsidiaries, list each entity with parent-child relationships",
+                },
             },
         },
     },
@@ -206,7 +231,21 @@ async def parse_and_classify(
     if len(context) > 12000:
         context = context[:12000] + "\n...[truncated]"
     messages = [
-        {"role": "user", "content": f"Classify these Excel sheets and summarize the model.\n\n{context}\n\nRespond with JSON: sheets (array of sheet_name, classification, role, confidence, is_financial_core), model_summary (entity_name, industry, model_type, currency_guess, horizon_months_guess, optional country_guess, has_revenue_model, has_cost_model, has_capex, has_working_capital, has_funding_debt, external_data_warning)."},
+        {"role": "user", "content": (
+            f"Classify these Excel sheets and summarize the model.\n\n{context}\n\n"
+            "Respond with JSON: sheets (array of sheet_name, classification, role, confidence, is_financial_core), "
+            "model_summary (entity_name, industry, model_type, currency_guess, horizon_months_guess, optional country_guess, "
+            "has_revenue_model, has_cost_model, has_capex, has_working_capital, has_funding_debt, external_data_warning, "
+            "naics_code, matched_template_id, detection_confidence, detected_revenue_drivers, detected_entities).\n\n"
+            "For industry detection: Analyze year-over-year trends and line items to determine the best-guess 4-6 digit NAICS code. "
+            "Match to the closest template from this catalog: manufacturing, saas, services, wholesale, consulting, legal, "
+            "software_dev, staffing, wholesale_import, retail, construction_gc, construction_specialty, healthcare_practice, "
+            "healthcare_services. Provide a confidence score 0-1 for the industry detection. "
+            "Identify key revenue drivers from the data (e.g. recurring subscriptions, unit sales, project billing).\n\n"
+            "For entity detection: If the AFS appears consolidated with subsidiaries or multiple business entities, "
+            "list each detected entity with its name, industry, whether it is a parent, and its children entity names. "
+            "Look for intercompany eliminations, segment reporting, or separate entity tabs as signals."
+        )},
     ]
     try:
         resp = await llm.complete_with_routing(tenant_id, messages, SHEET_CLASSIFICATION_SCHEMA, "excel_sheet_classification")
