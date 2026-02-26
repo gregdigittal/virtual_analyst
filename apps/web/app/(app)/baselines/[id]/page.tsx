@@ -4,6 +4,7 @@ import { api, type ScenarioItem } from "@/lib/api";
 import { ConfigViewer } from "@/components/ConfigViewer";
 import { FundingPanel } from "@/components/FundingPanel";
 import { CorrelationMatrixEditor } from "@/components/CorrelationMatrixEditor";
+import { ModelStepper, type StepStates } from "@/components/ModelStepper";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import { EntityTimeline } from "@/components/EntityTimeline";
@@ -11,6 +12,36 @@ import { CommentThread } from "@/components/CommentThread";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+/** Derive step states from baseline config for the ModelStepper. */
+function computeStepStates(cfg: unknown): StepStates {
+  const c = (cfg ?? {}) as Record<string, unknown>;
+  const metadata = (c.metadata ?? {}) as Record<string, unknown>;
+  const assumptions = (c.assumptions ?? {}) as Record<string, unknown>;
+  const revenueStreams = Array.isArray(assumptions.revenue_streams)
+    ? (assumptions.revenue_streams as unknown[])
+    : [];
+  const funding = assumptions.funding as Record<string, unknown> | undefined;
+  const correlationMatrix = Array.isArray(c.correlation_matrix)
+    ? (c.correlation_matrix as unknown[])
+    : [];
+
+  const hasEntity = !!metadata.entity_name;
+  const hasRevenue = revenueStreams.length > 0;
+  const hasFunding = !!funding && Object.keys(funding).length > 0;
+  const hasAssumptions = hasRevenue && hasFunding;
+  const hasCorrelations = correlationMatrix.length > 0;
+
+  return {
+    start: "done",
+    company: hasEntity ? "done" : "current",
+    historical: hasRevenue ? "done" : hasEntity ? "current" : "pending",
+    assumptions: hasAssumptions ? "done" : hasEntity ? "current" : "pending",
+    correlations: hasCorrelations ? "done" : hasAssumptions ? "current" : "pending",
+    run: "pending",
+    review: "locked",
+  };
+}
 
 export default function BaselineDetailPage() {
   const params = useParams();
@@ -175,6 +206,11 @@ export default function BaselineDetailPage() {
           </VAButton>
         </div>
       </div>
+      {config && (
+        <div className="mb-6">
+          <ModelStepper baselineId={id} steps={computeStepStates(config)} />
+        </div>
+      )}
       {showRunForm && !!config && (
         <VACard className="mb-6 space-y-4 p-4">
           <h2 className="font-brand text-lg font-medium text-va-text">Run configuration</h2>

@@ -70,4 +70,13 @@ describe("BaselineDetailPage", () => {
     expect(mockApi.drafts.create).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith("/drafts/draft-new?tab=funding");
   });
+
+  it("renders the model stepper with Start step done", async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("Start")).toBeInTheDocument();
+    });
+    const startStep = screen.getByText("Start").closest("[data-step]");
+    expect(startStep?.getAttribute("data-state")).toBe("done");
+  });
 });
