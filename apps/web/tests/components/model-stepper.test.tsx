@@ -123,4 +123,28 @@ describe("ModelStepper", () => {
     const assumptionsLink = screen.getByText("Assumptions").closest("a");
     expect(assumptionsLink).toBeNull();
   });
+
+  it("sets aria-label on each step with state information", () => {
+    render(
+      <ModelStepper
+        steps={{ start: "done", company: "current", historical: "pending", assumptions: "locked" }}
+        baselineId="b-1"
+      />
+    );
+    expect(screen.getByLabelText(/Step 1: Start \(done\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Step 2: Company \(current\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Step 3: Historical \(pending\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Step 4: Assumptions \(locked\)/)).toBeInTheDocument();
+  });
+
+  it("sets aria-current='step' on current step link", () => {
+    render(
+      <ModelStepper
+        steps={{ start: "done", company: "current" }}
+        baselineId="b-1"
+      />
+    );
+    const companyLink = screen.getByRole("link", { name: /Company/ });
+    expect(companyLink).toHaveAttribute("aria-current", "step");
+  });
 });

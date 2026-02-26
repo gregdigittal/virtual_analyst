@@ -200,11 +200,12 @@ export function ModelStepper({ steps, baselineId }: ModelStepperProps) {
                 idx < STEPS.length - 1 ? "flex-1" : ""
               }`}
             >
-              <div data-step={def.id} data-state={state}>
+              <div data-step={def.id} data-state={state} aria-label={`Step ${idx + 1}: ${def.label} (${state})`}>
                 {isClickable ? (
                   <Link
                     href={def.href(baselineId)}
                     className="focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue rounded-va-sm"
+                    aria-current={state === "current" ? "step" : undefined}
                   >
                     {stepContent}
                   </Link>
