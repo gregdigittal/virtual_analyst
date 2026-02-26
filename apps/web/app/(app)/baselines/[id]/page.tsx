@@ -6,7 +6,7 @@ import { FundingPanel } from "@/components/FundingPanel";
 import { CorrelationMatrixEditor } from "@/components/CorrelationMatrixEditor";
 import { ModelStepper, type StepStates } from "@/components/ModelStepper";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAFormDialog, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
 import { EntityTimeline } from "@/components/EntityTimeline";
 import { CommentThread } from "@/components/CommentThread";
 import Link from "next/link";
@@ -56,6 +56,7 @@ export default function BaselineDetailPage() {
   const [runCreating, setRunCreating] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
 
   // Version history
   const [versions, setVersions] = useState<{ baseline_version: string; is_active: boolean; status: string; created_at: string | null }[]>([]);
@@ -177,20 +178,24 @@ export default function BaselineDetailPage() {
     }
   }
 
-  async function handleSaveAsTemplate() {
+  function handleSaveAsTemplate() {
+    setTemplateDialogOpen(true);
+  }
+
+  async function confirmSaveAsTemplate(values: Record<string, string>) {
     if (!tenantId) return;
-    const name = window.prompt("Template name:");
-    if (!name?.trim()) return;
-    const industry = window.prompt("Industry tag (e.g. software, manufacturing):");
-    if (!industry?.trim()) return;
+    const name = values.name?.trim();
+    const industry = values.industry?.trim();
+    if (!name || !industry) return;
     setTemplateSaving(true);
     try {
       const res = await api.marketplace.saveAsTemplate(tenantId, {
         source_baseline_id: id,
-        name: name.trim(),
-        industry: industry.trim(),
+        name,
+        industry,
       });
       toast.success(`Template "${res.name}" saved (${res.template_id})`);
+      setTemplateDialogOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save template");
     } finally {
@@ -490,6 +495,19 @@ export default function BaselineDetailPage() {
           </VACard>
         </div>
       )}
+      <VAFormDialog
+        open={templateDialogOpen}
+        title="Save as Template"
+        description="Save this baseline's configuration as a reusable marketplace template."
+        fields={[
+          { name: "name", label: "Template name", placeholder: "My Industry Template", required: true },
+          { name: "industry", label: "Industry tag", placeholder: "e.g. software, manufacturing", required: true },
+        ]}
+        onSubmit={confirmSaveAsTemplate}
+        onCancel={() => setTemplateDialogOpen(false)}
+        submitLabel="Save template"
+        loading={templateSaving}
+      />
     </main>
   );
 }

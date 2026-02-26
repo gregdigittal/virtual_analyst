@@ -8,6 +8,7 @@ export { StatePill } from "./StatePill";
 export { RiskBadge } from "./RiskBadge";
 export { VASelect } from "./VASelect";
 export { VAConfirmDialog } from "./VAConfirmDialog";
+export { VAFormDialog } from "./VAFormDialog";
 export { ToastProvider, useToast } from "./ToastProvider";
 export { VASpinner } from "./VASpinner";
 export { VAPagination } from "./VAPagination";
