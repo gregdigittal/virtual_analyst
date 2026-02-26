@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { PublicFooter } from "@/components/PublicFooter";
+import { PublicHeader } from "@/components/PublicHeader";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -25,41 +27,7 @@ export default async function LandingPage({
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-va-border bg-va-midnight/95 backdrop-blur supports-[backdrop-filter]:bg-va-midnight/80">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link
-            href="/"
-            className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded-va-xs"
-            aria-label="Virtual Analyst home"
-          >
-            <Image
-              src="/va-icon.svg"
-              alt=""
-              width={32}
-              height={32}
-              className="h-8 w-8"
-            />
-            <span className="font-brand text-lg font-semibold text-va-text">
-              Virtual Analyst
-            </span>
-          </Link>
-          <nav className="flex items-center gap-3" aria-label="Main navigation">
-            <Link
-              href="/login"
-              className="rounded-va-xs px-3 py-2 text-sm font-medium text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/signup"
-              className="inline-flex items-center rounded-va-sm bg-va-blue px-4 py-2 text-sm font-medium text-white hover:bg-va-blue/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight shadow-va-glow-blue"
-            >
-              Get started
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <PublicHeader />
 
       <main className="flex-1">
         {/* Hero */}
@@ -183,38 +151,7 @@ export default async function LandingPage({
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="border-t border-va-border bg-va-ink py-8">
-          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
-            <div className="flex items-center gap-2">
-              <Image src="/va-icon.svg" alt="" width={24} height={24} className="h-6 w-6" />
-              <span className="font-brand text-sm font-medium text-va-text2">Virtual Analyst</span>
-            </div>
-            <nav className="flex items-center gap-6" aria-label="Footer navigation">
-              <Link
-                href="/login"
-                className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded-va-xs"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/signup"
-                className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded-va-xs"
-              >
-                Sign up
-              </Link>
-              <Link
-                href="/compare"
-                className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded-va-xs"
-              >
-                Compare
-              </Link>
-            </nav>
-            <p className="text-xs text-va-muted">
-              © {new Date().getFullYear()} Virtual Analyst. All rights reserved.
-            </p>
-          </div>
-        </footer>
+        <PublicFooter />
       </main>
     </div>
   );
