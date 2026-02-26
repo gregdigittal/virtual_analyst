@@ -2,7 +2,7 @@
 
 import { api, type DraftSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VASelect, VASpinner, StatePill, VAPagination } from "@/components/ui";
+import { VAButton, VASpinner, StatePill, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -30,6 +30,7 @@ export default function DraftsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [hasBaselines, setHasBaselines] = useState(true);
 
   const load = useCallback(async () => {
@@ -86,6 +87,12 @@ export default function DraftsPage() {
     }
   }
 
+  const displayed = search
+    ? items.filter((d) =>
+        d.draft_session_id.toLowerCase().includes(search.toLowerCase())
+      )
+    : items;
+
   if (!tenantId && !loading) return null;
 
   return (
@@ -112,17 +119,28 @@ export default function DraftsPage() {
         />
       )}
 
-      <div className="mb-4">
-        <VASelect
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="ready_to_commit">Ready to commit</option>
-          <option value="committed">Committed</option>
-        </VASelect>
-      </div>
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by draft ID…"
+        filters={[
+          {
+            key: "status",
+            label: "Status",
+            options: [
+              { value: "", label: "All statuses" },
+              { value: "active", label: "Active" },
+              { value: "ready_to_commit", label: "Ready to commit" },
+              { value: "committed", label: "Committed" },
+            ],
+          },
+        ]}
+        filterValues={{ status: statusFilter }}
+        onFilterChange={(key, value) => {
+          if (key === "status") setStatusFilter(value);
+        }}
+        className="mb-4"
+      />
 
       {error && (
         <div
@@ -135,14 +153,25 @@ export default function DraftsPage() {
       {loading ? (
         <VASpinner label="Loading drafts…" />
       ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No drafts yet. Create a draft to build a model with chat and
-          assumptions, then commit to create a baseline.
-        </VACard>
+        <VAEmptyState
+          icon="edit"
+          title="No drafts yet"
+          description="Create a draft to start modifying a baseline."
+          actionLabel="New draft"
+          onAction={createDraft}
+          variant="empty"
+        />
+      ) : displayed.length === 0 ? (
+        <VAEmptyState
+          title="No drafts match your search"
+          actionLabel="Clear search"
+          onAction={() => setSearch("")}
+          variant="no-results"
+        />
       ) : (
         <>
           <ul className="space-y-2">
-            {items.map((d) => {
+            {displayed.map((d) => {
               const state = statusToState(d.status);
               return (
                 <li key={d.draft_session_id}>

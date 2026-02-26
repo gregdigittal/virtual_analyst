@@ -1,6 +1,6 @@
 "use client";
 
-import { VAButton, VACard, VAInput, VASpinner, VAPagination, useToast } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAInput, VAListToolbar, VASpinner, VAPagination, useToast } from "@/components/ui";
 import { api, type MarketplaceTemplate } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -11,6 +11,7 @@ export default function MarketplacePage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [templates, setTemplates] = useState<MarketplaceTemplate[]>([]);
+  const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({
     industry: "",
     template_type: "",
@@ -104,41 +105,69 @@ export default function MarketplacePage() {
         </div>
       )}
 
-      <VACard className="mb-4 p-4">
-        <div className="grid gap-3 md:grid-cols-3">
-          <VAInput
-            placeholder="Industry"
-            value={filters.industry}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, industry: e.target.value }))
-            }
-          />
-          <VAInput
-            placeholder="Template type (budget/model)"
-            value={filters.template_type}
-            onChange={(e) =>
-              setFilters((prev) => ({
-                ...prev,
-                template_type: e.target.value,
-              }))
-            }
-          />
-          <VAButton variant="secondary" onClick={load}>
-            Apply filters
-          </VAButton>
-        </div>
-      </VACard>
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search templates..."
+        filters={[
+          {
+            key: "industry",
+            label: "All industries",
+            options: [...new Set(templates.map((t) => t.industry).filter(Boolean))].map(
+              (v) => ({ value: v, label: v }),
+            ),
+          },
+          {
+            key: "template_type",
+            label: "All types",
+            options: [...new Set(templates.map((t) => t.template_type).filter(Boolean))].map(
+              (v) => ({ value: v, label: v }),
+            ),
+          },
+        ]}
+        filterValues={filters}
+        onFilterChange={(key, value) => {
+          setFilters((prev) => ({ ...prev, [key]: value }));
+        }}
+        onClearFilters={() => {
+          setSearch("");
+          setFilters({ industry: "", template_type: "" });
+        }}
+      />
 
       {loading ? (
-        <VASpinner label="Loading marketplace…" />
+        <VASpinner label="Loading marketplace..." />
       ) : templates.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No templates available. Check back soon for community-contributed models.
-        </VACard>
-      ) : (
-        <>
+        <VAEmptyState
+          icon="store"
+          title="No templates available"
+          description="Templates will be added soon."
+        />
+      ) : (() => {
+        const filtered = templates.filter((tpl) => {
+          if (search && !tpl.name.toLowerCase().includes(search.toLowerCase())) return false;
+          if (filters.industry && tpl.industry !== filters.industry) return false;
+          if (filters.template_type && tpl.template_type !== filters.template_type) return false;
+          return true;
+        });
+        if (filtered.length === 0) {
+          return (
+            <VAEmptyState
+              variant="no-results"
+              title="No matching templates"
+              description="Try adjusting your search or filters."
+              actionLabel="Clear filters"
+              onAction={() => {
+                setSearch("");
+                setFilters({ industry: "", template_type: "" });
+              }}
+            />
+          );
+        }
+        return (
+          <>
           <div className="grid gap-4 md:grid-cols-2">
-            {templates.map((tpl) => {
+            {filtered.map((tpl) => {
               const form = forms[tpl.template_id] || { label: "", fiscal_year: "" };
               return (
                 <VACard key={tpl.template_id} className="p-5">
@@ -198,7 +227,8 @@ export default function MarketplacePage() {
             onPageChange={setPage}
           />
         </>
-      )}
+        );
+      })()}
     </main>
   );
 }

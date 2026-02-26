@@ -2,10 +2,10 @@
 
 import { api, type NotificationItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VASpinner, VAPagination } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAListToolbar, VASpinner, VAPagination } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 20;
@@ -21,6 +21,7 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     if (!tenantId || !userId) return;
@@ -62,6 +63,25 @@ export default function NotificationsPage() {
     setPage(1);
   }, [unreadOnly]);
 
+  const unreadFilterConfig = useMemo(() => [{
+    key: "unread",
+    label: "All",
+    options: [{ value: "unread", label: "Unread only" }],
+  }], []);
+
+  const filterValues = useMemo(() => ({
+    unread: unreadOnly ? "unread" : "",
+  }), [unreadOnly]);
+
+  const filteredItems = useMemo(() => {
+    if (!search) return items;
+    const q = search.toLowerCase();
+    return items.filter((n) =>
+      n.title.toLowerCase().includes(q) ||
+      (n.body ?? "").toLowerCase().includes(q)
+    );
+  }, [items, search]);
+
   async function markRead(id: string) {
     if (!tenantId || !userId) return;
     try {
@@ -90,17 +110,15 @@ export default function NotificationsPage() {
         )}
       </div>
 
-      <div className="mb-4">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-va-text">
-          <input
-            type="checkbox"
-            checked={unreadOnly}
-            onChange={(e) => setUnreadOnly(e.target.checked)}
-            className="accent-va-blue"
-          />
-          Show unread only
-        </label>
-      </div>
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search notifications..."
+        filters={unreadFilterConfig}
+        filterValues={filterValues}
+        onFilterChange={(_key, value) => setUnreadOnly(value === "unread")}
+        onClearFilters={() => { setUnreadOnly(false); setSearch(""); }}
+      />
 
       {error && (
         <div
@@ -113,14 +131,21 @@ export default function NotificationsPage() {
       {loading ? (
         <VASpinner label="Loading…" />
       ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No notifications yet. Notifications are created when a draft is
-          marked ready to commit or when a run completes.
-        </VACard>
+        <VAEmptyState
+          icon="bell"
+          title="No notifications yet"
+          description="You're all caught up! Notifications will appear here when there's activity."
+        />
+      ) : filteredItems.length === 0 ? (
+        <VAEmptyState
+          variant="no-results"
+          title="No matching notifications"
+          description="Try a different search term or clear your filters."
+        />
       ) : (
         <>
           <ul className="space-y-2">
-            {items.map((n) => (
+            {filteredItems.map((n) => (
               <li
                 key={n.id}
                 className={`rounded-va-lg border border-va-border bg-va-panel/80 p-4 ${

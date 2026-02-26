@@ -1,6 +1,6 @@
 "use client";
 
-import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
+import { VAButton, VACard, VAConfirmDialog, VAInput, VASelect, VASpinner, VAPagination, VAEmptyState, VAListToolbar, useToast } from "@/components/ui";
 import {
   api,
   type CovenantDefinition,
@@ -26,6 +26,7 @@ export default function CovenantsPage() {
     threshold_value: "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -184,13 +185,37 @@ export default function CovenantsPage() {
 
       {loading ? (
         <VASpinner label="Loading covenants…" className="mt-4" />
-      ) : items.length === 0 ? (
-        <VACard className="mt-4 p-6 text-center text-va-text2">
-          No covenants defined yet. Use the form above to create your first covenant threshold.
-        </VACard>
-      ) : (
+      ) : items.length === 0 && !search ? (
+        <VAEmptyState
+          icon="shield"
+          title="No covenants yet"
+          description="Add a covenant using the form above."
+          variant="empty"
+          className="mt-4"
+        />
+      ) : (() => {
+        const displayed = search
+          ? items.filter((i) => i.label.toLowerCase().includes(search.toLowerCase()))
+          : items;
+        return (
         <>
-          <div className="mt-4 overflow-x-auto rounded-va-lg border border-va-border">
+          <VAListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search covenants…"
+            className="mt-4 mb-4"
+          />
+          {displayed.length === 0 ? (
+            <VAEmptyState
+              title="No matching covenants"
+              description="Try a different search term."
+              actionLabel="Clear search"
+              onAction={() => setSearch("")}
+              variant="no-results"
+            />
+          ) : (
+          <>
+          <div className="overflow-x-auto rounded-va-lg border border-va-border">
             <table className="w-full text-sm text-va-text">
               <thead>
                 <tr className="border-b border-va-border bg-va-surface">
@@ -202,7 +227,7 @@ export default function CovenantsPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((c) => (
+                {displayed.map((c) => (
                   <tr key={c.covenant_id} className="border-b border-va-border/50">
                     <td className="px-3 py-2">{c.label}</td>
                     <td className="px-3 py-2 text-va-text2">{c.metric_ref}</td>
@@ -231,8 +256,11 @@ export default function CovenantsPage() {
             total={total}
             onPageChange={setPage}
           />
+          </>
+          )}
         </>
-      )}
+        );
+      })()}
       <VAConfirmDialog
         open={!!confirmAction}
         title={confirmAction?.title ?? ""}

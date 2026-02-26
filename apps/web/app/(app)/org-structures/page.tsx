@@ -2,7 +2,7 @@
 
 import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VAInput, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAInput, VAListToolbar, VASpinner } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,7 @@ export default function OrgStructuresPage() {
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -68,6 +69,12 @@ export default function OrgStructuresPage() {
       setCreating(false);
     }
   }
+
+  const filteredItems = search
+    ? items.filter((o) =>
+        o.group_name.toLowerCase().includes(search.toLowerCase()),
+      )
+    : items;
 
   if (!tenantId && !loading) return null;
 
@@ -139,7 +146,7 @@ export default function OrgStructuresPage() {
                 onClick={handleCreate}
                 disabled={creating || !newName.trim()}
               >
-                {creating ? "Creating…" : "Create"}
+                {creating ? "Creating..." : "Create"}
               </VAButton>
               <VAButton
                 type="button"
@@ -157,36 +164,57 @@ export default function OrgStructuresPage() {
         </VACard>
       )}
       {loading ? (
-        <VASpinner label="Loading…" />
+        <VASpinner label="Loading..." />
       ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No group structures yet. Click &quot;Create New&quot; to add one.
-        </VACard>
+        <VAEmptyState
+          icon="users"
+          title="No groups yet"
+          description="Create a group to organize your entities."
+          actionLabel="Create group"
+          onAction={() => setShowCreate(true)}
+        />
       ) : (
-        <ul className="space-y-2">
-          {items.map((o) => (
-            <li key={o.org_id}>
-              <Link
-                href={`/org-structures/${o.org_id}`}
-                className="block rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-va-text">
-                    {o.group_name}
-                  </span>
-                  <span className="text-sm text-va-text2">
-                    {o.status} · {o.entity_count} entities · {o.reporting_currency}
-                  </span>
-                </div>
-                {o.created_at && (
-                  <p className="mt-1 text-sm text-va-text2">
-                    Created {formatDateTime(o.created_at)}
-                  </p>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <VAListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search groups..."
+          />
+          {filteredItems.length === 0 ? (
+            <VAEmptyState
+              variant="no-results"
+              title="No matching groups"
+              description="Try adjusting your search term."
+              onAction={() => setSearch("")}
+              actionLabel="Clear search"
+            />
+          ) : (
+            <ul className="space-y-2">
+              {filteredItems.map((o) => (
+                <li key={o.org_id}>
+                  <Link
+                    href={`/org-structures/${o.org_id}`}
+                    className="block rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-va-text">
+                        {o.group_name}
+                      </span>
+                      <span className="text-sm text-va-text2">
+                        {o.status} · {o.entity_count} entities · {o.reporting_currency}
+                      </span>
+                    </div>
+                    {o.created_at && (
+                      <p className="mt-1 text-sm text-va-text2">
+                        Created {formatDateTime(o.created_at)}
+                      </p>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </main>
   );

@@ -2,7 +2,7 @@
 
 import { api, type AssignmentItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAButton, VASpinner } from "@/components/ui";
+import { VACard, VAButton, VAEmptyState, VAListToolbar, VASpinner } from "@/components/ui";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -88,6 +88,7 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -160,6 +161,18 @@ export default function InboxPage() {
     }
   }
 
+  const filteredAssignments = assignments.filter((a) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      a.entity_id.toLowerCase().includes(q) ||
+      a.entity_type.toLowerCase().includes(q) ||
+      a.assignment_id.toLowerCase().includes(q) ||
+      a.status.toLowerCase().includes(q) ||
+      (a.instructions ?? "").toLowerCase().includes(q)
+    );
+  });
+
   if (!tenantId && !loading) return null;
 
   return (
@@ -196,6 +209,14 @@ export default function InboxPage() {
         ))}
       </div>
 
+      {assignments.length > 0 && (
+        <VAListToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search assignments..."
+        />
+      )}
+
       {error && (
         <div
           className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
@@ -208,21 +229,26 @@ export default function InboxPage() {
       {loading ? (
         <VASpinner label="Loading…" />
       ) : assignments.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          {tab === "my_tasks"
-            ? "No tasks assigned to you."
-            : tab === "team_pool"
-              ? "No pool tasks to claim."
-              : "No assignments yet."}
-          {tab !== "all" && (
-            <Link href="/assignments/new" className="mt-2 block text-va-blue hover:underline">
-              Create an assignment
-            </Link>
-          )}
-        </VACard>
+        <VAEmptyState
+          icon="inbox"
+          title="Inbox is empty"
+          description={
+            tab === "my_tasks"
+              ? "No tasks assigned to you. Items requiring your attention will appear here."
+              : tab === "team_pool"
+                ? "No pool tasks to claim. Items requiring your attention will appear here."
+                : "Items requiring your attention will appear here."
+          }
+        />
+      ) : filteredAssignments.length === 0 ? (
+        <VAEmptyState
+          variant="no-results"
+          title="No matching assignments"
+          description="Try a different search term."
+        />
       ) : (
         <ul className="space-y-3">
-          {assignments.map((a) => (
+          {filteredAssignments.map((a) => (
             <li key={a.assignment_id}>
               <AssignmentCard
                 a={a}

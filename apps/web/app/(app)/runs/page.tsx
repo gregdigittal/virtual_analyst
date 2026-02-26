@@ -2,7 +2,7 @@
 
 import { api, type BaselineSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VASelect, VASpinner, VAPagination } from "@/components/ui";
+import { VASpinner, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -21,6 +21,7 @@ export default function RunsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [baselineFilter, setBaselineFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
 
   const load = useCallback(async () => {
@@ -64,6 +65,12 @@ export default function RunsPage() {
     setPage(1);
   }, [statusFilter, baselineFilter]);
 
+  const displayed = search
+    ? items.filter((r) =>
+        r.run_id.toLowerCase().includes(search.toLowerCase())
+      )
+    : items;
+
   if (!tenantId && !loading) return null;
 
   return (
@@ -85,29 +92,41 @@ export default function RunsPage() {
         />
       )}
 
-      <div className="mb-4 flex flex-wrap gap-3">
-        <VASelect
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All statuses</option>
-          <option value="succeeded">Succeeded</option>
-          <option value="failed">Failed</option>
-          <option value="running">Running</option>
-          <option value="pending">Pending</option>
-        </VASelect>
-        <VASelect
-          value={baselineFilter}
-          onChange={(e) => setBaselineFilter(e.target.value)}
-        >
-          <option value="">All baselines</option>
-          {baselines.map((b) => (
-            <option key={b.baseline_id} value={b.baseline_id}>
-              {b.baseline_id} (v{b.baseline_version})
-            </option>
-          ))}
-        </VASelect>
-      </div>
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by run ID…"
+        filters={[
+          {
+            key: "status",
+            label: "Status",
+            options: [
+              { value: "", label: "All statuses" },
+              { value: "succeeded", label: "Succeeded" },
+              { value: "failed", label: "Failed" },
+              { value: "running", label: "Running" },
+              { value: "pending", label: "Pending" },
+            ],
+          },
+          {
+            key: "baseline_id",
+            label: "Baseline",
+            options: [
+              { value: "", label: "All baselines" },
+              ...baselines.map((b) => ({
+                value: b.baseline_id,
+                label: `${b.baseline_id} (v${b.baseline_version})`,
+              })),
+            ],
+          },
+        ]}
+        filterValues={{ status: statusFilter, baseline_id: baselineFilter }}
+        onFilterChange={(key, value) => {
+          if (key === "status") setStatusFilter(value);
+          if (key === "baseline_id") setBaselineFilter(value);
+        }}
+        className="mb-4"
+      />
 
       {error && (
         <div
@@ -120,14 +139,25 @@ export default function RunsPage() {
       {loading ? (
         <VASpinner label="Loading runs…" />
       ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No runs yet. Create a baseline and run the model from the baseline
-          detail page.
-        </VACard>
+        <VAEmptyState
+          icon="play"
+          title="No runs yet"
+          description="Run a baseline to generate financial projections."
+          actionLabel="View baselines"
+          actionHref="/baselines"
+          variant="empty"
+        />
+      ) : displayed.length === 0 ? (
+        <VAEmptyState
+          title="No runs match your search"
+          actionLabel="Clear search"
+          onAction={() => setSearch("")}
+          variant="no-results"
+        />
       ) : (
         <>
           <ul className="space-y-2">
-            {items.map((r) => (
+            {displayed.map((r) => (
               <li key={r.run_id}>
                 <Link
                   href={`/runs/${r.run_id}`}

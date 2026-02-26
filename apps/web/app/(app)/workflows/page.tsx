@@ -2,7 +2,7 @@
 
 import { api, type WorkflowTemplate, type WorkflowInstance } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAInput, VAListToolbar, VASelect, VASpinner, useToast } from "@/components/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,6 +15,9 @@ export default function WorkflowsPage() {
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [instances, setInstances] = useState<WorkflowInstance[]>([]);
+
+  // Search for instances
+  const [instanceSearch, setInstanceSearch] = useState("");
 
   // Create form
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
@@ -71,6 +74,19 @@ export default function WorkflowsPage() {
     }
   }
 
+  const filteredInstances = instances.filter((inst) => {
+    if (!instanceSearch) return true;
+    const q = instanceSearch.toLowerCase();
+    const tpl = templates.find((t) => t.template_id === inst.template_id);
+    return (
+      inst.instance_id.toLowerCase().includes(q) ||
+      inst.entity_id.toLowerCase().includes(q) ||
+      inst.entity_type.toLowerCase().includes(q) ||
+      inst.status.toLowerCase().includes(q) ||
+      (tpl?.name ?? "").toLowerCase().includes(q)
+    );
+  });
+
   if (!tenantId && !loading) return null;
 
   return (
@@ -91,7 +107,11 @@ export default function WorkflowsPage() {
           <section>
             <h2 className="font-brand mb-3 text-lg font-medium text-va-text">Templates</h2>
             {templates.length === 0 ? (
-              <p className="text-sm text-va-text2">No workflow templates found.</p>
+              <VAEmptyState
+                icon="workflow"
+                title="No workflow templates"
+                description="Contact your administrator to set up workflow templates."
+              />
             ) : (
               <div className="overflow-x-auto rounded-va-lg border border-va-border">
                 <table className="w-full text-sm text-va-text">
@@ -159,8 +179,25 @@ export default function WorkflowsPage() {
           {/* Active instances */}
           <section>
             <h2 className="font-brand mb-3 text-lg font-medium text-va-text">Instances</h2>
+            {instances.length > 0 && (
+              <VAListToolbar
+                searchValue={instanceSearch}
+                onSearchChange={setInstanceSearch}
+                searchPlaceholder="Search instances..."
+              />
+            )}
             {instances.length === 0 ? (
-              <p className="text-sm text-va-text2">No workflow instances yet.</p>
+              <VAEmptyState
+                icon="workflow"
+                title="No workflow instances"
+                description="Start a workflow using a template above."
+              />
+            ) : filteredInstances.length === 0 ? (
+              <VAEmptyState
+                variant="no-results"
+                title="No matching instances"
+                description="Try a different search term."
+              />
             ) : (
               <div className="overflow-x-auto rounded-va-lg border border-va-border">
                 <table className="w-full text-sm text-va-text">
@@ -174,7 +211,7 @@ export default function WorkflowsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {instances.map((inst) => {
+                    {filteredInstances.map((inst) => {
                       const tpl = templates.find((t) => t.template_id === inst.template_id);
                       return (
                         <tr key={inst.instance_id} className="border-b border-va-border/50">

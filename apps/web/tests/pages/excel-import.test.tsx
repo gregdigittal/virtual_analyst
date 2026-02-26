@@ -77,7 +77,7 @@ describe("ExcelImportPage", () => {
     renderPage();
     await waitFor(() => {
       expect(
-        screen.getByText(/drop your file here/i),
+        screen.getByText(/drop your .xlsx file here/i),
       ).toBeInTheDocument();
     });
   });

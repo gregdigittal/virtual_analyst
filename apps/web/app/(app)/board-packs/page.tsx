@@ -2,7 +2,7 @@
 
 import { api, type BoardPackSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VASpinner, VAPagination } from "@/components/ui";
+import { VACard, VASpinner, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -20,6 +20,7 @@ export default function BoardPacksPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [hasBaselines, setHasBaselines] = useState(true);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -88,13 +89,38 @@ export default function BoardPacksPage() {
       {loading ? (
         <VASpinner label="Loading board packs…" />
       ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No board packs yet. Create one from the pack detail page (link a run and optionally a budget).
-        </VACard>
-      ) : (
+        <VAEmptyState
+          icon="briefcase"
+          title="No board packs yet"
+          description="Create a board pack from your completed runs."
+          actionLabel="View runs"
+          actionHref="/runs"
+          variant="empty"
+        />
+      ) : (() => {
+        const displayed = search
+          ? items.filter((i) => i.label.toLowerCase().includes(search.toLowerCase()))
+          : items;
+        return (
         <>
+          <VAListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search board packs…"
+            className="mb-4"
+          />
+          {displayed.length === 0 ? (
+            <VAEmptyState
+              title="No matching board packs"
+              description="Try a different search term."
+              actionLabel="Clear search"
+              onAction={() => setSearch("")}
+              variant="no-results"
+            />
+          ) : (
+          <>
           <ul className="space-y-2">
-            {items.map((p) => (
+            {displayed.map((p) => (
               <li key={p.pack_id}>
                 <Link
                   href={`/board-packs/${p.pack_id}`}
@@ -135,8 +161,11 @@ export default function BoardPacksPage() {
             hasMore={hasMore}
             onPageChange={setPage}
           />
+          </>
+          )}
         </>
-      )}
+        );
+      })()}
       <p className="mt-4 text-sm text-va-text2">
         Create new pack via API: <code className="rounded bg-va-panel px-1">POST /api/v1/board-packs</code> with label and run_id.
       </p>

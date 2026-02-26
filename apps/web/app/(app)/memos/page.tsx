@@ -1,6 +1,6 @@
 "use client";
 
-import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, VAEmptyState, VAListToolbar, useToast } from "@/components/ui";
 import { api, type MemoSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
@@ -29,6 +29,7 @@ export default function MemosPage() {
   const { toast } = useToast();
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState("");
   const [memoTypeFilter, setMemoTypeFilter] = useState("");
 
   const load = useCallback(async () => {
@@ -153,27 +154,50 @@ export default function MemosPage() {
         </VAButton>
       </VACard>
 
-      <div className="mt-4 mb-4">
-        <VASelect
-          value={memoTypeFilter}
-          onChange={(e) => setMemoTypeFilter(e.target.value)}
-        >
-          <option value="">All memo types</option>
-          {MEMO_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </VASelect>
-      </div>
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search memos…"
+        filters={[
+          {
+            key: "memo_type",
+            label: "Memo type",
+            options: [
+              { label: "All memo types", value: "" },
+              ...MEMO_TYPES.map((t) => ({ label: t, value: t })),
+            ],
+          },
+        ]}
+        filterValues={{ memo_type: memoTypeFilter }}
+        onFilterChange={(key, value) => {
+          if (key === "memo_type") setMemoTypeFilter(value);
+        }}
+        onClearFilters={() => { setMemoTypeFilter(""); setSearch(""); }}
+        className="mt-4 mb-4"
+      />
 
       {loading ? (
         <VASpinner label="Loading memos…" />
-      ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No memos generated yet.
-        </VACard>
-      ) : (
+      ) : items.length === 0 && !search ? (
+        <VAEmptyState
+          icon="file-text"
+          title="No memos yet"
+          description="Generate a memo using the form above."
+          variant="empty"
+        />
+      ) : (() => {
+        const displayed = search
+          ? items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()))
+          : items;
+        return displayed.length === 0 ? (
+          <VAEmptyState
+            title="No matching memos"
+            description="Try a different search term or filter."
+            actionLabel="Clear search"
+            onAction={() => setSearch("")}
+            variant="no-results"
+          />
+        ) : (
         <>
           <div className="overflow-x-auto rounded-va-lg border border-va-border">
             <table className="w-full text-sm text-va-text">
@@ -186,7 +210,7 @@ export default function MemosPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((memo) => (
+                {displayed.map((memo) => (
                   <tr
                     key={memo.memo_id}
                     className="border-b border-va-border/50"
@@ -220,7 +244,8 @@ export default function MemosPage() {
             onPageChange={setPage}
           />
         </>
-      )}
+        );
+      })()}
     </main>
   );
 }

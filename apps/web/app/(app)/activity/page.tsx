@@ -1,6 +1,6 @@
 "use client";
 
-import { VAButton, VACard, VAInput, VASpinner, VAPagination } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAInput, VAListToolbar, VASpinner, VAPagination } from "@/components/ui";
 import { api, type ActivityItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
@@ -17,6 +17,7 @@ export default function ActivityPage() {
     resource_id: "",
     since: "",
   });
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -61,6 +62,12 @@ export default function ActivityPage() {
     setPage(1);
   }, [filters]);
 
+  const filteredItems = search
+    ? items.filter((item) =>
+        item.summary?.toLowerCase().includes(search.toLowerCase()),
+      )
+    : items;
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6">
@@ -71,6 +78,12 @@ export default function ActivityPage() {
           Recent actions across your tenant with filters by user and entity.
         </p>
       </div>
+
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search activity..."
+      />
 
       <VACard className="mb-4 p-4">
         <div className="grid gap-3 md:grid-cols-4">
@@ -121,15 +134,25 @@ export default function ActivityPage() {
       )}
 
       {loading ? (
-        <VASpinner label="Loading activity…" />
+        <VASpinner label="Loading activity..." />
       ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No activity recorded yet. Actions across your workspace will appear here.
-        </VACard>
+        <VAEmptyState
+          icon="workflow"
+          title="No activity yet"
+          description="Activity will appear here as you work with your data."
+        />
+      ) : filteredItems.length === 0 ? (
+        <VAEmptyState
+          variant="no-results"
+          title="No matching activity"
+          description="Try adjusting your search term."
+          onAction={() => setSearch("")}
+          actionLabel="Clear search"
+        />
       ) : (
         <>
           <div className="space-y-3">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <VACard key={item.id} className="p-4">
                 <div className="flex items-center justify-between text-sm text-va-text2">
                   <span>{item.type.toUpperCase()}</span>

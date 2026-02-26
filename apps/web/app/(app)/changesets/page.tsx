@@ -9,6 +9,8 @@ import {
   VASelect,
   VASpinner,
   VAPagination,
+  VAEmptyState,
+  VAListToolbar,
   useToast,
 } from "@/components/ui";
 import Link from "next/link";
@@ -37,6 +39,7 @@ export default function ChangesetsPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [search, setSearch] = useState("");
 
   // Create form state
   const [showCreate, setShowCreate] = useState(false);
@@ -259,12 +262,37 @@ export default function ChangesetsPage() {
       {/* Changeset list */}
       {loading ? (
         <VASpinner label="Loading changesets..." />
-      ) : items.length === 0 ? (
-        <p className="text-sm text-va-text2">
-          No changesets yet. Create one to propose targeted assumption changes.
-        </p>
-      ) : (
+      ) : items.length === 0 && !search ? (
+        <VAEmptyState
+          icon="diff"
+          title="No changesets yet"
+          description="Create a changeset to track a group of related changes."
+          actionLabel="New changeset"
+          onAction={() => setShowCreate(true)}
+          variant="empty"
+        />
+      ) : (() => {
+        const displayed = search
+          ? items.filter((i) => (i.label ?? "").toLowerCase().includes(search.toLowerCase()))
+          : items;
+        return (
         <>
+          <VAListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search changesets…"
+            className="mb-4"
+          />
+          {displayed.length === 0 ? (
+            <VAEmptyState
+              title="No matching changesets"
+              description="Try a different search term."
+              actionLabel="Clear search"
+              onAction={() => setSearch("")}
+              variant="no-results"
+            />
+          ) : (
+          <>
           <div className="overflow-x-auto rounded-va-lg border border-va-border">
             <table className="w-full text-sm text-va-text">
               <thead>
@@ -281,7 +309,7 @@ export default function ChangesetsPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((cs) => (
+                {displayed.map((cs) => (
                   <tr
                     key={cs.changeset_id}
                     className="border-b border-va-border/50"
@@ -329,8 +357,11 @@ export default function ChangesetsPage() {
             hasMore={hasMore}
             onPageChange={setPage}
           />
+          </>
+          )}
         </>
-      )}
+        );
+      })()}
     </main>
   );
 }

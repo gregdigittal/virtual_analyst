@@ -2,7 +2,7 @@
 
 import { api, type BaselineSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAInput, VASpinner, VAPagination } from "@/components/ui";
+import { VASpinner, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -67,13 +67,12 @@ export default function BaselinesPage() {
         </h1>
       </div>
 
-      <div className="mb-4">
-        <VAInput
-          placeholder="Search by baseline ID…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by baseline ID…"
+        className="mb-4"
+      />
 
       {error && (
         <div
@@ -85,12 +84,22 @@ export default function BaselinesPage() {
       )}
       {loading ? (
         <VASpinner label="Loading baselines…" />
+      ) : items.length === 0 ? (
+        <VAEmptyState
+          icon="layers"
+          title="No baselines yet"
+          description="Import data or browse the marketplace to create your first baseline."
+          actionLabel="Browse marketplace"
+          actionHref="/marketplace"
+          variant="empty"
+        />
       ) : displayed.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          {search
-            ? "No baselines match your search."
-            : "No baselines yet. Create one via the API (POST /api/v1/baselines with a model_config)."}
-        </VACard>
+        <VAEmptyState
+          title="No baselines match your search"
+          actionLabel="Clear search"
+          onAction={() => setSearch("")}
+          variant="no-results"
+        />
       ) : (
         <>
           <ul className="space-y-2">

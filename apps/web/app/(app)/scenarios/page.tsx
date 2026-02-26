@@ -2,7 +2,7 @@
 
 import { api, type BaselineSummary, type ScenarioItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, useToast } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, useToast, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -22,6 +22,8 @@ export default function ScenariosPage() {
     scenarios: Record<string, unknown>[];
   } | null>(null);
   const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
+  const [search, setSearch] = useState("");
+  const [baselineFilter, setBaselineFilter] = useState("");
   const { toast } = useToast();
 
   // Create form state
@@ -131,6 +133,12 @@ export default function ScenariosPage() {
     }
   }
 
+  const displayed = items.filter((s) => {
+    if (search && !s.label.toLowerCase().includes(search.toLowerCase())) return false;
+    if (baselineFilter && s.baseline_id !== baselineFilter) return false;
+    return true;
+  });
+
   if (!tenantId && !loading) return null;
 
   return (
@@ -138,6 +146,29 @@ export default function ScenariosPage() {
       <h1 className="font-brand mb-6 text-2xl font-semibold tracking-tight text-va-text">
         Scenarios
       </h1>
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by label…"
+        filters={baselines.length > 0 ? [
+          {
+            key: "baseline_id",
+            label: "Baseline",
+            options: [
+              { value: "", label: "All baselines" },
+              ...baselines.map((b) => ({
+                value: b.baseline_id,
+                label: `${b.baseline_id} (v${b.baseline_version})`,
+              })),
+            ],
+          },
+        ] : undefined}
+        filterValues={{ baseline_id: baselineFilter }}
+        onFilterChange={(key, value) => {
+          if (key === "baseline_id") setBaselineFilter(value);
+        }}
+        className="mb-4"
+      />
       {error && (
         <div
           className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
@@ -155,9 +186,21 @@ export default function ScenariosPage() {
               Scenario list
             </h2>
             {items.length === 0 ? (
-              <p className="text-sm text-va-text2">
-                No scenarios yet. Create one from a baseline.
-              </p>
+              <VAEmptyState
+                icon="git-branch"
+                title="No scenarios yet"
+                description="Create a scenario to compare different assumptions."
+                actionLabel="New scenario"
+                onAction={() => setShowCreate(true)}
+                variant="empty"
+              />
+            ) : displayed.length === 0 ? (
+              <VAEmptyState
+                title="No scenarios match your search"
+                actionLabel="Clear search"
+                onAction={() => { setSearch(""); setBaselineFilter(""); }}
+                variant="no-results"
+              />
             ) : (
               <>
                 <div className="overflow-x-auto rounded-va-lg border border-va-border">
@@ -177,7 +220,7 @@ export default function ScenariosPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((s) => (
+                      {displayed.map((s) => (
                         <tr
                           key={s.scenario_id}
                           className="border-b border-va-border/50"

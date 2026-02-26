@@ -1,6 +1,6 @@
 "use client";
 
-import { VAButton, VACard, VAInput, VASelect, VASpinner, useToast } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAInput, VAListToolbar, VASelect, VASpinner, useToast } from "@/components/ui";
 import { api, type CommentItem, type DocumentItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
@@ -26,6 +26,7 @@ export default function DocumentsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [docSearch, setDocSearch] = useState("");
   const { toast } = useToast();
 
   const loadDocuments = useCallback(async () => {
@@ -107,6 +108,15 @@ export default function DocumentsPage() {
     }
   }
 
+  const filteredDocs = docs.filter((doc) => {
+    if (!docSearch) return true;
+    const q = docSearch.toLowerCase();
+    return (
+      doc.filename.toLowerCase().includes(q) ||
+      (doc.content_type ?? "").toLowerCase().includes(q)
+    );
+  });
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6">
@@ -163,43 +173,62 @@ export default function DocumentsPage() {
       {loading ? (
         <VASpinner label="Loading documents…" className="mt-4" />
       ) : docs.length === 0 ? (
-        <VACard className="mt-4 p-6 text-center text-va-text2">
-          No documents uploaded for this entity.
-        </VACard>
+        <VAEmptyState
+          icon="folder"
+          title="No documents yet"
+          description="Upload documents using the form above."
+          className="mt-4"
+        />
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-va-lg border border-va-border">
-          <table className="w-full text-sm text-va-text">
-            <thead>
-              <tr className="border-b border-va-border bg-va-surface">
-                <th className="px-3 py-2 text-left font-medium">Filename</th>
-                <th className="px-3 py-2 text-left font-medium">Type</th>
-                <th className="px-3 py-2 text-left font-medium">Size</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {docs.map((doc) => (
-                <tr key={doc.document_id} className="border-b border-va-border/50">
-                  <td className="px-3 py-2">{doc.filename}</td>
-                  <td className="px-3 py-2 text-va-text2">{doc.content_type}</td>
-                  <td className="px-3 py-2 text-va-text2">
-                    {doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <a
-                      className="text-va-blue hover:underline"
-                      href={api.documents.downloadUrl(doc.document_id)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Download
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <VAListToolbar
+            searchValue={docSearch}
+            onSearchChange={setDocSearch}
+            searchPlaceholder="Search documents..."
+            className="mt-4"
+          />
+          {filteredDocs.length === 0 ? (
+            <VAEmptyState
+              variant="no-results"
+              title="No matching documents"
+              description="Try a different search term."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-va-lg border border-va-border">
+              <table className="w-full text-sm text-va-text">
+                <thead>
+                  <tr className="border-b border-va-border bg-va-surface">
+                    <th className="px-3 py-2 text-left font-medium">Filename</th>
+                    <th className="px-3 py-2 text-left font-medium">Type</th>
+                    <th className="px-3 py-2 text-left font-medium">Size</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDocs.map((doc) => (
+                    <tr key={doc.document_id} className="border-b border-va-border/50">
+                      <td className="px-3 py-2">{doc.filename}</td>
+                      <td className="px-3 py-2 text-va-text2">{doc.content_type}</td>
+                      <td className="px-3 py-2 text-va-text2">
+                        {doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <a
+                          className="text-va-blue hover:underline"
+                          href={api.documents.downloadUrl(doc.document_id)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Download
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       <VACard className="mt-6 p-5">

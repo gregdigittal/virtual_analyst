@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useAgentStream } from "@/hooks/useAgentStream";
 
-import { VAButton, VACard, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VASpinner } from "@/components/ui";
 import { ImportStepper } from "@/components/excel-import/ImportStepper";
 import { ChatThread } from "@/components/excel-import/ChatThread";
 import { QuestionCard } from "@/components/excel-import/QuestionCard";
@@ -350,17 +350,12 @@ export default function ExcelImportPage() {
 
       {/* Upload drop zone (before streaming starts) */}
       {!streaming && !uploading && (
-        <VACard className="p-6">
-          <p className="text-va-text2 mb-4">
-            Upload an existing .xlsx financial model. The AI agent will classify
-            sheets, map line items, and ask clarifying questions in a chat
-            interface.
-          </p>
+        <div>
           <div
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
-            className={`rounded-va-lg border-2 border-dashed p-12 text-center transition ${
+            className={`rounded-va-lg border-2 border-dashed p-6 text-center transition ${
               dragOver
                 ? "border-va-blue bg-va-blue/10"
                 : "border-va-border bg-va-panel/50"
@@ -377,18 +372,15 @@ export default function ExcelImportPage() {
                 if (f) handleUpload(f);
               }}
             />
-            <p className="text-va-text2 mb-2">
-              Drop your file here or click to browse
-            </p>
-            <VAButton
-              type="button"
-              variant="secondary"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Select .xlsx file
-            </VAButton>
+            <VAEmptyState
+              icon="upload"
+              title="No Excel connections yet"
+              description="Create a connection to import data from Excel. Drop your .xlsx file here or click below to browse."
+              actionLabel="Select .xlsx file"
+              onAction={() => fileInputRef.current?.click()}
+            />
           </div>
-        </VACard>
+        </div>
       )}
 
       {/* Uploading spinner */}

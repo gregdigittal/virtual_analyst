@@ -2,7 +2,7 @@
 
 import { api, type BudgetSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VASpinner, VAPagination } from "@/components/ui";
+import { VASpinner, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -19,6 +19,7 @@ export default function BudgetsPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [search, setSearch] = useState("");
   const [hasBaselines, setHasBaselines] = useState(true);
 
   const load = useCallback(async () => {
@@ -56,6 +57,12 @@ export default function BudgetsPage() {
     if (tenantId) load();
   }, [tenantId, load]);
 
+  const displayed = search
+    ? items.filter((b) =>
+        b.label.toLowerCase().includes(search.toLowerCase())
+      )
+    : items;
+
   if (!tenantId && !loading) return null;
 
   return (
@@ -77,6 +84,13 @@ export default function BudgetsPage() {
         />
       )}
 
+      <VAListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by label…"
+        className="mb-4"
+      />
+
       {error && (
         <div
           className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
@@ -88,13 +102,25 @@ export default function BudgetsPage() {
       {loading ? (
         <VASpinner label="Loading budgets…" />
       ) : items.length === 0 ? (
-        <VACard className="p-6 text-center text-va-text2">
-          No budgets yet. Create one from the API or from a template.
-        </VACard>
+        <VAEmptyState
+          icon="dollar"
+          title="No budgets yet"
+          description="Browse templates to create your first budget."
+          actionLabel="Browse templates"
+          actionHref="/marketplace"
+          variant="empty"
+        />
+      ) : displayed.length === 0 ? (
+        <VAEmptyState
+          title="No budgets match your search"
+          actionLabel="Clear search"
+          onAction={() => setSearch("")}
+          variant="no-results"
+        />
       ) : (
         <>
           <ul className="space-y-2">
-            {items.map((b) => (
+            {displayed.map((b) => (
               <li key={b.budget_id}>
                 <Link
                   href={`/budgets/${b.budget_id}`}
