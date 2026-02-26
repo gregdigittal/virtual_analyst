@@ -317,7 +317,9 @@ class TestStartSession:
             )
         complete_events = [e for e in events if e["type"] == "complete"]
         assert len(complete_events) == 1
-        assert complete_events[0]["ingestion_id"] == "ing_003"
+        assert "mapping" in complete_events[0]
+        assert "classification" in complete_events[0]
+        assert "unmapped" in complete_events[0]
 
     async def test_full_message_sequence(self, manager):
         """Verify the full event ordering: session_start -> messages -> complete."""
@@ -376,9 +378,9 @@ class TestClassificationDetection:
                 "classification": classification_data,
             })
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -422,9 +424,9 @@ class TestClassificationDetection:
                 "text": "Continuing...",
             })
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -473,9 +475,8 @@ class TestPauseResume:
             })
             # Simulate ask_user_question tool setting pending_question
             yield format_sse_event("question", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "question": "What currency is used?",
+                "id": "q-test-1",
+                "text": "What currency is used?",
                 "options": ["USD", "EUR", "GBP"],
             })
             # Generator returns here — no complete event
@@ -504,7 +505,7 @@ class TestPauseResume:
         assert "complete" not in event_types  # paused, not completed
 
         q_event = [e for e in events if e["type"] == "question"][0]
-        assert q_event["question"] == "What currency is used?"
+        assert q_event["text"] == "What currency is used?"
         assert q_event["options"] == ["USD", "EUR", "GBP"]
 
     async def test_resume_session_emits_session_resume(self, manager):
@@ -517,9 +518,9 @@ class TestPauseResume:
                 "text": "Thank you for the answer.",
             })
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -561,9 +562,9 @@ class TestPauseResume:
                 "mapping": state["mapping"],
             })
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -597,9 +598,9 @@ class TestPauseResume:
         async def _patched_run(prompt, options, state, session_id, ingestion_id):
             state["mapping"] = {"metadata": {}}
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -665,7 +666,7 @@ class TestErrorHandling:
 
         error_events = [e for e in events if e["type"] == "error"]
         assert len(error_events) == 1
-        assert "API connection failed" in error_events[0]["error"]
+        assert "API connection failed" in error_events[0]["message"]
 
     async def test_error_event_includes_session_metadata(self, manager):
         """Error events should include session_id and ingestion_id."""
@@ -693,8 +694,8 @@ class TestErrorHandling:
 
         error_events = [e for e in events if e["type"] == "error"]
         assert len(error_events) == 1
-        assert error_events[0]["ingestion_id"] == "ing_err2"
-        assert "session_id" in error_events[0]
+        assert "Invalid model config" in error_events[0]["message"]
+        assert error_events[0]["recoverable"] is False
 
 
 # ===================================================================
@@ -756,9 +757,9 @@ class TestIntegrationMockSDK:
 
             # Done
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -798,10 +799,10 @@ class TestIntegrationMockSDK:
         mp = [e for e in events if e["type"] == "mapping"][0]
         assert mp["mapping"]["revenue_streams"][0]["label"] == "MRR"
 
-        # Verify complete includes full state
+        # Verify complete includes classification and mapping at top level
         comp = [e for e in events if e["type"] == "complete"][0]
-        assert "classification" in comp["state"]
-        assert "mapping" in comp["state"]
+        assert comp["classification"] is not None
+        assert comp["mapping"] is not None
 
     async def test_question_then_resume_flow(self, manager):
         """Simulate: start -> question -> pause, then resume -> mapping -> complete."""
@@ -814,9 +815,8 @@ class TestIntegrationMockSDK:
                 "text": "I need clarification.",
             })
             yield format_sse_event("question", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "question": "Is this in USD?",
+                "id": "q-test-2",
+                "text": "Is this in USD?",
                 "options": ["Yes", "No"],
             })
             # No complete — paused
@@ -858,9 +858,9 @@ class TestIntegrationMockSDK:
                 "mapping": state["mapping"],
             })
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -978,8 +978,9 @@ class TestRunAgentLoopDirect:
         assert "complete" not in event_types
 
         q = [e for e in events if e["type"] == "question"][0]
-        assert q["question"] == "Which entity?"
+        assert q["text"] == "Which entity?"
         assert q["options"] == ["Entity A", "Entity B"]
+        assert "id" in q
 
     async def test_pending_question_is_consumed(self):
         """After yielding question, pending_question should be removed from state."""
@@ -1056,7 +1057,7 @@ class TestRunAgentLoopDirect:
 
         error_events = [e for e in events if e["type"] == "error"]
         assert len(error_events) == 1
-        assert "Lost connection" in error_events[0]["error"]
+        assert "Lost connection" in error_events[0]["message"]
 
     async def test_exhausted_loop_sends_complete(self):
         """If the query loop ends without ResultMessage, complete is still sent."""
@@ -1228,9 +1229,9 @@ class TestResumePromptConstruction:
         async def _capturing_run(prompt, options, state, session_id, ingestion_id):
             captured_prompts.append(prompt)
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(
@@ -1270,9 +1271,9 @@ class TestResumePromptConstruction:
         async def _capturing_run(prompt, options, state, session_id, ingestion_id):
             captured_prompts.append(prompt)
             yield format_sse_event("complete", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "state": state,
+                "mapping": state.get("mapping"),
+                "classification": state.get("classification"),
+                "unmapped": state.get("unmapped", []),
             })
 
         with patch.object(

@@ -98,6 +98,27 @@ class ArtifactStore:
         else:
             self._memory.pop(path, None)
 
+    def download_bytes(self, bucket_name: str, path: str) -> bytes:
+        """Download raw bytes from a storage bucket (or in-memory fallback).
+
+        Parameters
+        ----------
+        bucket_name:
+            Supabase storage bucket name (e.g. ``"excel-uploads"``).
+        path:
+            Full path within the bucket.
+
+        Returns
+        -------
+        bytes
+            The raw file content.
+        """
+        if self._client:
+            bucket = self._client.storage.from_(bucket_name)
+            return bucket.download(path)
+        # In-memory fallback uses "excel:<path>" convention for non-artifact files
+        return self._memory.get(f"excel:{path}", b"")
+
     async def async_save(self, tenant_id: str, artifact_type: str, artifact_id: str, data: dict[str, Any]) -> str:
         return await asyncio.to_thread(self.save, tenant_id, artifact_type, artifact_id, data)
 

@@ -178,10 +178,10 @@ class AgentSessionManager:
                     if "pending_question" in state:
                         question_data = state.pop("pending_question")
                         yield format_sse_event("question", {
-                            "session_id": session_id,
-                            "ingestion_id": ingestion_id,
-                            "question": question_data["question"],
+                            "id": str(uuid.uuid4()),
+                            "text": question_data["question"],
                             "options": question_data.get("options", []),
+                            **({"context": question_data["context"]} if "context" in question_data else {}),
                         })
                         return  # pause — caller will resume later
 
@@ -197,9 +197,9 @@ class AgentSessionManager:
                 # --- ResultMessage: agent is done -------------------------
                 elif isinstance(message, ResultMessage):
                     yield format_sse_event("complete", {
-                        "session_id": session_id,
-                        "ingestion_id": ingestion_id,
-                        "state": state,
+                        "mapping": state.get("mapping"),
+                        "classification": state.get("classification"),
+                        "unmapped": state.get("unmapped", []),
                     })
                     return
 
@@ -211,17 +211,16 @@ class AgentSessionManager:
                 error=str(exc),
             )
             yield format_sse_event("error", {
-                "session_id": session_id,
-                "ingestion_id": ingestion_id,
-                "error": str(exc),
+                "message": str(exc),
+                "recoverable": False,
             })
             return
 
         # If the loop exhausts without a ResultMessage, still send complete.
         yield format_sse_event("complete", {
-            "session_id": session_id,
-            "ingestion_id": ingestion_id,
-            "state": state,
+            "mapping": state.get("mapping"),
+            "classification": state.get("classification"),
+            "unmapped": state.get("unmapped", []),
         })
 
     # ------------------------------------------------------------------

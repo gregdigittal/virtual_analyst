@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile
@@ -57,6 +57,122 @@ class AnswerQuestionsBody(BaseModel):
     """Request body for submitting answers to mapping questions."""
 
     answers: list[dict[str, Any]] = Field(default_factory=list, description="List of {question_index, answer}")
+
+
+# ---------------------------------------------------------------------------
+# SSE state persistence wrapper
+# ---------------------------------------------------------------------------
+
+
+async def _persist_stream_state(
+    stream: AsyncGenerator[str, None],
+    *,
+    tenant_id: str,
+    ingestion_id: str,
+) -> AsyncGenerator[str, None]:
+    """Wrap an SSE generator, persisting agent state to the DB on key events.
+
+    Intercepts ``session_start``, ``question``, ``complete``, and ``error``
+    events emitted by :class:`AgentSessionManager` and writes corresponding
+    state updates to ``excel_ingestion_sessions``.
+    """
+    async for frame in stream:
+        yield frame
+
+        # Parse the SSE frame to detect lifecycle events
+        if not frame.startswith("data: "):
+            continue
+        try:
+            data = json.loads(frame[6:].strip())
+        except (json.JSONDecodeError, IndexError):
+            continue
+
+        event_type = data.get("type")
+
+        if event_type == "session_start":
+            session_id = data.get("session_id", "")
+            async with tenant_conn(tenant_id) as conn:
+                await conn.execute(
+                    """UPDATE excel_ingestion_sessions
+                          SET agent_session_id = $1, agent_status = 'running'
+                        WHERE tenant_id = $2 AND ingestion_id = $3""",
+                    session_id,
+                    tenant_id,
+                    ingestion_id,
+                )
+
+        elif event_type == "session_resume":
+            async with tenant_conn(tenant_id) as conn:
+                await conn.execute(
+                    """UPDATE excel_ingestion_sessions
+                          SET agent_status = 'running', pending_question = NULL
+                        WHERE tenant_id = $1 AND ingestion_id = $2""",
+                    tenant_id,
+                    ingestion_id,
+                )
+
+        elif event_type == "question":
+            async with tenant_conn(tenant_id) as conn:
+                await conn.execute(
+                    """UPDATE excel_ingestion_sessions
+                          SET agent_status = 'paused',
+                              pending_question = $1::jsonb
+                        WHERE tenant_id = $2 AND ingestion_id = $3""",
+                    json.dumps(data),
+                    tenant_id,
+                    ingestion_id,
+                )
+
+        elif event_type == "complete":
+            state_json = json.dumps({
+                "mapping": data.get("mapping"),
+                "classification": data.get("classification"),
+                "unmapped": data.get("unmapped", []),
+            })
+            async with tenant_conn(tenant_id) as conn:
+                await conn.execute(
+                    """UPDATE excel_ingestion_sessions
+                          SET agent_status = 'complete',
+                              agent_state_json = $1::jsonb,
+                              pending_question = NULL
+                        WHERE tenant_id = $2 AND ingestion_id = $3""",
+                    state_json,
+                    tenant_id,
+                    ingestion_id,
+                )
+
+        elif event_type == "error":
+            async with tenant_conn(tenant_id) as conn:
+                await conn.execute(
+                    """UPDATE excel_ingestion_sessions
+                          SET agent_status = 'error'
+                        WHERE tenant_id = $1 AND ingestion_id = $2""",
+                    tenant_id,
+                    ingestion_id,
+                )
+
+        elif event_type in ("classification", "mapping"):
+            # Persist intermediate state snapshots (merge into existing)
+            async with tenant_conn(tenant_id) as conn:
+                existing = await conn.fetchval(
+                    """SELECT agent_state_json FROM excel_ingestion_sessions
+                        WHERE tenant_id = $1 AND ingestion_id = $2""",
+                    tenant_id,
+                    ingestion_id,
+                )
+                current_state: dict[str, Any] = json.loads(existing) if existing else {}
+                if event_type == "classification":
+                    current_state["classification"] = data.get("classification")
+                else:
+                    current_state["mapping"] = data.get("mapping")
+                await conn.execute(
+                    """UPDATE excel_ingestion_sessions
+                          SET agent_state_json = $1::jsonb
+                        WHERE tenant_id = $2 AND ingestion_id = $3""",
+                    json.dumps(current_state),
+                    tenant_id,
+                    ingestion_id,
+                )
 
 
 @router.post("/upload")
@@ -399,14 +515,18 @@ async def upload_and_stream(
         f"workbook into a budget model."
     )
 
-    # 6. Return SSE stream
+    # 6. Return SSE stream (with state persistence)
     return StreamingResponse(
-        session_mgr.start_session(
-            ingestion_id=ingestion_id,
+        _persist_stream_state(
+            session_mgr.start_session(
+                ingestion_id=ingestion_id,
+                tenant_id=x_tenant_id,
+                sheets=sheets,
+                templates=templates,
+                initial_prompt=initial_prompt,
+            ),
             tenant_id=x_tenant_id,
-            sheets=sheets,
-            templates=templates,
-            initial_prompt=initial_prompt,
+            ingestion_id=ingestion_id,
         ),
         media_type="text/event-stream",
         headers={
@@ -422,6 +542,7 @@ async def answer_and_stream(
     ingestion_id: str,
     body: AnswerQuestionsBody,
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
 ) -> StreamingResponse:
     """Resume a paused agent session with user answers, streaming SSE events.
 
@@ -459,20 +580,17 @@ async def answer_and_stream(
     filename: str = row["filename"] or "upload.xlsx"
 
     # 2. Rebuild sheets data from artifact store (re-parse stored file)
-    store = get_artifact_store()
     try:
         raw = store.load(x_tenant_id, EXCEL_UPLOAD_TYPE, ingestion_id)
     except StorageError as e:
         raise HTTPException(404, "Stored file metadata not found — cannot resume session") from e
 
-    if "file_storage_path" in raw and store._client:
-        bucket = store._client.storage.from_("excel-uploads")
-        file_bytes: bytes = bucket.download(raw["file_storage_path"])
+    file_storage_path = raw.get("file_storage_path")
+    if file_storage_path:
+        file_bytes: bytes = store.download_bytes("excel-uploads", file_storage_path)
     elif "content_base64" in raw:
         import base64
         file_bytes = base64.b64decode(raw["content_base64"])
-    elif "file_storage_path" in raw and not store._client:
-        file_bytes = store._memory.get(f"excel:{raw['file_storage_path']}", b"")
     else:
         raise HTTPException(404, "Stored file not found — cannot resume session")
 
@@ -504,15 +622,19 @@ async def answer_and_stream(
         max_budget_usd=settings.agent_sdk_max_budget_usd,
     )
 
-    # 5. Return SSE stream for resumed session
+    # 5. Return SSE stream for resumed session (with state persistence)
     return StreamingResponse(
-        session_mgr.resume_session(
+        _persist_stream_state(
+            session_mgr.resume_session(
+                ingestion_id=ingestion_id,
+                session_id=session_id,
+                answers=body.answers,
+                sheets=sheets,
+                templates=templates,
+                prior_state=prior_state,
+            ),
+            tenant_id=x_tenant_id,
             ingestion_id=ingestion_id,
-            session_id=session_id,
-            answers=body.answers,
-            sheets=sheets,
-            templates=templates,
-            prior_state=prior_state,
         ),
         media_type="text/event-stream",
         headers={

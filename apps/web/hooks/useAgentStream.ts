@@ -99,6 +99,7 @@ export function useAgentStream(): UseAgentStreamReturn {
 
       case "mapping": {
         setMapping(data as object);
+        setCurrentStep("map");
         break;
       }
 
