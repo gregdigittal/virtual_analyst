@@ -1392,6 +1392,71 @@ export const api = {
       );
     },
   },
+
+  // --- AFS (Annual Financial Statements) ---
+  afs: {
+    // Frameworks
+    listFrameworks: (tenantId: string) =>
+      request<{ items: AFSFramework[] }>("/api/v1/afs/frameworks", { tenantId }),
+    seedFrameworks: (tenantId: string) =>
+      request<{ seeded: number; message: string }>("/api/v1/afs/frameworks/seed", { tenantId, method: "POST" }),
+    getFramework: (tenantId: string, frameworkId: string) =>
+      request<AFSFramework>(`/api/v1/afs/frameworks/${encodeURIComponent(frameworkId)}`, { tenantId }),
+    getChecklist: (tenantId: string, frameworkId: string) =>
+      request<{ items: AFSDisclosureItem[] }>(`/api/v1/afs/frameworks/${encodeURIComponent(frameworkId)}/checklist`, { tenantId }),
+
+    // Engagements
+    listEngagements: (tenantId: string, opts?: { limit?: number; offset?: number; status?: string }) => {
+      const p = new URLSearchParams();
+      if (opts?.limit != null) p.set("limit", String(opts.limit));
+      if (opts?.offset != null) p.set("offset", String(opts.offset));
+      if (opts?.status) p.set("status", opts.status);
+      const qs = p.toString();
+      return request<{ items: AFSEngagement[]; total: number }>(`/api/v1/afs/engagements${qs ? `?${qs}` : ""}`, { tenantId });
+    },
+    createEngagement: (tenantId: string, body: { entity_name: string; framework_id: string; period_start: string; period_end: string; prior_engagement_id?: string }) =>
+      request<AFSEngagement>("/api/v1/afs/engagements", { tenantId, method: "POST", body }),
+    getEngagement: (tenantId: string, engagementId: string) =>
+      request<AFSEngagement>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}`, { tenantId }),
+    updateEngagement: (tenantId: string, engagementId: string, body: Record<string, unknown>) =>
+      request<AFSEngagement>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}`, { tenantId, method: "PATCH", body }),
+    deleteEngagement: (tenantId: string, engagementId: string) =>
+      request<void>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}`, { tenantId, method: "DELETE" }),
+
+    // Trial Balance
+    uploadTrialBalance: (tenantId: string, engagementId: string, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return requestForm<AFSTrialBalance>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/trial-balance`, { tenantId, body: form });
+    },
+    listTrialBalances: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSTrialBalance[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/trial-balance`, { tenantId }),
+
+    // Prior AFS
+    uploadPriorAFS: (tenantId: string, engagementId: string, file: File, sourceType: "pdf" | "excel") => {
+      const form = new FormData();
+      form.append("file", file);
+      return requestForm<AFSPriorAFS>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/prior-afs?source_type=${sourceType}`, { tenantId, body: form });
+    },
+    listPriorAFS: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSPriorAFS[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/prior-afs`, { tenantId }),
+    reconcile: (tenantId: string, engagementId: string) =>
+      request<{ discrepancies: AFSDiscrepancy[]; message?: string }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/prior-afs/reconcile`, { tenantId, method: "POST" }),
+    setBaseSource: (tenantId: string, engagementId: string, baseSource: string) =>
+      request<AFSEngagement>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/base-source`, { tenantId, method: "POST", body: { base_source: baseSource } }),
+
+    // Discrepancies
+    listDiscrepancies: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSDiscrepancy[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/discrepancies`, { tenantId }),
+    resolveDiscrepancy: (tenantId: string, engagementId: string, discrepancyId: string, body: { resolution: string; resolution_note: string }) =>
+      request<AFSDiscrepancy>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/discrepancies/${encodeURIComponent(discrepancyId)}`, { tenantId, method: "PATCH", body }),
+
+    // Projections
+    createProjection: (tenantId: string, engagementId: string, body: { month: string; basis_description: string }) =>
+      request<AFSProjection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/projections`, { tenantId, method: "POST", body }),
+    listProjections: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSProjection[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/projections`, { tenantId }),
+  },
 };
 
 export interface ScenarioItem {
@@ -1800,4 +1865,89 @@ export interface MetricsSummary {
   latency_p50_ms: number;
   latency_p95_ms: number;
   by_endpoint: Record<string, number>;
+}
+
+// --- AFS (Annual Financial Statements) ---
+export interface AFSFramework {
+  framework_id: string;
+  name: string;
+  standard: string;
+  version: string;
+  jurisdiction: string | null;
+  is_builtin: boolean;
+  disclosure_schema_json: Record<string, unknown> | null;
+  statement_templates_json: Record<string, unknown> | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface AFSDisclosureItem {
+  item_id: string;
+  framework_id: string;
+  section: string;
+  reference: string | null;
+  description: string;
+  required: boolean;
+  applicable_entity_types: string[] | null;
+}
+
+export interface AFSEngagement {
+  engagement_id: string;
+  entity_name: string;
+  framework_id: string;
+  period_start: string;
+  period_end: string;
+  prior_engagement_id: string | null;
+  status: string;
+  base_source: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AFSTrialBalance {
+  trial_balance_id: string;
+  engagement_id: string;
+  entity_id: string | null;
+  source: string;
+  data_json: unknown[];
+  mapped_accounts_json: Record<string, unknown> | null;
+  period_months: string[] | null;
+  is_partial: boolean;
+  uploaded_at: string;
+}
+
+export interface AFSPriorAFS {
+  prior_afs_id: string;
+  engagement_id: string;
+  source_type: string;
+  filename: string;
+  file_size: number | null;
+  extracted_json: Record<string, unknown> | null;
+  upload_path: string | null;
+  uploaded_at: string;
+}
+
+export interface AFSDiscrepancy {
+  discrepancy_id: string;
+  engagement_id: string;
+  line_item: string;
+  pdf_value: number | null;
+  excel_value: number | null;
+  difference: number | null;
+  resolution: string | null;
+  resolution_note: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+}
+
+export interface AFSProjection {
+  projection_id: string;
+  engagement_id: string;
+  month: string;
+  basis_description: string;
+  projected_data_json: Record<string, unknown>;
+  is_estimate: boolean;
+  created_by: string | null;
+  created_at: string;
 }

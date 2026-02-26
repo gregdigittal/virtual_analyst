@@ -1,7 +1,7 @@
 # AFS Module — Annual Financial Statement Generation
 
-> Design Document | 2026-02-24
-> Status: Approved for backlog
+> Design Document | 2026-02-24 (updated 2026-02-26)
+> Status: In development — Phase 1
 
 ---
 
@@ -43,18 +43,24 @@ Manages accounting standards, disclosure checklists, and statement templates.
 
 ### 2. Data Ingestion & Mapping
 
-Imports financial data and maps to the standard chart of accounts.
+Imports financial data and maps to the standard chart of accounts. Supports dual-source ingestion with reconciliation.
 
 **Capabilities:**
 - Sources: VA baselines/runs (internal), Excel/CSV trial balance upload, Xero/QuickBooks via existing connectors
+- **Dual-source ingestion:** User can import historic PDF AFS as the base OR Excel-based financials/management accounts OR both. When both are provided, the system reconciles and flags discrepancies (typically audit adjustments). User elects which source to use as the base and adds notes describing differences for audit trail.
+- **PDF AFS as primary source:** For scenarios where Excel files are unavailable (e.g., stock market analysts working from published annual reports), the PDF AFS serves as the sole data source. AI extracts structured financial data from the PDF.
+- **Discrepancy resolution:** When both PDF and Excel sources are ingested, system identifies line-item differences. Each discrepancy is surfaced in a resolution list. User confirms the nature of each difference and elects base source (Excel or PDF). A note is recorded per resolved item.
+- **YTD management accounts — missing month extrapolation:** When current-year management accounts cover only part of the year (e.g., Jan–Aug of a Dec year-end), the system detects missing months. During the draft phase, the user describes in natural language how missing months should be filled (e.g., "assume flat revenue", "apply 5% seasonal uplift in Q4", "use prior year actuals for Sep–Dec"). AI generates projected figures for missing months, flagged as estimates vs actuals.
 - Account mapping: map trial balance accounts to standard chart of accounts for the selected framework. AI-assisted mapping suggestions based on account names
 - Multi-entity consolidation: aggregate trial balances from multiple entities, intercompany elimination, minority interest calculations, currency translation
 - Roll-forward: auto-populate comparatives from prior period, carry forward prior-year disclosure notes with flags for required updates
 
 **Data model:**
-- `afs_engagements` — id, tenant_id, entity_name, framework_id, period_start, period_end, prior_engagement_id, status, created_by
-- `afs_trial_balances` — id, engagement_id, entity_id, source (va_baseline/upload/connector), data_json, mapped_accounts_json
+- `afs_engagements` — id, tenant_id, entity_name, framework_id, period_start, period_end, prior_engagement_id, status, base_source (pdf/excel/va_baseline), created_by
+- `afs_trial_balances` — id, engagement_id, entity_id, source (va_baseline/upload/connector/pdf_extracted), data_json, mapped_accounts_json, period_months (array of YYYY-MM covered), is_partial (bool)
 - `afs_consolidation_rules` — id, engagement_id, parent_entity_id, child_entity_id, ownership_pct, elimination_rules_json
+- `afs_source_discrepancies` — id, engagement_id, line_item, pdf_value, excel_value, difference, resolution (use_pdf/use_excel/noted), resolution_note, resolved_by, resolved_at
+- `afs_month_projections` — id, engagement_id, month (YYYY-MM), basis_description, projected_data_json, is_estimate (bool), created_by
 
 ### 3. AI Disclosure Drafter
 
@@ -159,8 +165,8 @@ Deferred tax computation and tax note generation.
 
 | Phase | Sub-modules | Effort |
 |-------|-------------|--------|
-| **Phase 1** | Framework Engine + Data Ingestion (single entity) + Statement Generator (PDF/DOCX) | XL |
-| **Phase 2** | AI Disclosure Drafter + Prior AFS Analysis | XL |
+| **Phase 1** | Framework Engine + Data Ingestion (single entity, dual-source with reconciliation) + Statement Generator (PDF/DOCX) + YTD extrapolation | XL |
+| **Phase 2** | AI Disclosure Drafter + Prior AFS Analysis + Discrepancy resolution workflow | XL |
 | **Phase 3** | Review Workflow + Tax Computation | L |
 | **Phase 4** | Multi-entity Consolidation + iXBRL/XBRL output | L |
 | **Phase 5** | AFS Analytics + Industry Benchmarking | M |
@@ -178,6 +184,8 @@ New tables required (all tenant-scoped with RLS):
 | `afs_disclosure_items` | Disclosure checklist items per framework |
 | `afs_engagements` | AFS engagement (one per entity per period) |
 | `afs_trial_balances` | Imported trial balance data |
+| `afs_source_discrepancies` | PDF vs Excel line-item differences + resolution |
+| `afs_month_projections` | AI-projected missing months for partial-year data |
 | `afs_consolidation_rules` | Multi-entity consolidation config |
 | `afs_sections` | Generated statement sections/notes |
 | `afs_section_history` | Version history per section |
@@ -213,9 +221,17 @@ GET    /api/v1/afs/engagements/{id}/trial-balance
 POST   /api/v1/afs/engagements/{id}/consolidate
 GET    /api/v1/afs/engagements/{id}/consolidation
 
-# Prior AFS
-POST   /api/v1/afs/engagements/{id}/prior-afs          (upload PDF or Excel)
+# Prior AFS (dual-source: PDF and/or Excel)
+POST   /api/v1/afs/engagements/{id}/prior-afs          (upload PDF or Excel — multiple allowed)
 GET    /api/v1/afs/engagements/{id}/prior-afs
+POST   /api/v1/afs/engagements/{id}/prior-afs/reconcile (compare PDF vs Excel, generate discrepancy list)
+GET    /api/v1/afs/engagements/{id}/discrepancies
+PATCH  /api/v1/afs/engagements/{id}/discrepancies/{did} (resolve: use_pdf/use_excel + note)
+POST   /api/v1/afs/engagements/{id}/base-source         (elect PDF or Excel as base)
+
+# YTD Month Projections
+POST   /api/v1/afs/engagements/{id}/projections         (NL basis → AI fills missing months)
+GET    /api/v1/afs/engagements/{id}/projections
 
 # AI Disclosure Drafting
 POST   /api/v1/afs/engagements/{id}/sections/{section}/draft   (NL instruction → AI draft)
@@ -254,7 +270,8 @@ GET    /api/v1/afs/engagements/{id}/analytics/anomalies
 | AFS Dashboard | `/afs` | List engagements, create new |
 | Engagement Setup | `/afs/{id}/setup` | Select framework, upload TB, configure entity |
 | Account Mapping | `/afs/{id}/mapping` | Map TB accounts to chart of accounts |
-| Prior AFS Review | `/afs/{id}/prior` | View extracted prior-year sections |
+| Prior AFS Review | `/afs/{id}/prior` | View extracted prior-year sections, upload PDF and/or Excel |
+| Source Reconciliation | `/afs/{id}/reconcile` | Compare PDF vs Excel, resolve discrepancies, elect base source |
 | Section Editor | `/afs/{id}/sections` | NL-instruction panel + generated draft side-by-side |
 | Tax Computation | `/afs/{id}/tax` | Deferred tax worksheet |
 | Consolidation | `/afs/{id}/consolidation` | Multi-entity consolidation view |
