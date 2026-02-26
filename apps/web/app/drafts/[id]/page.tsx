@@ -15,14 +15,18 @@ import {
   VAConfirmDialog,
   VAInput,
   VASpinner,
+  VATabs,
   useToast,
 } from "@/components/ui";
 import { getAuthContext } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { EntityTimeline } from "@/components/EntityTimeline";
 import { CommentThread } from "@/components/CommentThread";
+import { FundingEditor } from "@/components/FundingEditor";
+import { RevenueStreamEditor } from "@/components/RevenueStreamEditor";
+import { CorrelationMatrixEditor } from "@/components/CorrelationMatrixEditor";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 function AssumptionTree({ data }: { data: unknown }) {
@@ -102,7 +106,9 @@ function AssumptionTree({ data }: { data: unknown }) {
 export default function DraftWorkspacePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const initialTab = searchParams.get("tab") ?? "overview";
   const [detail, setDetail] = useState<DraftDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +125,8 @@ export default function DraftWorkspacePage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; description: string } | null>(null);
+  const [editorTab, setEditorTab] = useState(initialTab);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadDraft = useCallback(async () => {
     if (!tenantId) return;
@@ -132,6 +140,18 @@ export default function DraftWorkspacePage() {
       setLoading(false);
     }
   }, [tenantId, id]);
+
+  const debouncedPatch = useCallback((updatedWorkspace: Record<string, unknown>) => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await api.drafts.patch(tenantId!, id, { workspace: updatedWorkspace });
+        toast.success("Saved");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Save failed");
+      }
+    }, 300);
+  }, [tenantId, id, toast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -315,16 +335,76 @@ export default function DraftWorkspacePage() {
       ) : (
         <>
           <div className="flex min-h-0 flex-1 gap-4 px-4">
-            <VACard
-              className="flex min-w-[60%] flex-1 flex-col overflow-hidden"
-            >
-              <div className="border-b border-va-border px-3 py-2 text-sm font-medium text-va-text">
-                Assumptions
-              </div>
-              <div className="flex-1 overflow-auto p-3">
-                <AssumptionTree data={detail.workspace?.assumptions ?? {}} />
-              </div>
-            </VACard>
+            <div className="flex min-w-[60%] flex-1 flex-col overflow-hidden">
+              <VATabs
+                activeId={editorTab}
+                onSelect={setEditorTab}
+                className="flex flex-1 flex-col"
+                tabs={[
+                  {
+                    id: "overview",
+                    label: "Overview",
+                    content: (
+                      <div className="overflow-auto">
+                        <AssumptionTree data={detail.workspace?.assumptions ?? {}} />
+                      </div>
+                    ),
+                  },
+                  {
+                    id: "funding",
+                    label: "Funding",
+                    content: (
+                      <div className="overflow-auto">
+                        <FundingEditor
+                          funding={(detail.workspace?.assumptions as Record<string, unknown> | undefined)?.funding as Parameters<typeof FundingEditor>[0]["funding"] ?? null}
+                          onChange={(f) => {
+                            const assumptions = { ...detail.workspace?.assumptions, funding: f };
+                            const ws = { ...detail.workspace, assumptions };
+                            setDetail((d) => d ? { ...d, workspace: ws } : d);
+                            debouncedPatch(ws as Record<string, unknown>);
+                          }}
+                        />
+                      </div>
+                    ),
+                  },
+                  {
+                    id: "revenue",
+                    label: "Revenue",
+                    content: (
+                      <div className="overflow-auto">
+                        <RevenueStreamEditor
+                          streams={((detail.workspace?.assumptions as Record<string, unknown> | undefined)?.revenue_streams ?? []) as Parameters<typeof RevenueStreamEditor>[0]["streams"]}
+                          onChange={(streams) => {
+                            const assumptions = { ...detail.workspace?.assumptions, revenue_streams: streams };
+                            const ws = { ...detail.workspace, assumptions };
+                            setDetail((d) => d ? { ...d, workspace: ws } : d);
+                            debouncedPatch(ws as Record<string, unknown>);
+                          }}
+                        />
+                      </div>
+                    ),
+                  },
+                  {
+                    id: "correlations",
+                    label: "Correlations",
+                    content: (
+                      <div className="overflow-auto">
+                        <CorrelationMatrixEditor
+                          distributions={(detail.workspace?.distributions ?? []) as Parameters<typeof CorrelationMatrixEditor>[0]["distributions"]}
+                          correlationMatrix={((detail.workspace as Record<string, unknown>)?.correlation_matrix ?? []) as Parameters<typeof CorrelationMatrixEditor>[0]["correlationMatrix"]}
+                          editable={true}
+                          onChange={(entries) => {
+                            const ws = { ...detail.workspace, correlation_matrix: entries };
+                            setDetail((d) => d ? { ...d, workspace: ws } : d);
+                            debouncedPatch(ws as Record<string, unknown>);
+                          }}
+                        />
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </div>
             <VACard className="flex w-[40%] min-w-[280px] flex-col overflow-hidden">
               <div className="border-b border-va-border px-3 py-2 text-sm font-medium text-va-text">
                 Chat
