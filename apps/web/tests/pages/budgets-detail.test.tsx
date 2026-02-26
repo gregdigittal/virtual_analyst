@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { mockReplace, mockGetAuthContext } from "./setup";
 
 import { ToastProvider } from "@/components/ui";
-import BudgetDetailPage from "@/app/budgets/[id]/page";
+import BudgetDetailPage from "@/app/(app)/budgets/[id]/page";
 
 function renderPage() {
   return render(

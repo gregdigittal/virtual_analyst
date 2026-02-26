@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { mockReplace, mockGetAuthContext } from "./setup";
 
 import { ToastProvider } from "@/components/ui";
-import WorkflowsPage from "@/app/workflows/page";
+import WorkflowsPage from "@/app/(app)/workflows/page";
 
 function renderPage() {
   return render(

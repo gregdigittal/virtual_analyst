@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { mockApi, mockGetAuthContext } from "./setup";
 
 import { ToastProvider } from "@/components/ui";
-import DraftDetailPage from "@/app/drafts/[id]/page";
+import DraftDetailPage from "@/app/(app)/drafts/[id]/page";
 
 // jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();

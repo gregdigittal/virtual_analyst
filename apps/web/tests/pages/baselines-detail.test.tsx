@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import { mockReplace, mockPush, mockGetAuthContext, mockApi } from "./setup";
 
 import { ToastProvider } from "@/components/ui";
-import BaselineDetailPage from "@/app/baselines/[id]/page";
+import BaselineDetailPage from "@/app/(app)/baselines/[id]/page";
 
 function renderPage() {
   return render(
