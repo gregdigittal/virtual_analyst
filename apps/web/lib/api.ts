@@ -884,19 +884,9 @@ export const api = {
     getUploadStreamUrl(): string {
       return `${API_URL}/api/v1/excel-ingestion/upload-stream`;
     },
-    /** POST answers to resume a streaming session. Returns the resume URL. */
-    async answerStream(
-      tenantId: string,
-      ingestionId: string,
-      answers: { question: string; answer: string }[]
-    ): Promise<string> {
-      const url = `/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}/answer-stream`;
-      await request<unknown>(url, {
-        tenantId,
-        method: "POST",
-        body: { answers },
-      });
-      return `${API_URL}${url}`;
+    /** Build the SSE answer-stream URL for POST-based streaming. */
+    getAnswerStreamUrl(ingestionId: string): string {
+      return `${API_URL}/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}/answer-stream`;
     },
   },
   orgStructures: {
