@@ -13,3 +13,5 @@ export { ToastProvider, useToast } from "./ToastProvider";
 export { VASpinner } from "./VASpinner";
 export { VAPagination } from "./VAPagination";
 export { VAListToolbar } from "./VAListToolbar";
+export { NavIcon } from "./NavIcon";
+export { VAEmptyState } from "./VAEmptyState";
