@@ -16,11 +16,17 @@ export const mockReplace = vi.fn();
 export const mockPush = vi.fn();
 export const mockRefresh = vi.fn();
 
+// Stable object references prevent useEffect infinite re-trigger loops
+// when effects depend on router/params/searchParams.
+const stableRouter = { replace: mockReplace, push: mockPush, refresh: mockRefresh };
+const stableParams = { id: "test-id-123" };
+const stableSearchParams = new URLSearchParams();
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: mockReplace, push: mockPush, refresh: mockRefresh }),
-  useParams: () => ({ id: "test-id-123" }),
+  useRouter: () => stableRouter,
+  useParams: () => stableParams,
   usePathname: () => "/",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => stableSearchParams,
 }));
 
 vi.mock("next/link", () => ({

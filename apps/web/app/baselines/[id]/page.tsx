@@ -24,6 +24,7 @@ export default function BaselineDetailPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [runCreating, setRunCreating] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   // Version history
   const [versions, setVersions] = useState<{ baseline_version: string; is_active: boolean; status: string; created_at: string | null }[]>([]);
@@ -102,6 +103,27 @@ export default function BaselineDetailPage() {
     }
   }
 
+  async function handleEditConfig() {
+    if (!tenantId) return;
+    setEditLoading(true);
+    try {
+      const draftsRes = await api.drafts.list(tenantId, {
+        status: "active",
+        parent_baseline_id: id,
+      });
+      if (draftsRes.items.length > 0) {
+        router.push(`/drafts/${draftsRes.items[0].draft_session_id}?tab=funding`);
+      } else {
+        const newDraft = await api.drafts.create(tenantId, { parent_baseline_id: id });
+        router.push(`/drafts/${newDraft.draft_session_id}?tab=funding`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to open editor");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
   async function handleDiff() {
     if (!tenantId || !diffVersionA || !diffVersionB) return;
     setDiffing(true);
@@ -142,14 +164,19 @@ export default function BaselineDetailPage() {
           <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
             Baseline {id}
           </h1>
-          <VAButton
-            type="button"
-            variant={showRunForm ? "ghost" : "primary"}
-            onClick={() => setShowRunForm((v) => !v)}
-            disabled={!config}
-          >
-            {showRunForm ? "Cancel" : "Run model"}
-          </VAButton>
+          <div className="flex items-center gap-3">
+            <VAButton variant="secondary" onClick={handleEditConfig} disabled={editLoading}>
+              {editLoading ? "Opening\u2026" : "Edit Configuration"}
+            </VAButton>
+            <VAButton
+              type="button"
+              variant={showRunForm ? "ghost" : "primary"}
+              onClick={() => setShowRunForm((v) => !v)}
+              disabled={!config}
+            >
+              {showRunForm ? "Cancel" : "Run model"}
+            </VAButton>
+          </div>
         </div>
         {showRunForm && !!config && (
           <VACard className="mb-6 space-y-4 p-4">
