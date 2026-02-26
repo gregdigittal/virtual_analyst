@@ -23,7 +23,7 @@ export function PublicFooter() {
             Sign up
           </Link>
           <Link
-            href="/compare"
+            href="/competitors"
             className="text-sm text-va-text2 hover:text-va-text focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded-va-xs"
           >
             Compare

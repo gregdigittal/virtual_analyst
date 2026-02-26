@@ -14,8 +14,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /** Derive step states from baseline config for the ModelStepper. */
-function computeStepStates(cfg: unknown): StepStates {
-  const c = (cfg ?? {}) as Record<string, unknown>;
+function computeStepStates(cfg: Record<string, unknown>): StepStates {
+  const c = cfg;
   const metadata = (c.metadata ?? {}) as Record<string, unknown>;
   const assumptions = (c.assumptions ?? {}) as Record<string, unknown>;
   const revenueStreams = Array.isArray(assumptions.revenue_streams)
@@ -48,7 +48,7 @@ export default function BaselineDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const { toast } = useToast();
-  const [config, setConfig] = useState<unknown>(null);
+  const [config, setConfig] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -85,7 +85,7 @@ export default function BaselineDetailPage() {
       setUserId(ctx.userId);
       try {
         const res = await api.baselines.get(ctx.tenantId, id);
-        if (!cancelled) setConfig(res.model_config);
+        if (!cancelled) setConfig(res.model_config as Record<string, unknown>);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
