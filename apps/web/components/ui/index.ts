@@ -12,3 +12,4 @@ export { VAFormDialog } from "./VAFormDialog";
 export { ToastProvider, useToast } from "./ToastProvider";
 export { VASpinner } from "./VASpinner";
 export { VAPagination } from "./VAPagination";
+export { VAListToolbar } from "./VAListToolbar";
