@@ -201,6 +201,23 @@ describe("VASidebar", () => {
     expect(stored.setup).toBe(true);
   });
 
+  it("accepts onClose prop for mobile drawer", async () => {
+    const onClose = vi.fn();
+    render(<VASidebar mobileOpen onClose={onClose} />);
+    const nav = await screen.findByRole("navigation");
+    expect(nav).toBeInTheDocument();
+    const user = userEvent.setup();
+    const closeBtn = screen.getByRole("button", { name: /close menu/i });
+    await user.click(closeBtn);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("renders backdrop when mobileOpen is true", async () => {
+    render(<VASidebar mobileOpen onClose={vi.fn()} />);
+    await screen.findByRole("navigation");
+    expect(document.querySelector("[data-testid='mobile-backdrop']")).toBeInTheDocument();
+  });
+
   it("toggles rail mode when collapse button is clicked", async () => {
     const user = userEvent.setup();
     render(<VASidebar />);
