@@ -55,6 +55,7 @@ export default function BaselineDetailPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [runCreating, setRunCreating] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
+  const [templateSaving, setTemplateSaving] = useState(false);
 
   // Version history
   const [versions, setVersions] = useState<{ baseline_version: string; is_active: boolean; status: string; created_at: string | null }[]>([]);
@@ -176,6 +177,27 @@ export default function BaselineDetailPage() {
     }
   }
 
+  async function handleSaveAsTemplate() {
+    if (!tenantId) return;
+    const name = window.prompt("Template name:");
+    if (!name?.trim()) return;
+    const industry = window.prompt("Industry tag (e.g. software, manufacturing):");
+    if (!industry?.trim()) return;
+    setTemplateSaving(true);
+    try {
+      const res = await api.marketplace.saveAsTemplate(tenantId, {
+        source_baseline_id: id,
+        name: name.trim(),
+        industry: industry.trim(),
+      });
+      toast.success(`Template "${res.name}" saved (${res.template_id})`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save template");
+    } finally {
+      setTemplateSaving(false);
+    }
+  }
+
   if (!tenantId && !loading) return null;
 
   return (
@@ -193,6 +215,9 @@ export default function BaselineDetailPage() {
           Baseline {id}
         </h1>
         <div className="flex items-center gap-3">
+          <VAButton variant="ghost" onClick={handleSaveAsTemplate} disabled={templateSaving || !config}>
+            {templateSaving ? "Saving\u2026" : "Save as Template"}
+          </VAButton>
           <VAButton variant="secondary" onClick={handleEditConfig} disabled={editLoading}>
             {editLoading ? "Opening\u2026" : "Edit Configuration"}
           </VAButton>

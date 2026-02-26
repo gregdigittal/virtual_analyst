@@ -1251,6 +1251,16 @@ export const api = {
         `/api/v1/marketplace/templates/${encodeURIComponent(templateId)}/use`,
         { tenantId, userId, method: "POST", body }
       ),
+    saveAsTemplate: (tenantId: string, body: {
+      source_baseline_id: string;
+      name: string;
+      industry: string;
+      description?: string;
+    }) =>
+      request<{ template_id: string; name: string; industry: string; template_type: string }>(
+        "/api/v1/marketplace/templates/from-baseline",
+        { tenantId, method: "POST", body }
+      ),
   },
   sso: {
     getConfig: (tenantId: string) =>

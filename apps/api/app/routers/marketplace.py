@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -10,9 +11,10 @@ from pydantic import BaseModel, Field
 from apps.api.app.data.budget_catalog import get_budget_template
 from apps.api.app.db import tenant_conn
 from apps.api.app.db.audit import create_audit_event, EVENT_MARKETPLACE_TEMPLATE_USED
-from apps.api.app.deps import get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.routers.budgets import create_budget_from_template_impl
 from apps.api.app.services.llm.router import LLMRouter
+from shared.fm_shared.storage import ArtifactStore
 
 router = APIRouter(prefix="/marketplace", tags=["marketplace"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
@@ -24,6 +26,54 @@ class UseMarketplaceTemplateBody(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
     prior_year_actuals: list[dict[str, Any]] | None = Field(default=None)
     num_periods: int = Field(default=12, ge=1, le=24)
+
+
+class SaveAsTemplateBody(BaseModel):
+    """Body for saving a baseline as a reusable marketplace template."""
+    source_baseline_id: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1, max_length=255)
+    industry: str = Field(..., min_length=1, max_length=100)
+    description: str = Field(default="", max_length=2000)
+
+
+# ---------------------------------------------------------------------------
+# Helpers: extract template structure from baseline assumptions
+# ---------------------------------------------------------------------------
+
+def _extract_question_plan_from_assumptions(assumptions: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract question structure (revenue stream types, funding instruments) without actual values."""
+    plan: list[dict[str, Any]] = []
+    for stream in assumptions.get("revenue_streams", []):
+        entry: dict[str, Any] = {"section": "revenue"}
+        if stream.get("stream_type"):
+            entry["stream_type"] = stream["stream_type"]
+        if stream.get("label"):
+            entry["label"] = stream["label"]
+        if stream.get("business_line"):
+            entry["business_line"] = stream["business_line"]
+        plan.append(entry)
+    funding = assumptions.get("funding", {})
+    if isinstance(funding, dict):
+        for instrument, _details in funding.items():
+            plan.append({"section": "funding", "instrument": instrument})
+    return plan
+
+
+def _extract_account_refs(assumptions: dict[str, Any]) -> list[str]:
+    """Extract unique account reference names from cost_structure."""
+    refs: list[str] = []
+    seen: set[str] = set()
+    cost_structure = assumptions.get("cost_structure", {})
+    if isinstance(cost_structure, dict):
+        for category_items in cost_structure.values():
+            items = category_items if isinstance(category_items, list) else [category_items]
+            for item in items:
+                if isinstance(item, dict):
+                    ref = item.get("account_ref") or item.get("label") or ""
+                    if ref and ref not in seen:
+                        refs.append(ref)
+                        seen.add(ref)
+    return refs
 
 
 @router.get("/templates")
@@ -150,3 +200,61 @@ async def use_marketplace_template(
     if row["template_type"] == "model":
         raise HTTPException(501, "Model template use not yet implemented")
     raise HTTPException(400, "Unknown template type")
+
+
+@router.post("/templates/from-baseline", status_code=201)
+async def save_baseline_as_template(
+    body: SaveAsTemplateBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """Save a completed baseline as a reusable marketplace template."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    # 1. Load baseline row from DB
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """SELECT baseline_id, baseline_version, storage_path, is_active
+               FROM model_baselines
+               WHERE tenant_id = $1 AND baseline_id = $2 AND is_active = true""",
+            x_tenant_id,
+            body.source_baseline_id,
+        )
+    if not row:
+        raise HTTPException(404, "Baseline not found")
+
+    # 2. Load the baseline config from artifact store
+    artifact_id = f"{row['baseline_id']}_{row['baseline_version']}"
+    config = store.load(x_tenant_id, "model_config_v1", artifact_id)
+    if not config:
+        raise HTTPException(404, "Baseline config artifact not found")
+
+    # 3. Extract assumption structure without actual values
+    assumptions = config.get("assumptions", {}) if isinstance(config, dict) else {}
+    question_plan = _extract_question_plan_from_assumptions(assumptions)
+    account_refs = _extract_account_refs(assumptions)
+
+    # 4. Generate unique template_id
+    template_id = f"user-{uuid.uuid4().hex[:12]}"
+
+    # 5. Insert into marketplace_templates
+    async with tenant_conn(x_tenant_id) as conn:
+        await conn.execute(
+            """INSERT INTO marketplace_templates (template_id, name, industry, template_type, description)
+               VALUES ($1, $2, $3, 'model', $4)""",
+            template_id,
+            body.name,
+            body.industry,
+            body.description,
+        )
+
+    return {
+        "template_id": template_id,
+        "name": body.name,
+        "industry": body.industry,
+        "template_type": "model",
+        "description": body.description,
+        "question_plan": question_plan,
+        "account_refs": account_refs,
+    }
