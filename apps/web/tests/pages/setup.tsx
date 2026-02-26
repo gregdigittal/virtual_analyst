@@ -133,6 +133,9 @@ export const mockApi = {
   scenarios: {
     list: vi.fn(emptyList),
   },
+  boardPacks: {
+    list: vi.fn(emptyList),
+  },
   drafts: {
     list: vi.fn(async () => ({ items: [], total: 0, limit: 50, offset: 0 })),
     get: vi.fn(async () => ({

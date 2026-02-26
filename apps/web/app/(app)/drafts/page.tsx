@@ -3,6 +3,7 @@
 import { api, type DraftSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASelect, VASpinner, StatePill, VAPagination } from "@/components/ui";
+import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -29,6 +30,7 @@ export default function DraftsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
+  const [hasBaselines, setHasBaselines] = useState(true);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -55,6 +57,10 @@ export default function DraftsPage() {
       if (!ctx) { router.replace("/login"); return; }
       api.setAccessToken(ctx.accessToken);
       setTenantId(ctx.tenantId);
+      try {
+        const blRes = await api.baselines.list(ctx.tenantId, { limit: 1 });
+        setHasBaselines((blRes.items ?? []).length > 0);
+      } catch { /* baseline check is non-critical */ }
     })();
   }, [router]);
 
@@ -97,6 +103,14 @@ export default function DraftsPage() {
           {creating ? "Creating…" : "New draft"}
         </VAButton>
       </div>
+
+      {!loading && !hasBaselines && (
+        <SoftGateBanner
+          message="No baselines yet — create one before starting drafts."
+          actionLabel="Create baseline"
+          actionHref="/marketplace"
+        />
+      )}
 
       <div className="mb-4">
         <VASelect

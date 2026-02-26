@@ -3,6 +3,7 @@
 import { api, type BoardPackSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VACard, VASpinner, VAPagination } from "@/components/ui";
+import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -18,6 +19,7 @@ export default function BoardPacksPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [hasBaselines, setHasBaselines] = useState(true);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -43,6 +45,10 @@ export default function BoardPacksPage() {
       if (!ctx) { router.replace("/login"); return; }
       api.setAccessToken(ctx.accessToken);
       setTenantId(ctx.tenantId);
+      try {
+        const blRes = await api.baselines.list(ctx.tenantId, { limit: 1 });
+        setHasBaselines((blRes.items ?? []).length > 0);
+      } catch { /* baseline check is non-critical */ }
     })();
   }, [router]);
 
@@ -62,6 +68,15 @@ export default function BoardPacksPage() {
           Create and generate board packs; export as PDF, PPTX, or HTML.
         </p>
       </div>
+
+      {!loading && !hasBaselines && (
+        <SoftGateBanner
+          message="No baselines or runs yet — complete a run before creating board packs."
+          actionLabel="Create baseline"
+          actionHref="/marketplace"
+        />
+      )}
+
       {error && (
         <div
           className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"

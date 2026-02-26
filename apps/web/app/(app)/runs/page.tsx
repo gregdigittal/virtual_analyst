@@ -3,6 +3,7 @@
 import { api, type BaselineSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VACard, VASelect, VASpinner, VAPagination } from "@/components/ui";
+import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -75,6 +76,14 @@ export default function RunsPage() {
           View run results, statements, and KPIs.
         </p>
       </div>
+
+      {!loading && baselines.length === 0 && (
+        <SoftGateBanner
+          message="No baselines found — create a baseline before running simulations."
+          actionLabel="Create baseline"
+          actionHref="/marketplace"
+        />
+      )}
 
       <div className="mb-4 flex flex-wrap gap-3">
         <VASelect
