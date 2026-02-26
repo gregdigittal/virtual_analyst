@@ -9,6 +9,9 @@ import { CommentThread } from "@/components/CommentThread";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
+
+const SEGMENT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 type Tab = "statements" | "kpis";
 
@@ -349,11 +352,32 @@ export default function RunDetailPage() {
               Object.keys(statements.revenue_by_segment as Record<string, unknown>).length > 1 && (() => {
                 const segments = statements.revenue_by_segment as Record<string, number[]>;
                 const segNames = Object.keys(segments);
+                const chartData = periods.map((p, idx) => {
+                  const row: Record<string, string | number> = { period: p };
+                  for (const seg of segNames) {
+                    row[seg] = (segments[seg] ?? [])[idx] ?? 0;
+                  }
+                  return row;
+                });
                 return (
                   <div className="mb-8">
                     <h3 className="font-brand mb-2 text-lg font-medium text-va-text">
                       Revenue by Segment
                     </h3>
+                    {/* Revenue by Segment Chart */}
+                    <div className="mb-4" style={{ width: "100%", height: 300 }}>
+                      <ResponsiveContainer>
+                        <BarChart data={chartData}>
+                          <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip />
+                          <Legend />
+                          {segNames.map((seg, i) => (
+                            <Bar key={seg} dataKey={seg} stackId="rev" fill={SEGMENT_COLORS[i % SEGMENT_COLORS.length]} />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                     <div className="overflow-x-auto rounded-va-lg border border-va-border">
                       <table className="w-full min-w-[600px] text-sm text-va-text">
                         <thead>
