@@ -127,6 +127,23 @@ export const mockApi = {
   scenarios: {
     list: vi.fn(emptyList),
   },
+  drafts: {
+    list: vi.fn(async () => ({ items: [], total: 0, limit: 50, offset: 0 })),
+    get: vi.fn(async () => ({
+      draft_session_id: "draft-1",
+      parent_baseline_id: "b-1",
+      parent_baseline_version: null,
+      status: "active",
+      created_at: "2026-01-01T00:00:00Z",
+      workspace: { assumptions: {}, distributions: [], correlation_matrix: [] },
+    })),
+    create: vi.fn(async () => ({ draft_session_id: "draft-new", status: "active", storage_path: "/tmp" })),
+    patch: vi.fn(async () => ({ draft_session_id: "draft-1" })),
+    chat: vi.fn(async () => ({ messages: [], proposals: [] })),
+    acceptProposal: vi.fn(async () => ({ proposal_id: "p-1", status: "accepted" })),
+    rejectProposal: vi.fn(async () => ({ proposal_id: "p-1", status: "rejected" })),
+    commit: vi.fn(async () => ({ baseline_id: "b-1", baseline_version: "v-2" })),
+  },
   versions: {
     list: vi.fn(async () => ({ versions: [] })),
     diff: vi.fn(async () => ({})),

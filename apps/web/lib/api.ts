@@ -395,10 +395,11 @@ export const api = {
       ),
   },
   drafts: {
-    list: (tenantId: string, opts?: { status?: string; limit?: number; offset?: number }) =>
+    list: (tenantId: string, opts?: { status?: string; parent_baseline_id?: string; limit?: number; offset?: number }) =>
       request<DraftsResponse>(
         `/api/v1/drafts?${new URLSearchParams({
           ...(opts?.status && { status: opts.status }),
+          ...(opts?.parent_baseline_id && { parent_baseline_id: opts.parent_baseline_id }),
           ...(opts?.limit != null && { limit: String(opts.limit) }),
           ...(opts?.offset != null && { offset: String(opts.offset) }),
         }).toString()}`,
