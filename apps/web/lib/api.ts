@@ -880,6 +880,24 @@ export const api = {
         `/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}`,
         { tenantId, method: "DELETE" }
       ),
+    /** Build the SSE upload stream URL for POST-based streaming. */
+    getUploadStreamUrl(): string {
+      return `${API_URL}/api/v1/excel-ingestion/upload-stream`;
+    },
+    /** POST answers to resume a streaming session. Returns the resume URL. */
+    async answerStream(
+      tenantId: string,
+      ingestionId: string,
+      answers: { question: string; answer: string }[]
+    ): Promise<string> {
+      const url = `/api/v1/excel-ingestion/${encodeURIComponent(ingestionId)}/answer-stream`;
+      await request<unknown>(url, {
+        tenantId,
+        method: "POST",
+        body: { answers },
+      });
+      return `${API_URL}${url}`;
+    },
   },
   orgStructures: {
     list: (tenantId: string, limit?: number, offset?: number, status?: string) => {
