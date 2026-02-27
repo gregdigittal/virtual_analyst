@@ -1402,6 +1402,8 @@ export const api = {
       request<{ seeded: number; message: string }>("/api/v1/afs/frameworks/seed", { tenantId, method: "POST" }),
     getFramework: (tenantId: string, frameworkId: string) =>
       request<AFSFramework>(`/api/v1/afs/frameworks/${encodeURIComponent(frameworkId)}`, { tenantId }),
+    createFramework: (tenantId: string, body: { name: string; standard: string; version?: string; jurisdiction?: string | null; disclosure_schema_json?: Record<string, unknown> | null; statement_templates_json?: Record<string, unknown> | null }) =>
+      request<AFSFramework>("/api/v1/afs/frameworks", { tenantId, method: "POST", body }),
     getChecklist: (tenantId: string, frameworkId: string) =>
       request<{ items: AFSDisclosureItem[] }>(`/api/v1/afs/frameworks/${encodeURIComponent(frameworkId)}/checklist`, { tenantId }),
 
@@ -1526,6 +1528,14 @@ export const api = {
       request<{ anomalies: { ratio_key: string; severity: string; description: string; disclosure_impact: string }[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/analytics/anomalies`, { tenantId }),
     getGoingConcern: (tenantId: string, engagementId: string) =>
       request<{ risk_level: string; factors: { factor: string; indicator: string; detail: string }[]; recommendation: string; disclosure_required: boolean }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/analytics/going-concern`, { tenantId }),
+
+    // Phase 6: Custom frameworks + roll-forward
+    inferFramework: (tenantId: string, body: { description: string; jurisdiction?: string; entity_type?: string }) =>
+      request<AFSFramework & { items_count: number }>("/api/v1/afs/frameworks/infer", { tenantId, method: "POST", body }),
+    addDisclosureItem: (tenantId: string, frameworkId: string, body: { section: string; reference?: string; description: string; required?: boolean }) =>
+      request<AFSDisclosureItem>(`/api/v1/afs/frameworks/${encodeURIComponent(frameworkId)}/items`, { tenantId, method: "POST", body }),
+    rollforward: (tenantId: string, engagementId: string) =>
+      request<{ sections_copied: number; comparatives_copied: boolean }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/rollforward`, { tenantId, method: "POST" }),
   },
 };
 
@@ -2036,6 +2046,7 @@ export interface AFSSection {
   } | null;
   status: string;
   version: number;
+  rolled_forward_from: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

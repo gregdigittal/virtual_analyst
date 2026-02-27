@@ -178,9 +178,14 @@ export default function AFSPage() {
             compliance.
           </p>
         </div>
-        <VAButton variant="primary" onClick={() => setShowCreate(true)}>
-          New Engagement
-        </VAButton>
+        <div className="flex gap-2">
+          <Link href="/afs/frameworks">
+            <VAButton variant="secondary">Custom Framework</VAButton>
+          </Link>
+          <VAButton variant="primary" onClick={() => setShowCreate(true)}>
+            New Engagement
+          </VAButton>
+        </div>
       </div>
 
       {/* Loading */}
