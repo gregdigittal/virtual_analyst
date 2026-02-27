@@ -13,6 +13,7 @@ import { ChatThread } from "@/components/excel-import/ChatThread";
 import { QuestionCard } from "@/components/excel-import/QuestionCard";
 import { MappingPreview, type MappingData } from "@/components/excel-import/MappingPreview";
 import { ReviewPanel, type ReviewMapping } from "@/components/excel-import/ReviewPanel";
+import { EntityHierarchyEditor, type DetectedEntity } from "@/components/EntityHierarchyEditor";
 
 /* ------------------------------------------------------------------ */
 /*  SSE stream reader helper                                           */
@@ -109,6 +110,9 @@ export default function ExcelImportPage() {
   const [draftLoading, setDraftLoading] = useState(false);
   const [answering, setAnswering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* ---- entity hierarchy state ---- */
+  const [detectedEntities, setDetectedEntities] = useState<DetectedEntity[]>([]);
 
   /* ---- agent stream (destructure stable callbacks) ---- */
   const {
@@ -279,6 +283,19 @@ export default function ExcelImportPage() {
   }, []);
 
   /* ---------------------------------------------------------------- */
+  /*  Populate detected entities from classification                    */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
+    const cls = classification as Record<string, unknown> | null;
+    const summary = cls?.model_summary as Record<string, unknown> | undefined;
+    const entities = summary?.detected_entities as DetectedEntity[] | undefined;
+    if (entities && entities.length > 0) {
+      setDetectedEntities(entities);
+    }
+  }, [classification]);
+
+  /* ---------------------------------------------------------------- */
   /*  Derive mapping preview data                                      */
   /* ---------------------------------------------------------------- */
 
@@ -412,6 +429,17 @@ export default function ExcelImportPage() {
               )}
             </ChatThread>
           </VACard>
+
+          {/* Detected entities (when classification has multi-entity data) */}
+          {isComplete && detectedEntities.length > 0 && (
+            <VACard className="p-4">
+              <h3 className="text-sm font-medium text-va-text mb-2">Detected Entities</h3>
+              <EntityHierarchyEditor
+                entities={detectedEntities}
+                onChange={setDetectedEntities}
+              />
+            </VACard>
+          )}
 
           {/* Review panel (when stream is complete) */}
           {isComplete && reviewMapping && (
