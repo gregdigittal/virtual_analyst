@@ -1496,6 +1496,24 @@ export const api = {
       request<AFSTemporaryDifference>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/tax/${encodeURIComponent(computationId)}/differences`, { tenantId, method: "POST", body }),
     generateTaxNote: (tenantId: string, engagementId: string, computationId: string, body?: { nl_instruction?: string }) =>
       request<AFSTaxComputation>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/tax/${encodeURIComponent(computationId)}/generate-note`, { tenantId, method: "POST", body }),
+
+    // Consolidation
+    linkOrg: (tenantId: string, engagementId: string, body: { org_id: string; reporting_currency?: string; fx_avg_rates?: Record<string, number>; fx_closing_rates?: Record<string, number> }) =>
+      request<AFSConsolidation>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/consolidation/link`, { tenantId, method: "POST", body }),
+    getConsolidation: (tenantId: string, engagementId: string) =>
+      request<AFSConsolidation>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/consolidation`, { tenantId }),
+    runConsolidation: (tenantId: string, engagementId: string, body?: { fx_avg_rates?: Record<string, number>; fx_closing_rates?: Record<string, number> }) =>
+      request<AFSConsolidation>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/consolidation/run`, { tenantId, method: "POST", body: body ?? {} }),
+    listConsolidationEntities: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSConsolidationEntity[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/consolidation/entities`, { tenantId }),
+
+    // Outputs
+    generateOutput: (tenantId: string, engagementId: string, body: { format: string }) =>
+      request<AFSOutput>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/outputs/generate`, { tenantId, method: "POST", body }),
+    listOutputs: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSOutput[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/outputs`, { tenantId }),
+    downloadOutput: (tenantId: string, engagementId: string, outputId: string) =>
+      request<Blob>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/outputs/${encodeURIComponent(outputId)}/download`, { tenantId }),
   },
 };
 
@@ -2089,4 +2107,41 @@ export interface AFSTemporaryDifference {
   difference: number;
   deferred_tax_effect: number;
   diff_type: string;
+}
+
+export interface AFSConsolidation {
+  consolidation_id: string;
+  engagement_id: string;
+  org_id: string;
+  reporting_currency: string;
+  fx_avg_rates: Record<string, number>;
+  fx_closing_rates: Record<string, number>;
+  elimination_entries_json: unknown[];
+  consolidated_tb_json: unknown[] | null;
+  entity_tb_map: Record<string, string>;
+  status: string;
+  error_message: string | null;
+  consolidated_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface AFSConsolidationEntity {
+  entity_id: string;
+  name: string;
+  entity_type: string;
+  currency: string;
+  has_trial_balance: boolean;
+}
+
+export interface AFSOutput {
+  output_id: string;
+  engagement_id: string;
+  format: string;
+  filename: string;
+  file_size_bytes: number | null;
+  status: string;
+  error_message: string | null;
+  generated_by: string | null;
+  generated_at: string;
 }

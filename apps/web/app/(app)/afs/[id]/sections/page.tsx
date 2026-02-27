@@ -189,6 +189,12 @@ export default function SectionEditorPage() {
           <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/review`)}>
             Review
           </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/consolidation`)}>
+            Consolidation
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/output`)}>
+            Output
+          </VAButton>
           <VAButton variant="secondary" onClick={handleValidate} disabled={validating || sections.length === 0}>
             {validating ? "Validating..." : "Validate Disclosures"}
           </VAButton>

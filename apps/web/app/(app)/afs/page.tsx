@@ -250,9 +250,11 @@ export default function AFSPage() {
                       href={
                         eng.status === "setup"
                           ? `/afs/${eng.engagement_id}/setup`
-                          : eng.status === "review" || eng.status === "approved"
-                            ? `/afs/${eng.engagement_id}/review`
-                            : `/afs/${eng.engagement_id}/sections`
+                          : eng.status === "published"
+                            ? `/afs/${eng.engagement_id}/output`
+                            : eng.status === "review" || eng.status === "approved"
+                              ? `/afs/${eng.engagement_id}/review`
+                              : `/afs/${eng.engagement_id}/sections`
                       }
                       className="group"
                     >
@@ -273,7 +275,7 @@ export default function AFSPage() {
                         </p>
                         {eng.status !== "setup" && (
                           <p className="mt-2 text-xs font-medium text-va-blue">
-                            Edit Sections &rarr;
+                            {eng.status === "published" ? "View Outputs" : "Edit Sections"} &rarr;
                           </p>
                         )}
                       </VACard>

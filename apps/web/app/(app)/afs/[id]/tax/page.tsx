@@ -188,6 +188,20 @@ export default function TaxComputationPage() {
             {engagement?.entity_name} — Tax Computation
           </h1>
         </div>
+        <div className="flex gap-2">
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/sections`)}>
+            Sections
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/review`)}>
+            Review
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/consolidation`)}>
+            Consolidation
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/output`)}>
+            Output
+          </VAButton>
+        </div>
       </div>
 
       {/* Content */}

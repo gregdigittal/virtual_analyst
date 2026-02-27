@@ -16,6 +16,7 @@ from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, 
 from apps.api.app.services.afs.tb_parser import parse_excel_tb, parse_csv_tb, tb_accounts_to_json
 from apps.api.app.services.afs.pdf_extractor import extract_pdf, sections_to_json
 from apps.api.app.services.afs.disclosure_drafter import draft_section, validate_sections
+from apps.api.app.services.afs.output_generator import generate_pdf_html, generate_docx, generate_ixbrl
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.storage import ArtifactStore
 
@@ -437,6 +438,14 @@ def _temp_difference_id() -> str:
     return f"atd_{uuid.uuid4().hex[:14]}"
 
 
+def _consolidation_id() -> str:
+    return f"acr_{uuid.uuid4().hex[:14]}"
+
+
+def _output_id() -> str:
+    return f"afo_{uuid.uuid4().hex[:14]}"
+
+
 class SetBaseSourceBody(BaseModel):
     base_source: str = Field(...)  # pdf, excel, va_baseline
 
@@ -504,6 +513,26 @@ class TemporaryDifferenceBody(BaseModel):
 
 class GenerateTaxNoteBody(BaseModel):
     nl_instruction: str | None = Field(default=None, max_length=5000)
+
+
+# Phase 4 request models
+VALID_OUTPUT_FORMATS = {"pdf", "docx", "ixbrl"}
+
+
+class LinkOrgBody(BaseModel):
+    org_id: str = Field(..., min_length=1)
+    reporting_currency: str = Field(default="ZAR", pattern=r"^[A-Z]{3}$")
+    fx_avg_rates: dict[str, float] = Field(default_factory=dict)
+    fx_closing_rates: dict[str, float] | None = None
+
+
+class ConsolidateBody(BaseModel):
+    fx_avg_rates: dict[str, float] | None = None
+    fx_closing_rates: dict[str, float] | None = None
+
+
+class GenerateOutputBody(BaseModel):
+    format: str = Field(...)  # pdf, docx, ixbrl
 
 
 def _validate_engagement(row, engagement_id: str):
@@ -1760,3 +1789,427 @@ async def generate_tax_note(
         result["llm_cost_usd"] = llm_result.cost_estimate_usd
         result["llm_tokens"] = llm_result.tokens.total_tokens
         return result
+
+
+# ===========================================================================
+# Consolidation (Phase 4)
+# ===========================================================================
+
+
+@router.post("/engagements/{engagement_id}/consolidation/link", status_code=201)
+async def link_org_structure(
+    engagement_id: str,
+    body: LinkOrgBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Link an engagement to an org-structure for multi-entity consolidation."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        eng = await conn.fetchrow(
+            "SELECT * FROM afs_engagements WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        # Validate org_id exists
+        org = await conn.fetchrow(
+            "SELECT org_id, group_name FROM org_structures WHERE tenant_id = $1 AND org_id = $2",
+            x_tenant_id, body.org_id,
+        )
+        if not org:
+            raise HTTPException(404, f"Org-structure {body.org_id} not found")
+
+        # Check for existing link
+        existing = await conn.fetchval(
+            "SELECT consolidation_id FROM afs_consolidation_rules WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        if existing:
+            raise HTTPException(409, "Engagement is already linked to an org-structure. Unlink first.")
+
+        cid = _consolidation_id()
+        row = await conn.fetchrow(
+            """INSERT INTO afs_consolidation_rules
+               (tenant_id, consolidation_id, engagement_id, org_id, reporting_currency,
+                fx_avg_rates, fx_closing_rates, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)
+               RETURNING *""",
+            x_tenant_id, cid, engagement_id, body.org_id, body.reporting_currency,
+            json.dumps(body.fx_avg_rates),
+            json.dumps(body.fx_closing_rates or {}),
+            x_user_id or None,
+        )
+        return dict(row)
+
+
+@router.get("/engagements/{engagement_id}/consolidation")
+async def get_consolidation(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """Get consolidation config for an engagement."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            "SELECT * FROM afs_consolidation_rules WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        if not row:
+            raise HTTPException(404, "No consolidation linked for this engagement")
+        return dict(row)
+
+
+@router.get("/engagements/{engagement_id}/consolidation/entities")
+async def list_consolidation_entities(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """List entities from the linked org-structure with their TB upload status."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        consol = await conn.fetchrow(
+            "SELECT org_id FROM afs_consolidation_rules WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        if not consol:
+            raise HTTPException(404, "No consolidation linked for this engagement")
+
+        entities = await conn.fetch(
+            """SELECT entity_id, name, entity_type, currency
+               FROM org_entities
+               WHERE tenant_id = $1 AND org_id = $2 AND status = 'active'
+               ORDER BY is_root DESC, name""",
+            x_tenant_id, consol["org_id"],
+        )
+
+        # Check which entities have trial balances uploaded for this engagement
+        tb_entity_ids = await conn.fetch(
+            """SELECT DISTINCT entity_id FROM afs_trial_balances
+               WHERE tenant_id = $1 AND engagement_id = $2 AND entity_id IS NOT NULL""",
+            x_tenant_id, engagement_id,
+        )
+        tb_set = {r["entity_id"] for r in tb_entity_ids}
+
+        items = []
+        for e in entities:
+            items.append({
+                **dict(e),
+                "has_trial_balance": e["entity_id"] in tb_set,
+            })
+
+        return {"items": items}
+
+
+@router.post("/engagements/{engagement_id}/consolidation/run")
+async def run_consolidation(
+    engagement_id: str,
+    body: ConsolidateBody | None = None,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """Run consolidation: aggregate entity trial balances with eliminations."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        consol = await conn.fetchrow(
+            "SELECT * FROM afs_consolidation_rules WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        if not consol:
+            raise HTTPException(404, "No consolidation linked for this engagement")
+
+        org_id = consol["org_id"]
+        reporting_ccy = consol["reporting_currency"]
+
+        # Update FX rates if provided
+        fx_avg = dict(consol["fx_avg_rates"] or {})
+        fx_closing = dict(consol["fx_closing_rates"] or {})
+        if body and body.fx_avg_rates:
+            fx_avg.update(body.fx_avg_rates)
+        if body and body.fx_closing_rates:
+            fx_closing.update(body.fx_closing_rates)
+
+        # Load entities
+        entities = await conn.fetch(
+            """SELECT entity_id, name, currency
+               FROM org_entities
+               WHERE tenant_id = $1 AND org_id = $2 AND status = 'active'""",
+            x_tenant_id, org_id,
+        )
+        entity_map = {e["entity_id"]: dict(e) for e in entities}
+
+        # Load all entity trial balances
+        tbs = await conn.fetch(
+            """SELECT entity_id, data_json FROM afs_trial_balances
+               WHERE tenant_id = $1 AND engagement_id = $2 AND entity_id IS NOT NULL
+               ORDER BY uploaded_at DESC""",
+            x_tenant_id, engagement_id,
+        )
+
+        # Group by entity (take latest per entity)
+        entity_tbs: dict[str, list] = {}
+        for tb in tbs:
+            eid = tb["entity_id"]
+            if eid not in entity_tbs:
+                data = tb["data_json"] if isinstance(tb["data_json"], list) else []
+                entity_tbs[eid] = data
+
+        if not entity_tbs:
+            raise HTTPException(400, "No entity trial balances found. Upload trial balances with entity_id tags first.")
+
+        # Build entity-TB map for tracking
+        entity_tb_map = {eid: "loaded" for eid in entity_tbs}
+        for eid in entity_map:
+            if eid not in entity_tb_map:
+                entity_tb_map[eid] = "missing"
+
+        # Load intercompany links for elimination
+        ic_links = await conn.fetch(
+            """SELECT from_entity_id, to_entity_id, link_type, amount_or_rate, frequency
+               FROM org_intercompany_links
+               WHERE tenant_id = $1 AND org_id = $2""",
+            x_tenant_id, org_id,
+        )
+
+        # Consolidate: sum accounts across entities with FX translation
+        consolidated: dict[str, float] = {}
+        for eid, accounts in entity_tbs.items():
+            entity_ccy = entity_map.get(eid, {}).get("currency", reporting_ccy)
+            fx_rate = 1.0
+            if entity_ccy != reporting_ccy:
+                pair_key = f"{entity_ccy}/{reporting_ccy}"
+                fx_rate = fx_avg.get(pair_key, 1.0)
+
+            for acct in accounts:
+                name = acct.get("account_name", "Unknown")
+                net = float(acct.get("net", 0)) * fx_rate
+                consolidated[name] = consolidated.get(name, 0) + net
+
+        # Compute elimination entries
+        eliminations: list[dict] = []
+        for link in ic_links:
+            lt = link["link_type"]
+            amount = float(link["amount_or_rate"] or 0)
+            freq = link["frequency"] or "annual"
+
+            # Annualize
+            if freq == "monthly":
+                amount *= 12
+            elif freq == "quarterly":
+                amount *= 4
+
+            from_name = entity_map.get(link["from_entity_id"], {}).get("name", link["from_entity_id"])
+            to_name = entity_map.get(link["to_entity_id"], {}).get("name", link["to_entity_id"])
+
+            if lt in ("management_fee", "royalty", "trade"):
+                eliminations.append({
+                    "type": lt,
+                    "from_entity": from_name,
+                    "to_entity": to_name,
+                    "revenue_eliminated": amount,
+                    "expense_eliminated": amount,
+                })
+                # Remove from consolidated (simplified: reduce revenue and expense)
+                consolidated[f"Intercompany {lt} revenue"] = consolidated.get(f"Intercompany {lt} revenue", 0) - amount
+                consolidated[f"Intercompany {lt} expense"] = consolidated.get(f"Intercompany {lt} expense", 0) + amount
+            elif lt == "loan":
+                interest = amount  # amount_or_rate is interest rate for loans
+                eliminations.append({
+                    "type": "loan_interest",
+                    "from_entity": from_name,
+                    "to_entity": to_name,
+                    "interest_eliminated": interest,
+                })
+            elif lt == "dividend":
+                eliminations.append({
+                    "type": "dividend",
+                    "from_entity": from_name,
+                    "to_entity": to_name,
+                    "dividend_eliminated": amount,
+                })
+
+        # Build consolidated TB array
+        consolidated_tb = [
+            {"account_name": name, "net": round(net, 2)}
+            for name, net in sorted(consolidated.items())
+            if abs(net) > 0.005
+        ]
+
+        try:
+            row = await conn.fetchrow(
+                """UPDATE afs_consolidation_rules
+                   SET consolidated_tb_json = $1::jsonb,
+                       elimination_entries_json = $2::jsonb,
+                       entity_tb_map = $3::jsonb,
+                       fx_avg_rates = $4::jsonb,
+                       fx_closing_rates = $5::jsonb,
+                       status = 'consolidated',
+                       consolidated_at = now()
+                   WHERE tenant_id = $6 AND consolidation_id = $7
+                   RETURNING *""",
+                json.dumps(consolidated_tb),
+                json.dumps(eliminations),
+                json.dumps(entity_tb_map),
+                json.dumps(fx_avg),
+                json.dumps(fx_closing),
+                x_tenant_id, consol["consolidation_id"],
+            )
+            return dict(row)
+        except Exception as exc:
+            await conn.execute(
+                """UPDATE afs_consolidation_rules
+                   SET status = 'error', error_message = $1
+                   WHERE tenant_id = $2 AND consolidation_id = $3""",
+                str(exc)[:2000], x_tenant_id, consol["consolidation_id"],
+            )
+            raise HTTPException(500, f"Consolidation failed: {exc}")
+
+
+# ===========================================================================
+# Output Generation (Phase 4)
+# ===========================================================================
+
+
+@router.post("/engagements/{engagement_id}/outputs/generate", status_code=201)
+async def generate_output(
+    engagement_id: str,
+    body: GenerateOutputBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """Generate an output file (PDF, DOCX, iXBRL) from locked sections."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    fmt = body.format.lower()
+    if fmt not in VALID_OUTPUT_FORMATS:
+        raise HTTPException(400, f"Invalid format '{fmt}'. Must be one of: {', '.join(sorted(VALID_OUTPUT_FORMATS))}")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        eng = await conn.fetchrow(
+            """SELECT e.*, f.name AS framework_name, f.standard
+               FROM afs_engagements e
+               JOIN afs_frameworks f ON e.tenant_id = f.tenant_id AND e.framework_id = f.framework_id
+               WHERE e.tenant_id = $1 AND e.engagement_id = $2""",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        # Load locked sections
+        sections = await conn.fetch(
+            """SELECT * FROM afs_sections
+               WHERE tenant_id = $1 AND engagement_id = $2 AND status = 'locked'
+               ORDER BY section_number ASC""",
+            x_tenant_id, engagement_id,
+        )
+        if not sections:
+            raise HTTPException(400, "No locked sections found. Lock sections before generating output.")
+
+        section_dicts = [dict(s) for s in sections]
+        entity_name = eng["entity_name"]
+        period_start = str(eng["period_start"])
+        period_end = str(eng["period_end"])
+        framework_name = eng["framework_name"]
+        standard = eng["standard"]
+
+        # Generate
+        if fmt == "pdf":
+            content_bytes = generate_pdf_html(entity_name, period_start, period_end, framework_name, section_dicts)
+            content_type = "text/html"
+            ext = "html"
+        elif fmt == "docx":
+            content_bytes = generate_docx(entity_name, period_start, period_end, framework_name, section_dicts)
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ext = "docx"
+        elif fmt == "ixbrl":
+            content_bytes = generate_ixbrl(entity_name, period_start, period_end, framework_name, standard, section_dicts)
+            content_type = "text/html"
+            ext = "html"
+        else:
+            raise HTTPException(400, f"Unsupported format: {fmt}")
+
+        safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", entity_name)[:50]
+        filename = f"{safe_name}_AFS_{period_end}.{ext}"
+
+        oid = _output_id()
+        store.save(x_tenant_id, "afs_output", oid, {
+            "b64": base64.b64encode(content_bytes).decode("ascii"),
+            "content_type": content_type,
+            "filename": filename,
+        })
+
+        row = await conn.fetchrow(
+            """INSERT INTO afs_outputs
+               (tenant_id, output_id, engagement_id, format, filename,
+                file_size_bytes, artifact_key, status, generated_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', $8)
+               RETURNING *""",
+            x_tenant_id, oid, engagement_id, fmt, filename,
+            len(content_bytes), oid, x_user_id or None,
+        )
+        return dict(row)
+
+
+@router.get("/engagements/{engagement_id}/outputs")
+async def list_outputs(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """List generated outputs for an engagement."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        rows = await conn.fetch(
+            """SELECT * FROM afs_outputs
+               WHERE tenant_id = $1 AND engagement_id = $2
+               ORDER BY generated_at DESC""",
+            x_tenant_id, engagement_id,
+        )
+        return {"items": [dict(r) for r in rows]}
+
+
+@router.get("/engagements/{engagement_id}/outputs/{output_id}/download")
+async def download_output(
+    engagement_id: str,
+    output_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+):
+    """Download a generated output file."""
+    from fastapi.responses import Response
+
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """SELECT * FROM afs_outputs
+               WHERE tenant_id = $1 AND output_id = $2 AND engagement_id = $3""",
+            x_tenant_id, output_id, engagement_id,
+        )
+        if not row:
+            raise HTTPException(404, f"Output {output_id} not found")
+        if row["status"] != "ready":
+            raise HTTPException(400, f"Output is not ready (status={row['status']})")
+
+    artifact = store.load(x_tenant_id, "afs_output", row["artifact_key"] or output_id)
+    if not artifact:
+        raise HTTPException(404, "Output file not found in storage")
+
+    content_bytes = base64.b64decode(artifact["b64"])
+    content_type = artifact.get("content_type", "application/octet-stream")
+    filename = artifact.get("filename", row["filename"])
+
+    return Response(
+        content=content_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

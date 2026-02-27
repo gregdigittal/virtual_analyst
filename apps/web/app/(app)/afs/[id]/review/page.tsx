@@ -285,19 +285,33 @@ export default function ReviewWorkflowPage() {
             {engagement?.entity_name} — Review Workflow
           </h1>
         </div>
-        <VAButton
-          variant="primary"
-          onClick={handleSubmitReview}
-          disabled={
-            submitting ||
-            hasDraftSections ||
-            allApproved ||
-            pendingReview != null ||
-            getNextStage() === null
-          }
-        >
-          {submitting ? "Submitting..." : "Submit for Review"}
-        </VAButton>
+        <div className="flex gap-2">
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/sections`)}>
+            Sections
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/tax`)}>
+            Tax
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/consolidation`)}>
+            Consolidation
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/output`)}>
+            Output
+          </VAButton>
+          <VAButton
+            variant="primary"
+            onClick={handleSubmitReview}
+            disabled={
+              submitting ||
+              hasDraftSections ||
+              allApproved ||
+              pendingReview != null ||
+              getNextStage() === null
+            }
+          >
+            {submitting ? "Submitting..." : "Submit for Review"}
+          </VAButton>
+        </div>
       </div>
 
       {/* Body */}
