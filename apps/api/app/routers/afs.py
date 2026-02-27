@@ -96,6 +96,20 @@ class CreateFrameworkBody(BaseModel):
     statement_templates_json: dict | None = None
 
 
+class InferFrameworkBody(BaseModel):
+    description: str = Field(..., min_length=10, max_length=2000)
+    jurisdiction: str | None = None
+    entity_type: str | None = None
+
+
+class CreateDisclosureItemBody(BaseModel):
+    section: str = Field(..., min_length=1)
+    reference: str | None = None
+    description: str = Field(..., min_length=1)
+    required: bool = True
+    applicable_entity_types: list[str] | None = None
+
+
 class CreateEngagementBody(BaseModel):
     entity_name: str = Field(..., min_length=1, max_length=255)
     framework_id: str = Field(..., min_length=1)
@@ -163,6 +177,66 @@ async def create_framework(
         return dict(row)
 
 
+@router.post("/frameworks/infer")
+async def infer_framework_endpoint(
+    body: InferFrameworkBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+    llm_router: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """Use AI to infer a custom framework from a natural-language description."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    from apps.api.app.services.afs.framework_ai import infer_framework
+
+    result = await infer_framework(
+        llm_router, tenant_id=x_tenant_id,
+        description=body.description,
+        jurisdiction=body.jurisdiction,
+        entity_type=body.entity_type,
+    )
+
+    # Extract the parsed result
+    parsed = result.content if hasattr(result, 'content') else result
+
+    # Create the framework
+    fid = _framework_id()
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """INSERT INTO afs_frameworks
+               (tenant_id, framework_id, name, standard, version, jurisdiction,
+                disclosure_schema_json, statement_templates_json, is_builtin, created_by)
+               VALUES ($1, $2, $3, 'custom', '1.0', $4, $5, $6, false, $7)
+               RETURNING *""",
+            x_tenant_id, fid,
+            parsed.get("name", "Custom Framework"),
+            body.jurisdiction,
+            json.dumps(parsed.get("disclosure_schema")),
+            json.dumps(parsed.get("statement_templates")),
+            x_user_id or None,
+        )
+
+        # Seed disclosure items from suggested_items
+        items_count = 0
+        for item in parsed.get("suggested_items", []):
+            await conn.execute(
+                """INSERT INTO afs_disclosure_items
+                   (tenant_id, item_id, framework_id, section, reference, description, required)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING""",
+                x_tenant_id, _disclosure_item_id(), fid,
+                item.get("section", ""),
+                item.get("reference", ""),
+                item.get("description", ""),
+                item.get("required", True),
+            )
+            items_count += 1
+
+        result_dict = dict(row)
+        result_dict["items_count"] = items_count
+        return result_dict
+
+
 @router.get("/frameworks/{framework_id}")
 async def get_framework(
     framework_id: str,
@@ -197,6 +271,37 @@ async def list_disclosure_items(
             framework_id,
         )
         return {"items": [dict(r) for r in rows]}
+
+
+@router.post("/frameworks/{framework_id}/items", status_code=201)
+async def add_disclosure_item(
+    framework_id: str,
+    body: CreateDisclosureItemBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """Add a disclosure checklist item to a framework."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        # Validate framework exists
+        fw = await conn.fetchval(
+            "SELECT framework_id FROM afs_frameworks WHERE tenant_id = $1 AND framework_id = $2",
+            x_tenant_id, framework_id,
+        )
+        if not fw:
+            raise HTTPException(404, "Framework not found")
+
+        item_id = _disclosure_item_id()
+        row = await conn.fetchrow(
+            """INSERT INTO afs_disclosure_items
+               (tenant_id, item_id, framework_id, section, reference, description, required, applicable_entity_types)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+               RETURNING *""",
+            x_tenant_id, item_id, framework_id,
+            body.section, body.reference, body.description, body.required,
+            body.applicable_entity_types,
+        )
+        return dict(row)
 
 
 @router.post("/frameworks/seed")
@@ -446,6 +551,55 @@ async def delete_engagement(
         )
         if result and result.endswith("0"):
             raise HTTPException(404, "Engagement not found")
+
+
+@router.post("/engagements/{engagement_id}/rollforward")
+async def rollforward_engagement(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Roll forward sections and comparatives from the prior engagement."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    from apps.api.app.services.afs.rollforward import rollforward_sections, rollforward_comparatives
+
+    async with tenant_conn(x_tenant_id) as conn:
+        # Validate engagement exists and has prior_engagement_id
+        eng = await conn.fetchrow(
+            "SELECT engagement_id, prior_engagement_id FROM afs_engagements WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        if not eng:
+            raise HTTPException(404, "Engagement not found")
+        if not eng["prior_engagement_id"]:
+            raise HTTPException(400, "No prior engagement linked — set prior_engagement_id first")
+
+        prior_id = eng["prior_engagement_id"]
+
+        # Validate prior engagement exists
+        prior = await conn.fetchval(
+            "SELECT engagement_id FROM afs_engagements WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, prior_id,
+        )
+        if not prior:
+            raise HTTPException(404, f"Prior engagement {prior_id} not found")
+
+        # Execute roll-forward
+        sections_result = await rollforward_sections(
+            conn, x_tenant_id, prior_id, engagement_id,
+            created_by=x_user_id or None,
+        )
+        comparatives_result = await rollforward_comparatives(
+            conn, x_tenant_id, prior_id, engagement_id,
+        )
+
+        return {
+            "sections_copied": sections_result["sections_copied"],
+            "comparatives_copied": comparatives_result["comparatives_copied"],
+            "sections": sections_result["sections"],
+        }
 
 
 # ===========================================================================
