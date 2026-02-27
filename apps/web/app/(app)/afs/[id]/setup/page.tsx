@@ -63,6 +63,10 @@ export default function AFSSetupPage() {
   const [discrepancies, setDiscrepancies] = useState<AFSDiscrepancy[]>([]);
   const [projections, setProjections] = useState<AFSProjection[]>([]);
 
+  // Roll-forward state
+  const [rollingForward, setRollingForward] = useState(false);
+  const [rolledForward, setRolledForward] = useState(false);
+
   // Upload state
   const [uploading, setUploading] = useState(false);
 
@@ -236,6 +240,57 @@ export default function AFSSetupPage() {
               </p>
             </div>
           </div>
+          {engagement.prior_engagement_id && (
+            <div className="mt-4 rounded-va-md border border-va-blue/30 bg-va-blue/5 p-4">
+              <h3 className="text-sm font-semibold text-va-text">
+                Roll Forward Available
+              </h3>
+              <p className="mt-1 text-xs text-va-text2">
+                This engagement is linked to a prior period. You can carry
+                forward sections and comparative data to use as a starting
+                point.
+              </p>
+              <div className="mt-3 flex items-center gap-3">
+                <VAButton
+                  variant="primary"
+                  disabled={rollingForward || rolledForward}
+                  onClick={async () => {
+                    if (!tenantId) return;
+                    setRollingForward(true);
+                    try {
+                      const result = await api.afs.rollforward(
+                        tenantId,
+                        engagementId,
+                      );
+                      toast.success(
+                        `Rolled forward ${result.sections_copied} section${result.sections_copied !== 1 ? "s" : ""}`,
+                      );
+                      setRolledForward(true);
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error
+                          ? e.message
+                          : "Roll-forward failed",
+                      );
+                    } finally {
+                      setRollingForward(false);
+                    }
+                  }}
+                >
+                  {rollingForward
+                    ? "Rolling forward..."
+                    : rolledForward
+                      ? "Rolled Forward"
+                      : "Roll Forward Sections"}
+                </VAButton>
+                {rolledForward && (
+                  <span className="text-xs text-green-400">
+                    Sections and comparatives copied successfully
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="mt-6 flex justify-end">
             <VAButton variant="primary" onClick={() => setStep(2)}>
               Next: Upload Data
