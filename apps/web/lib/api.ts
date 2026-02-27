@@ -1456,6 +1456,22 @@ export const api = {
       request<AFSProjection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/projections`, { tenantId, method: "POST", body }),
     listProjections: (tenantId: string, engagementId: string) =>
       request<{ items: AFSProjection[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/projections`, { tenantId }),
+
+    // Sections
+    listSections: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSSection[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/sections`, { tenantId }),
+    draftSection: (tenantId: string, engagementId: string, body: { section_type: string; title: string; nl_instruction: string }) =>
+      request<AFSSection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/sections/draft`, { tenantId, method: "POST", body }),
+    getSection: (tenantId: string, engagementId: string, sectionId: string) =>
+      request<AFSSection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/sections/${encodeURIComponent(sectionId)}`, { tenantId }),
+    updateSection: (tenantId: string, engagementId: string, sectionId: string, body: { nl_instruction?: string; content_json?: Record<string, unknown>; title?: string }) =>
+      request<AFSSection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/sections/${encodeURIComponent(sectionId)}`, { tenantId, method: "PATCH", body }),
+    lockSection: (tenantId: string, engagementId: string, sectionId: string) =>
+      request<AFSSection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/sections/${encodeURIComponent(sectionId)}/lock`, { tenantId, method: "POST" }),
+    unlockSection: (tenantId: string, engagementId: string, sectionId: string) =>
+      request<AFSSection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/sections/${encodeURIComponent(sectionId)}/unlock`, { tenantId, method: "POST" }),
+    validateSections: (tenantId: string, engagementId: string) =>
+      request<AFSValidationResult>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/validate`, { tenantId, method: "POST" }),
   },
 };
 
@@ -1950,4 +1966,45 @@ export interface AFSProjection {
   is_estimate: boolean;
   created_by: string | null;
   created_at: string;
+}
+
+export interface AFSSection {
+  section_id: string;
+  engagement_id: string;
+  section_type: string;
+  section_number: number;
+  title: string;
+  content_json: {
+    title: string;
+    paragraphs: { type: "text" | "table" | "heading"; content: string }[];
+    references: string[];
+    warnings: string[];
+  } | null;
+  status: string;
+  version: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  llm_cost_usd?: number;
+  llm_tokens?: number;
+}
+
+export interface AFSSectionHistory {
+  history_id: string;
+  section_id: string;
+  version: number;
+  content_json: Record<string, unknown>;
+  nl_instruction: string | null;
+  changed_by: string | null;
+  changed_at: string;
+}
+
+export interface AFSValidationResult {
+  compliant: boolean;
+  missing_disclosures: { reference: string; description: string; severity: string }[];
+  suggestions: string[];
+  llm_cost_usd?: number;
+  llm_tokens?: number;
+  sections_validated?: number;
+  checklist_items_checked?: number;
 }

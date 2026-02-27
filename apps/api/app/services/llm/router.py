@@ -35,6 +35,10 @@ DEFAULT_POLICY = {
         {"task_label": "excel_model_mapping", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 8192, "temperature": 0.2},
         {"task_label": "budget_nl_query", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 512, "temperature": 0.1},
         {"task_label": "budget_nl_query", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 512, "temperature": 0.1},
+        {"task_label": "afs_disclosure_draft", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 8192, "temperature": 0.3},
+        {"task_label": "afs_disclosure_draft", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 8192, "temperature": 0.3},
+        {"task_label": "afs_disclosure_validate", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.1},
+        {"task_label": "afs_disclosure_validate", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.1},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }

@@ -466,7 +466,7 @@ export default function AFSSetupPage() {
                           { status: "ingestion" },
                         );
                         toast.success("Setup complete");
-                        router.push("/afs");
+                        router.push(`/afs/${engagementId}/sections`);
                       } catch (e) {
                         toast.error(
                           e instanceof Error
@@ -664,7 +664,7 @@ export default function AFSSetupPage() {
                       { status: "ingestion" },
                     );
                     toast.success("Setup complete");
-                    router.push("/afs");
+                    router.push(`/afs/${engagementId}/sections`);
                   } catch (e) {
                     toast.error(
                       e instanceof Error
@@ -810,7 +810,7 @@ export default function AFSSetupPage() {
                     status: "ingestion",
                   });
                   toast.success("Setup complete");
-                  router.push("/afs");
+                  router.push(`/afs/${engagementId}/sections`);
                 } catch (e) {
                   toast.error(
                     e instanceof Error

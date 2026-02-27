@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import uuid
 from typing import Any
 
@@ -11,7 +12,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import get_artifact_store, require_role, ROLES_CAN_WRITE
+from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
+from apps.api.app.services.afs.tb_parser import parse_excel_tb, parse_csv_tb, tb_accounts_to_json
+from apps.api.app.services.afs.pdf_extractor import extract_pdf, sections_to_json
+from apps.api.app.services.afs.disclosure_drafter import draft_section, validate_sections
+from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.storage import ArtifactStore
 
 router = APIRouter(prefix="/afs", tags=["afs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
@@ -408,6 +413,14 @@ def _projection_id() -> str:
     return f"amp_{uuid.uuid4().hex[:14]}"
 
 
+def _section_id() -> str:
+    return f"asc_{uuid.uuid4().hex[:14]}"
+
+
+def _history_id() -> str:
+    return f"ash_{uuid.uuid4().hex[:14]}"
+
+
 class SetBaseSourceBody(BaseModel):
     base_source: str = Field(...)  # pdf, excel, va_baseline
 
@@ -420,6 +433,21 @@ class ResolveDiscrepancyBody(BaseModel):
 class CreateProjectionBody(BaseModel):
     month: str = Field(..., min_length=7, max_length=7)  # YYYY-MM
     basis_description: str = Field(..., min_length=1, max_length=2000)
+
+
+VALID_SECTION_TYPES = {"note", "statement", "directors_report", "accounting_policy"}
+
+
+class DraftSectionBody(BaseModel):
+    section_type: str = Field(default="note")
+    title: str = Field(..., min_length=1, max_length=500)
+    nl_instruction: str = Field(..., min_length=1, max_length=10000)
+
+
+class UpdateSectionBody(BaseModel):
+    nl_instruction: str | None = Field(default=None, max_length=10000)
+    content_json: dict | None = None
+    title: str | None = Field(default=None, max_length=500)
 
 
 def _validate_engagement(row, engagement_id: str):
@@ -441,7 +469,7 @@ async def upload_trial_balance(
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
-    """Upload a trial balance file (Excel/CSV) for an engagement."""
+    """Upload a trial balance file (Excel/CSV) for an engagement and parse it."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
 
@@ -451,8 +479,18 @@ async def upload_trial_balance(
     content_type = file.content_type or "application/octet-stream"
     filename = (file.filename or "trial_balance").strip() or "trial_balance"
 
-    source = "upload"
+    # Parse the uploaded file into structured account data
+    lower_name = filename.lower()
+    if not lower_name.endswith((".xlsx", ".xls", ".csv")):
+        raise HTTPException(400, "Trial balance must be .xlsx, .xls, or .csv")
+    if lower_name.endswith(".csv"):
+        parse_result = parse_csv_tb(content)
+    else:
+        parse_result = parse_excel_tb(content, filename)
 
+    data_json = json.dumps(tb_accounts_to_json(parse_result.accounts))
+
+    source = "upload"
     tb_id = _tb_id()
     async with tenant_conn(x_tenant_id) as conn:
         eng = await conn.fetchrow(
@@ -464,9 +502,9 @@ async def upload_trial_balance(
         row = await conn.fetchrow(
             """INSERT INTO afs_trial_balances
                (tenant_id, trial_balance_id, engagement_id, source, data_json, is_partial)
-               VALUES ($1, $2, $3, $4, '[]'::jsonb, false)
+               VALUES ($1, $2, $3, $4, $5::jsonb, false)
                RETURNING *""",
-            x_tenant_id, tb_id, engagement_id, source,
+            x_tenant_id, tb_id, engagement_id, source, data_json,
         )
 
     store.save(x_tenant_id, AFS_ARTIFACT_TYPE, tb_id, {
@@ -474,7 +512,11 @@ async def upload_trial_balance(
         "content_type": content_type,
         "filename": filename,
     })
-    return dict(row)
+
+    result = dict(row)
+    result["parse_warnings"] = parse_result.warnings
+    result["account_count"] = parse_result.row_count
+    return result
 
 
 @router.get("/engagements/{engagement_id}/trial-balance")
@@ -494,7 +536,7 @@ async def list_trial_balances(
         _validate_engagement(eng, engagement_id)
 
         rows = await conn.fetch(
-            "SELECT * FROM afs_trial_balances WHERE tenant_id = $1 AND engagement_id = $2 ORDER BY created_at DESC",
+            "SELECT * FROM afs_trial_balances WHERE tenant_id = $1 AND engagement_id = $2 ORDER BY uploaded_at DESC",
             x_tenant_id, engagement_id,
         )
         return {"items": [dict(r) for r in rows]}
@@ -514,7 +556,7 @@ async def upload_prior_afs(
     x_user_id: str = Header("", alias="X-User-ID"),
     store: ArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
-    """Upload a prior AFS file (PDF or Excel) for an engagement."""
+    """Upload a prior AFS file (PDF or Excel) and extract structured data."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     if source_type not in {"pdf", "excel"}:
@@ -526,6 +568,25 @@ async def upload_prior_afs(
     content_type = file.content_type or "application/octet-stream"
     filename = (file.filename or "prior_afs").strip() or "prior_afs"
 
+    # Extract structured data from the uploaded file
+    if source_type == "pdf":
+        pdf_result = extract_pdf(content)
+        extracted = {
+            "page_count": pdf_result.page_count,
+            "sections": sections_to_json(pdf_result.sections),
+            "table_count": len(pdf_result.all_tables),
+            "warnings": pdf_result.warnings,
+        }
+    else:
+        excel_result = parse_excel_tb(content, filename)
+        extracted = {
+            "accounts": tb_accounts_to_json(excel_result.accounts),
+            "row_count": excel_result.row_count,
+            "warnings": excel_result.warnings,
+        }
+
+    extracted_json = json.dumps(extracted)
+
     pa_id = _prior_afs_id()
     async with tenant_conn(x_tenant_id) as conn:
         eng = await conn.fetchrow(
@@ -536,10 +597,10 @@ async def upload_prior_afs(
 
         row = await conn.fetchrow(
             """INSERT INTO afs_prior_afs
-               (tenant_id, prior_afs_id, engagement_id, filename, file_size, source_type)
-               VALUES ($1, $2, $3, $4, $5, $6)
+               (tenant_id, prior_afs_id, engagement_id, filename, file_size, source_type, extracted_json)
+               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
                RETURNING *""",
-            x_tenant_id, pa_id, engagement_id, filename, len(content), source_type,
+            x_tenant_id, pa_id, engagement_id, filename, len(content), source_type, extracted_json,
         )
 
     store.save(x_tenant_id, AFS_ARTIFACT_TYPE, pa_id, {
@@ -567,7 +628,7 @@ async def list_prior_afs(
         _validate_engagement(eng, engagement_id)
 
         rows = await conn.fetch(
-            "SELECT * FROM afs_prior_afs WHERE tenant_id = $1 AND engagement_id = $2 ORDER BY created_at DESC",
+            "SELECT * FROM afs_prior_afs WHERE tenant_id = $1 AND engagement_id = $2 ORDER BY uploaded_at DESC",
             x_tenant_id, engagement_id,
         )
         return {"items": [dict(r) for r in rows]}
@@ -584,7 +645,7 @@ async def reconcile_prior_afs(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     x_user_id: str = Header("", alias="X-User-ID"),
 ) -> dict[str, Any]:
-    """Reconcile prior AFS sources. Phase 1 stub: generates mock discrepancies."""
+    """Reconcile prior AFS sources by comparing PDF and Excel extracted data."""
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
 
@@ -595,40 +656,81 @@ async def reconcile_prior_afs(
         )
         _validate_engagement(eng, engagement_id)
 
-        # Check that at least one PDF and one Excel prior AFS exist
-        has_pdf = await conn.fetchval(
-            "SELECT count(*) FROM afs_prior_afs WHERE tenant_id = $1 AND engagement_id = $2 AND source_type = 'pdf'",
+        # Fetch the most recent PDF and Excel prior AFS with extracted data
+        pdf_row = await conn.fetchrow(
+            """SELECT extracted_json FROM afs_prior_afs
+               WHERE tenant_id = $1 AND engagement_id = $2 AND source_type = 'pdf'
+               ORDER BY uploaded_at DESC LIMIT 1""",
             x_tenant_id, engagement_id,
         )
-        has_excel = await conn.fetchval(
-            "SELECT count(*) FROM afs_prior_afs WHERE tenant_id = $1 AND engagement_id = $2 AND source_type = 'excel'",
+        excel_row = await conn.fetchrow(
+            """SELECT extracted_json FROM afs_prior_afs
+               WHERE tenant_id = $1 AND engagement_id = $2 AND source_type = 'excel'
+               ORDER BY uploaded_at DESC LIMIT 1""",
             x_tenant_id, engagement_id,
         )
 
-        if not has_pdf or not has_excel:
+        if not pdf_row or not excel_row:
             return {"discrepancies": [], "message": "Both PDF and Excel sources required for reconciliation"}
 
-        # Phase 1 stub: generate 3 mock discrepancy rows
-        mock_items = [
-            {"line_item": "Revenue", "pdf_value": "1200000.00", "excel_value": "1250000.00", "difference": "50000.00"},
-            {"line_item": "Total Assets", "pdf_value": "5000000.00", "excel_value": "4980000.00", "difference": "20000.00"},
-            {"line_item": "Net Profit", "pdf_value": "350000.00", "excel_value": "340000.00", "difference": "10000.00"},
-        ]
+        pdf_extracted = pdf_row["extracted_json"] if pdf_row["extracted_json"] else {}
+        excel_extracted = excel_row["extracted_json"] if excel_row["extracted_json"] else {}
 
+        # Build Excel lookup: account name → net value
+        excel_accounts: dict[str, float] = {}
+        for acct in excel_extracted.get("accounts", []):
+            name = acct.get("account_name", "").strip().lower()
+            if name:
+                excel_accounts[name] = float(acct.get("net", 0))
+
+        # Build PDF lookup: extract line items from section text
+        pdf_line_items: dict[str, float] = {}
+        for section in pdf_extracted.get("sections", []):
+            text = section.get("text", "")
+            for line in text.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                # Try to match "Line Item Name ... 1,234,567.89" pattern
+                match = re.match(r"^(.+?)\s+([\d,]+(?:\.\d+)?)\s*$", line)
+                if match:
+                    item_name = match.group(1).strip().lower()
+                    try:
+                        value = float(match.group(2).replace(",", ""))
+                        pdf_line_items[item_name] = value
+                    except ValueError:
+                        continue
+
+        # Clear existing unresolved discrepancies for this engagement
+        await conn.execute(
+            """DELETE FROM afs_source_discrepancies
+               WHERE tenant_id = $1 AND engagement_id = $2 AND resolved_at IS NULL""",
+            x_tenant_id, engagement_id,
+        )
+
+        # Compare and insert real discrepancies
         created = []
-        for item in mock_items:
-            d_id = _discrepancy_id()
-            row = await conn.fetchrow(
-                """INSERT INTO afs_source_discrepancies
-                   (tenant_id, discrepancy_id, engagement_id, line_item, pdf_value, excel_value, difference)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7)
-                   RETURNING *""",
-                x_tenant_id, d_id, engagement_id,
-                item["line_item"], item["pdf_value"], item["excel_value"], item["difference"],
-            )
-            created.append(dict(row))
+        all_items = set(excel_accounts.keys()) | set(pdf_line_items.keys())
 
-        return {"discrepancies": created}
+        for item_name in sorted(all_items):
+            excel_val = excel_accounts.get(item_name)
+            pdf_val = pdf_line_items.get(item_name)
+
+            if excel_val is not None and pdf_val is not None:
+                diff = abs(excel_val - pdf_val)
+                if diff > 0.01:
+                    d_id = _discrepancy_id()
+                    row = await conn.fetchrow(
+                        """INSERT INTO afs_source_discrepancies
+                           (tenant_id, discrepancy_id, engagement_id, line_item, pdf_value, excel_value, difference)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7)
+                           RETURNING *""",
+                        x_tenant_id, d_id, engagement_id,
+                        item_name, round(pdf_val, 2), round(excel_val, 2), round(diff, 2),
+                    )
+                    created.append(dict(row))
+
+        return {"discrepancies": created, "items_compared": len(all_items)}
 
 
 @router.post("/engagements/{engagement_id}/base-source")
@@ -673,7 +775,7 @@ async def list_discrepancies(
         _validate_engagement(eng, engagement_id)
 
         rows = await conn.fetch(
-            "SELECT * FROM afs_source_discrepancies WHERE tenant_id = $1 AND engagement_id = $2 ORDER BY created_at DESC",
+            "SELECT * FROM afs_source_discrepancies WHERE tenant_id = $1 AND engagement_id = $2 ORDER BY line_item ASC",
             x_tenant_id, engagement_id,
         )
         return {"items": [dict(r) for r in rows]}
@@ -762,3 +864,427 @@ async def list_projections(
             x_tenant_id, engagement_id,
         )
         return {"items": [dict(r) for r in rows]}
+
+
+# ===========================================================================
+# Sections (AI-drafted disclosure notes)
+# ===========================================================================
+
+
+@router.get("/engagements/{engagement_id}/sections")
+async def list_sections(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """List all sections for an engagement."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        eng = await conn.fetchrow(
+            "SELECT engagement_id FROM afs_engagements WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        rows = await conn.fetch(
+            """SELECT * FROM afs_sections
+               WHERE tenant_id = $1 AND engagement_id = $2
+               ORDER BY section_number ASC, created_at ASC""",
+            x_tenant_id, engagement_id,
+        )
+        return {"items": [dict(r) for r in rows]}
+
+
+@router.post("/engagements/{engagement_id}/sections/draft", status_code=201)
+async def draft_new_section(
+    engagement_id: str,
+    body: DraftSectionBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+    llm: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """AI-draft a new section for an engagement."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    if body.section_type not in VALID_SECTION_TYPES:
+        raise HTTPException(400, f"Invalid section_type; must be one of {sorted(VALID_SECTION_TYPES)}")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        # Load engagement with framework info
+        eng = await conn.fetchrow(
+            """SELECT e.*, f.name AS framework_name, f.standard
+               FROM afs_engagements e
+               JOIN afs_frameworks f ON e.tenant_id = f.tenant_id AND e.framework_id = f.framework_id
+               WHERE e.tenant_id = $1 AND e.engagement_id = $2""",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        # Load trial balance data for context
+        tb_row = await conn.fetchrow(
+            """SELECT data_json FROM afs_trial_balances
+               WHERE tenant_id = $1 AND engagement_id = $2
+               ORDER BY uploaded_at DESC LIMIT 1""",
+            x_tenant_id, engagement_id,
+        )
+        tb_summary = ""
+        if tb_row and tb_row["data_json"]:
+            accounts = tb_row["data_json"] if isinstance(tb_row["data_json"], list) else []
+            lines = []
+            for acct in accounts[:100]:  # limit context size
+                name = acct.get("account_name", "")
+                net = acct.get("net", 0)
+                lines.append(f"- {name}: {net:,.2f}")
+            tb_summary = "\n".join(lines) if lines else "No trial balance data available."
+
+        # Load prior AFS context
+        prior_row = await conn.fetchrow(
+            """SELECT extracted_json FROM afs_prior_afs
+               WHERE tenant_id = $1 AND engagement_id = $2 AND source_type = 'pdf'
+               ORDER BY uploaded_at DESC LIMIT 1""",
+            x_tenant_id, engagement_id,
+        )
+        prior_context = ""
+        if prior_row and prior_row["extracted_json"]:
+            extracted = prior_row["extracted_json"] if isinstance(prior_row["extracted_json"], dict) else {}
+            sections = extracted.get("sections", [])
+            parts = []
+            for s in sections[:10]:
+                title = s.get("title", "")
+                text = s.get("text", "")[:500]
+                parts.append(f"### {title}\n{text}")
+            prior_context = "\n\n".join(parts)
+
+        # Call AI drafter
+        llm_result = await draft_section(
+            llm,
+            x_tenant_id,
+            framework_name=eng["framework_name"],
+            standard=eng["standard"],
+            period_start=str(eng["period_start"]),
+            period_end=str(eng["period_end"]),
+            entity_name=eng["entity_name"],
+            section_title=body.title,
+            nl_instruction=body.nl_instruction,
+            trial_balance_summary=tb_summary,
+            prior_afs_context=prior_context,
+        )
+
+        # Determine next section number
+        max_num = await conn.fetchval(
+            """SELECT COALESCE(MAX(section_number), 0) FROM afs_sections
+               WHERE tenant_id = $1 AND engagement_id = $2""",
+            x_tenant_id, engagement_id,
+        )
+        section_number = max_num + 1
+
+        # Insert section
+        s_id = _section_id()
+        content_json = json.dumps(llm_result.content)
+        row = await conn.fetchrow(
+            """INSERT INTO afs_sections
+               (tenant_id, section_id, engagement_id, section_type, section_number,
+                title, content_json, version, status, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 1, 'draft', $8)
+               RETURNING *""",
+            x_tenant_id, s_id, engagement_id, body.section_type, section_number,
+            body.title, content_json, x_user_id or None,
+        )
+
+        # Record history
+        h_id = _history_id()
+        await conn.execute(
+            """INSERT INTO afs_section_history
+               (tenant_id, history_id, section_id, version,
+                content_json, nl_instruction, changed_by)
+               VALUES ($1, $2, $3, 1, $4::jsonb, $5, $6)""",
+            x_tenant_id, h_id, s_id,
+            content_json, body.nl_instruction, x_user_id or None,
+        )
+
+        result = dict(row)
+        result["llm_cost_usd"] = llm_result.cost_estimate_usd
+        result["llm_tokens"] = llm_result.tokens.total_tokens
+        return result
+
+
+@router.get("/engagements/{engagement_id}/sections/{section_id}")
+async def get_section(
+    engagement_id: str,
+    section_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """Get a single section by ID."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """SELECT * FROM afs_sections
+               WHERE tenant_id = $1 AND engagement_id = $2 AND section_id = $3""",
+            x_tenant_id, engagement_id, section_id,
+        )
+        if not row:
+            raise HTTPException(404, f"Section {section_id} not found")
+        return dict(row)
+
+
+@router.patch("/engagements/{engagement_id}/sections/{section_id}")
+async def update_section(
+    engagement_id: str,
+    section_id: str,
+    body: UpdateSectionBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+    llm: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """Update a section: manual edit (content_json) or AI re-draft (nl_instruction only)."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        existing = await conn.fetchrow(
+            """SELECT * FROM afs_sections
+               WHERE tenant_id = $1 AND engagement_id = $2 AND section_id = $3""",
+            x_tenant_id, engagement_id, section_id,
+        )
+        if not existing:
+            raise HTTPException(404, f"Section {section_id} not found")
+        if existing["status"] == "locked":
+            raise HTTPException(409, "Section is locked; unlock it before editing")
+
+        new_version = existing["version"] + 1
+        new_title = body.title if body.title is not None else existing["title"]
+        llm_cost = None
+        llm_tokens = None
+
+        if body.nl_instruction and not body.content_json:
+            # AI re-draft: load context and call drafter with existing content
+            eng = await conn.fetchrow(
+                """SELECT e.*, f.name AS framework_name, f.standard
+                   FROM afs_engagements e
+                   JOIN afs_frameworks f ON e.tenant_id = f.tenant_id AND e.framework_id = f.framework_id
+                   WHERE e.tenant_id = $1 AND e.engagement_id = $2""",
+                x_tenant_id, engagement_id,
+            )
+            _validate_engagement(eng, engagement_id)
+
+            # Load TB data
+            tb_row = await conn.fetchrow(
+                """SELECT data_json FROM afs_trial_balances
+                   WHERE tenant_id = $1 AND engagement_id = $2
+                   ORDER BY uploaded_at DESC LIMIT 1""",
+                x_tenant_id, engagement_id,
+            )
+            tb_summary = ""
+            if tb_row and tb_row["data_json"]:
+                accounts = tb_row["data_json"] if isinstance(tb_row["data_json"], list) else []
+                lines = []
+                for acct in accounts[:100]:
+                    name = acct.get("account_name", "")
+                    net = acct.get("net", 0)
+                    lines.append(f"- {name}: {net:,.2f}")
+                tb_summary = "\n".join(lines) if lines else "No trial balance data available."
+
+            # Load prior AFS context
+            prior_row = await conn.fetchrow(
+                """SELECT extracted_json FROM afs_prior_afs
+                   WHERE tenant_id = $1 AND engagement_id = $2 AND source_type = 'pdf'
+                   ORDER BY uploaded_at DESC LIMIT 1""",
+                x_tenant_id, engagement_id,
+            )
+            prior_context = ""
+            if prior_row and prior_row["extracted_json"]:
+                extracted = prior_row["extracted_json"] if isinstance(prior_row["extracted_json"], dict) else {}
+                sections = extracted.get("sections", [])
+                parts = []
+                for s in sections[:10]:
+                    title = s.get("title", "")
+                    text = s.get("text", "")[:500]
+                    parts.append(f"### {title}\n{text}")
+                prior_context = "\n\n".join(parts)
+
+            # Pass existing draft for revision
+            existing_draft_json = existing["content_json"]
+            existing_draft_str = json.dumps(existing_draft_json) if existing_draft_json else None
+            llm_result = await draft_section(
+                llm,
+                x_tenant_id,
+                framework_name=eng["framework_name"],
+                standard=eng["standard"],
+                period_start=str(eng["period_start"]),
+                period_end=str(eng["period_end"]),
+                entity_name=eng["entity_name"],
+                section_title=new_title,
+                nl_instruction=body.nl_instruction,
+                trial_balance_summary=tb_summary,
+                prior_afs_context=prior_context,
+                existing_draft=existing_draft_str,
+            )
+            content_json = json.dumps(llm_result.content)
+            nl_instruction = body.nl_instruction
+            llm_cost = llm_result.cost_estimate_usd
+            llm_tokens = llm_result.tokens.total_tokens
+        elif body.content_json is not None:
+            # Manual edit
+            content_json = json.dumps(body.content_json)
+            nl_instruction = body.nl_instruction
+        else:
+            # Title-only update or no-op
+            content_json = json.dumps(existing["content_json"]) if existing["content_json"] else None
+            nl_instruction = body.nl_instruction
+
+        row = await conn.fetchrow(
+            """UPDATE afs_sections
+               SET title = $4, content_json = $5::jsonb,
+                   version = $6, updated_at = now()
+               WHERE tenant_id = $1 AND engagement_id = $2 AND section_id = $3
+               RETURNING *""",
+            x_tenant_id, engagement_id, section_id,
+            new_title, content_json, new_version,
+        )
+
+        # Record history
+        h_id = _history_id()
+        await conn.execute(
+            """INSERT INTO afs_section_history
+               (tenant_id, history_id, section_id, version,
+                content_json, nl_instruction, changed_by)
+               VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)""",
+            x_tenant_id, h_id, section_id,
+            new_version, content_json, nl_instruction, x_user_id or None,
+        )
+
+        result = dict(row)
+        if llm_cost is not None:
+            result["llm_cost_usd"] = llm_cost
+            result["llm_tokens"] = llm_tokens
+        return result
+
+
+@router.post("/engagements/{engagement_id}/sections/{section_id}/lock")
+async def lock_section(
+    engagement_id: str,
+    section_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Lock a section to prevent further edits."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """UPDATE afs_sections
+               SET status = 'locked', updated_at = now()
+               WHERE tenant_id = $1 AND engagement_id = $2 AND section_id = $3
+               RETURNING *""",
+            x_tenant_id, engagement_id, section_id,
+        )
+        if not row:
+            raise HTTPException(404, f"Section {section_id} not found")
+        return dict(row)
+
+
+@router.post("/engagements/{engagement_id}/sections/{section_id}/unlock")
+async def unlock_section(
+    engagement_id: str,
+    section_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Unlock a section to allow edits."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """UPDATE afs_sections
+               SET status = 'draft', updated_at = now()
+               WHERE tenant_id = $1 AND engagement_id = $2 AND section_id = $3
+               RETURNING *""",
+            x_tenant_id, engagement_id, section_id,
+        )
+        if not row:
+            raise HTTPException(404, f"Section {section_id} not found")
+        return dict(row)
+
+
+@router.post("/engagements/{engagement_id}/validate")
+async def validate_engagement_sections(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+    llm: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """Validate all sections against the disclosure checklist via AI."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        # Load engagement with framework
+        eng = await conn.fetchrow(
+            """SELECT e.*, f.name AS framework_name, f.standard
+               FROM afs_engagements e
+               JOIN afs_frameworks f ON e.tenant_id = f.tenant_id AND e.framework_id = f.framework_id
+               WHERE e.tenant_id = $1 AND e.engagement_id = $2""",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        # Load all sections
+        section_rows = await conn.fetch(
+            """SELECT section_type, section_number, title, content_json
+               FROM afs_sections
+               WHERE tenant_id = $1 AND engagement_id = $2
+               ORDER BY section_number ASC""",
+            x_tenant_id, engagement_id,
+        )
+
+        if not section_rows:
+            raise HTTPException(400, "No sections to validate; draft sections first")
+
+        # Build sections summary
+        parts = []
+        for s in section_rows:
+            content = s["content_json"] if s["content_json"] else {}
+            title = content.get("title", s["title"]) if isinstance(content, dict) else s["title"]
+            paragraphs = content.get("paragraphs", []) if isinstance(content, dict) else []
+            text_preview = " ".join(
+                p.get("content", "")[:200] for p in paragraphs[:5]
+            ) if paragraphs else "(empty)"
+            parts.append(f"### {s['section_number']}. {title}\n{text_preview}")
+        sections_summary = "\n\n".join(parts)
+
+        # Load disclosure checklist
+        checklist_rows = await conn.fetch(
+            """SELECT section, reference, description, required
+               FROM afs_disclosure_items
+               WHERE tenant_id = $1 AND framework_id = $2
+               ORDER BY section, reference""",
+            x_tenant_id, eng["framework_id"],
+        )
+
+        checklist_parts = []
+        for item in checklist_rows:
+            mandatory = " [MANDATORY]" if item["required"] else ""
+            checklist_parts.append(f"- {item['reference']}: {item['description']}{mandatory}")
+        checklist_items = "\n".join(checklist_parts) if checklist_parts else "No disclosure checklist items found."
+
+        # Call AI validator
+        llm_result = await validate_sections(
+            llm,
+            x_tenant_id,
+            framework_name=eng["framework_name"],
+            standard=eng["standard"],
+            sections_summary=sections_summary,
+            checklist_items=checklist_items,
+        )
+
+        result = {**llm_result.content}
+        result["llm_cost_usd"] = llm_result.cost_estimate_usd
+        result["llm_tokens"] = llm_result.tokens.total_tokens
+        result["sections_validated"] = len(section_rows)
+        result["checklist_items_checked"] = len(checklist_rows)
+        return result

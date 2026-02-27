@@ -247,7 +247,11 @@ export default function AFSPage() {
                   {filtered.map((eng) => (
                     <Link
                       key={eng.engagement_id}
-                      href={`/afs/${eng.engagement_id}/setup`}
+                      href={
+                        eng.status === "setup"
+                          ? `/afs/${eng.engagement_id}/setup`
+                          : `/afs/${eng.engagement_id}/sections`
+                      }
                       className="group"
                     >
                       <VACard className="h-full p-5 transition-colors group-hover:border-va-blue/50">
@@ -265,6 +269,11 @@ export default function AFSPage() {
                         <p className="mt-1 text-xs text-va-muted">
                           {eng.period_start} &mdash; {eng.period_end}
                         </p>
+                        {eng.status !== "setup" && (
+                          <p className="mt-2 text-xs font-medium text-va-blue">
+                            Edit Sections &rarr;
+                          </p>
+                        )}
                       </VACard>
                     </Link>
                   ))}
