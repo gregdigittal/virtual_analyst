@@ -1472,6 +1472,30 @@ export const api = {
       request<AFSSection>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/sections/${encodeURIComponent(sectionId)}/unlock`, { tenantId, method: "POST" }),
     validateSections: (tenantId: string, engagementId: string) =>
       request<AFSValidationResult>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/validate`, { tenantId, method: "POST" }),
+
+    // Reviews
+    submitReview: (tenantId: string, engagementId: string, body: { stage: string; comments?: string }) =>
+      request<AFSReview>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/reviews/submit`, { tenantId, method: "POST", body }),
+    listReviews: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSReview[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/reviews`, { tenantId }),
+    approveReview: (tenantId: string, engagementId: string, reviewId: string, body?: { comments?: string }) =>
+      request<AFSReview>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/reviews/${encodeURIComponent(reviewId)}/approve`, { tenantId, method: "POST", body }),
+    rejectReview: (tenantId: string, engagementId: string, reviewId: string, body?: { comments?: string }) =>
+      request<AFSReview>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/reviews/${encodeURIComponent(reviewId)}/reject`, { tenantId, method: "POST", body }),
+    listReviewComments: (tenantId: string, engagementId: string, reviewId: string) =>
+      request<{ items: AFSReviewComment[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/reviews/${encodeURIComponent(reviewId)}/comments`, { tenantId }),
+    createReviewComment: (tenantId: string, engagementId: string, body: { review_id: string; section_id?: string; parent_comment_id?: string; body: string }) =>
+      request<AFSReviewComment>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/reviews/comments`, { tenantId, method: "POST", body }),
+
+    // Tax
+    computeTax: (tenantId: string, engagementId: string, body: { jurisdiction?: string; statutory_rate?: number; taxable_income: number; adjustments?: { description: string; amount: number }[] }) =>
+      request<AFSTaxComputation>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/tax/compute`, { tenantId, method: "POST", body }),
+    listTaxComputations: (tenantId: string, engagementId: string) =>
+      request<{ items: AFSTaxComputation[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/tax`, { tenantId }),
+    addTemporaryDifference: (tenantId: string, engagementId: string, computationId: string, body: { description: string; carrying_amount: number; tax_base: number; diff_type?: string }) =>
+      request<AFSTemporaryDifference>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/tax/${encodeURIComponent(computationId)}/differences`, { tenantId, method: "POST", body }),
+    generateTaxNote: (tenantId: string, engagementId: string, computationId: string, body?: { nl_instruction?: string }) =>
+      request<AFSTaxComputation>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/tax/${encodeURIComponent(computationId)}/generate-note`, { tenantId, method: "POST", body }),
   },
 };
 
@@ -2007,4 +2031,62 @@ export interface AFSValidationResult {
   llm_tokens?: number;
   sections_validated?: number;
   checklist_items_checked?: number;
+}
+
+export interface AFSReview {
+  review_id: string;
+  engagement_id: string;
+  stage: string;
+  status: string;
+  submitted_by: string | null;
+  submitted_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  comments: string | null;
+}
+
+export interface AFSReviewComment {
+  comment_id: string;
+  review_id: string;
+  section_id: string | null;
+  parent_comment_id: string | null;
+  body: string;
+  resolved: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface AFSTaxComputation {
+  computation_id: string;
+  engagement_id: string;
+  entity_id: string | null;
+  jurisdiction: string;
+  statutory_rate: number;
+  taxable_income: number;
+  current_tax: number;
+  deferred_tax_json: Record<string, unknown>;
+  reconciliation_json: { description: string; amount: number; tax_effect: number }[];
+  tax_note_json: {
+    title: string;
+    paragraphs: { type: "text" | "table" | "heading"; content: string }[];
+    references: string[];
+    warnings: string[];
+  } | null;
+  temporary_differences?: AFSTemporaryDifference[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  llm_cost_usd?: number;
+  llm_tokens?: number;
+}
+
+export interface AFSTemporaryDifference {
+  difference_id: string;
+  computation_id: string;
+  description: string;
+  carrying_amount: number;
+  tax_base: number;
+  difference: number;
+  deferred_tax_effect: number;
+  diff_type: string;
 }

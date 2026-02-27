@@ -250,7 +250,9 @@ export default function AFSPage() {
                       href={
                         eng.status === "setup"
                           ? `/afs/${eng.engagement_id}/setup`
-                          : `/afs/${eng.engagement_id}/sections`
+                          : eng.status === "review" || eng.status === "approved"
+                            ? `/afs/${eng.engagement_id}/review`
+                            : `/afs/${eng.engagement_id}/sections`
                       }
                       className="group"
                     >

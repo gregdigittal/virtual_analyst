@@ -421,6 +421,22 @@ def _history_id() -> str:
     return f"ash_{uuid.uuid4().hex[:14]}"
 
 
+def _review_id() -> str:
+    return f"arv_{uuid.uuid4().hex[:14]}"
+
+
+def _review_comment_id() -> str:
+    return f"arc_{uuid.uuid4().hex[:14]}"
+
+
+def _tax_computation_id() -> str:
+    return f"atc_{uuid.uuid4().hex[:14]}"
+
+
+def _temp_difference_id() -> str:
+    return f"atd_{uuid.uuid4().hex[:14]}"
+
+
 class SetBaseSourceBody(BaseModel):
     base_source: str = Field(...)  # pdf, excel, va_baseline
 
@@ -448,6 +464,46 @@ class UpdateSectionBody(BaseModel):
     nl_instruction: str | None = Field(default=None, max_length=10000)
     content_json: dict | None = None
     title: str | None = Field(default=None, max_length=500)
+
+
+# Phase 3 request models
+VALID_REVIEW_STAGES = {"preparer_review", "manager_review", "partner_signoff"}
+VALID_DIFF_TYPES = {"asset", "liability"}
+
+
+class SubmitReviewBody(BaseModel):
+    stage: str = Field(...)  # preparer_review, manager_review, partner_signoff
+    comments: str | None = Field(default=None, max_length=5000)
+
+
+class ReviewActionBody(BaseModel):
+    comments: str | None = Field(default=None, max_length=5000)
+
+
+class CreateReviewCommentBody(BaseModel):
+    review_id: str = Field(..., min_length=1)
+    section_id: str | None = None
+    parent_comment_id: str | None = None
+    body: str = Field(..., min_length=1, max_length=10000)
+
+
+class TaxComputationBody(BaseModel):
+    entity_id: str | None = None
+    jurisdiction: str = Field(default="ZA", max_length=10)
+    statutory_rate: float = Field(default=0.27, ge=0, le=1)
+    taxable_income: float = Field(default=0)
+    adjustments: list[dict] | None = None  # [{description, amount}]
+
+
+class TemporaryDifferenceBody(BaseModel):
+    description: str = Field(..., min_length=1, max_length=500)
+    carrying_amount: float = Field(default=0)
+    tax_base: float = Field(default=0)
+    diff_type: str = Field(default="liability")  # asset or liability
+
+
+class GenerateTaxNoteBody(BaseModel):
+    nl_instruction: str | None = Field(default=None, max_length=5000)
 
 
 def _validate_engagement(row, engagement_id: str):
@@ -1287,4 +1343,420 @@ async def validate_engagement_sections(
         result["llm_tokens"] = llm_result.tokens.total_tokens
         result["sections_validated"] = len(section_rows)
         result["checklist_items_checked"] = len(checklist_rows)
+        return result
+
+
+# ===========================================================================
+# Review Workflow (Phase 3)
+# ===========================================================================
+
+
+@router.post("/engagements/{engagement_id}/reviews/submit", status_code=201)
+async def submit_review(
+    engagement_id: str,
+    body: SubmitReviewBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Submit engagement for review at a given stage."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    if body.stage not in VALID_REVIEW_STAGES:
+        raise HTTPException(400, f"Invalid stage '{body.stage}'. Must be one of: {', '.join(sorted(VALID_REVIEW_STAGES))}")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        eng = await conn.fetchrow(
+            "SELECT * FROM afs_engagements WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        # Verify all sections are reviewed or locked (none in draft)
+        draft_count = await conn.fetchval(
+            """SELECT count(*) FROM afs_sections
+               WHERE tenant_id = $1 AND engagement_id = $2 AND status = 'draft'""",
+            x_tenant_id, engagement_id,
+        )
+        if draft_count and draft_count > 0:
+            raise HTTPException(400, f"{draft_count} section(s) still in draft. Review or lock all sections before submitting.")
+
+        # Guard against duplicate pending review for the same stage
+        existing = await conn.fetchval(
+            """SELECT review_id FROM afs_reviews
+               WHERE tenant_id = $1 AND engagement_id = $2 AND stage = $3 AND status = 'pending'""",
+            x_tenant_id, engagement_id, body.stage,
+        )
+        if existing:
+            raise HTTPException(409, f"A pending review already exists for stage '{body.stage}'.")
+
+        rid = _review_id()
+        row = await conn.fetchrow(
+            """INSERT INTO afs_reviews (tenant_id, review_id, engagement_id, stage, status, submitted_by, comments)
+               VALUES ($1, $2, $3, $4, 'pending', $5, $6)
+               RETURNING *""",
+            x_tenant_id, rid, engagement_id, body.stage, x_user_id or None, body.comments,
+        )
+
+        # Update engagement status to review
+        await conn.execute(
+            "UPDATE afs_engagements SET status = 'review', updated_at = now() WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+
+        return dict(row)
+
+
+@router.get("/engagements/{engagement_id}/reviews")
+async def list_reviews(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """List all reviews for an engagement."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        rows = await conn.fetch(
+            """SELECT * FROM afs_reviews
+               WHERE tenant_id = $1 AND engagement_id = $2
+               ORDER BY submitted_at DESC""",
+            x_tenant_id, engagement_id,
+        )
+        return {"items": [dict(r) for r in rows]}
+
+
+@router.post("/engagements/{engagement_id}/reviews/{review_id}/approve")
+async def approve_review(
+    engagement_id: str,
+    review_id: str,
+    body: ReviewActionBody | None = None,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Approve a pending review."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        review = await conn.fetchrow(
+            "SELECT * FROM afs_reviews WHERE tenant_id = $1 AND review_id = $2 AND engagement_id = $3",
+            x_tenant_id, review_id, engagement_id,
+        )
+        if not review:
+            raise HTTPException(404, f"Review {review_id} not found")
+        if review["status"] != "pending":
+            raise HTTPException(400, f"Review is already '{review['status']}', cannot approve")
+
+        comments = body.comments if body else None
+        row = await conn.fetchrow(
+            """UPDATE afs_reviews
+               SET status = 'approved', reviewed_by = $1, reviewed_at = now(),
+                   comments = CASE WHEN $2 IS NOT NULL THEN coalesce(comments || E'\n', '') || $2 ELSE comments END
+               WHERE tenant_id = $3 AND review_id = $4
+               RETURNING *""",
+            x_user_id or None, comments, x_tenant_id, review_id,
+        )
+
+        # If partner sign-off approved, update engagement to approved
+        if review["stage"] == "partner_signoff":
+            await conn.execute(
+                "UPDATE afs_engagements SET status = 'approved', updated_at = now() WHERE tenant_id = $1 AND engagement_id = $2",
+                x_tenant_id, engagement_id,
+            )
+
+        return dict(row)
+
+
+@router.post("/engagements/{engagement_id}/reviews/{review_id}/reject")
+async def reject_review(
+    engagement_id: str,
+    review_id: str,
+    body: ReviewActionBody | None = None,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Reject a pending review."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        review = await conn.fetchrow(
+            "SELECT * FROM afs_reviews WHERE tenant_id = $1 AND review_id = $2 AND engagement_id = $3",
+            x_tenant_id, review_id, engagement_id,
+        )
+        if not review:
+            raise HTTPException(404, f"Review {review_id} not found")
+        if review["status"] != "pending":
+            raise HTTPException(400, f"Review is already '{review['status']}', cannot reject")
+
+        comments = body.comments if body else None
+        row = await conn.fetchrow(
+            """UPDATE afs_reviews
+               SET status = 'rejected', reviewed_by = $1, reviewed_at = now(),
+                   comments = CASE WHEN $2 IS NOT NULL THEN coalesce(comments || E'\n', '') || $2 ELSE comments END
+               WHERE tenant_id = $3 AND review_id = $4
+               RETURNING *""",
+            x_user_id or None, comments, x_tenant_id, review_id,
+        )
+        return dict(row)
+
+
+@router.post("/engagements/{engagement_id}/reviews/comments", status_code=201)
+async def create_review_comment(
+    engagement_id: str,
+    body: CreateReviewCommentBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Add a comment to a review."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        # Verify review belongs to this engagement
+        review = await conn.fetchrow(
+            "SELECT review_id FROM afs_reviews WHERE tenant_id = $1 AND review_id = $2 AND engagement_id = $3",
+            x_tenant_id, body.review_id, engagement_id,
+        )
+        if not review:
+            raise HTTPException(404, f"Review {body.review_id} not found for engagement {engagement_id}")
+
+        cid = _review_comment_id()
+        row = await conn.fetchrow(
+            """INSERT INTO afs_review_comments
+               (tenant_id, comment_id, review_id, section_id, parent_comment_id, body, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               RETURNING *""",
+            x_tenant_id, cid, body.review_id, body.section_id, body.parent_comment_id,
+            body.body, x_user_id or None,
+        )
+        return dict(row)
+
+
+@router.get("/engagements/{engagement_id}/reviews/{review_id}/comments")
+async def list_review_comments(
+    engagement_id: str,
+    review_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """List comments for a review."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        # Verify review belongs to this engagement
+        review = await conn.fetchrow(
+            "SELECT review_id FROM afs_reviews WHERE tenant_id = $1 AND review_id = $2 AND engagement_id = $3",
+            x_tenant_id, review_id, engagement_id,
+        )
+        if not review:
+            raise HTTPException(404, f"Review {review_id} not found for engagement {engagement_id}")
+
+        rows = await conn.fetch(
+            """SELECT * FROM afs_review_comments
+               WHERE tenant_id = $1 AND review_id = $2
+               ORDER BY created_at ASC""",
+            x_tenant_id, review_id,
+        )
+        return {"items": [dict(r) for r in rows]}
+
+
+# ===========================================================================
+# Tax Computation (Phase 3)
+# ===========================================================================
+
+
+@router.post("/engagements/{engagement_id}/tax/compute", status_code=201)
+async def compute_tax(
+    engagement_id: str,
+    body: TaxComputationBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_user_id: str = Header("", alias="X-User-ID"),
+) -> dict[str, Any]:
+    """Create a tax computation for an engagement."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        eng = await conn.fetchrow(
+            "SELECT * FROM afs_engagements WHERE tenant_id = $1 AND engagement_id = $2",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        current_tax = round(body.taxable_income * body.statutory_rate, 2)
+
+        # Build reconciliation from adjustments
+        reconciliation = []
+        if body.adjustments:
+            for adj in body.adjustments:
+                desc = adj.get("description", "")
+                amount = adj.get("amount", 0)
+                effect = round(amount * body.statutory_rate, 2)
+                reconciliation.append({"description": desc, "amount": amount, "tax_effect": effect})
+
+        cid = _tax_computation_id()
+        row = await conn.fetchrow(
+            """INSERT INTO afs_tax_computations
+               (tenant_id, computation_id, engagement_id, entity_id, jurisdiction,
+                statutory_rate, taxable_income, current_tax, reconciliation_json, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+               RETURNING *""",
+            x_tenant_id, cid, engagement_id, body.entity_id, body.jurisdiction,
+            body.statutory_rate, body.taxable_income, current_tax,
+            json.dumps(reconciliation), x_user_id or None,
+        )
+        result = dict(row)
+        result["temporary_differences"] = []
+        return result
+
+
+@router.get("/engagements/{engagement_id}/tax")
+async def list_tax_computations(
+    engagement_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """List all tax computations for an engagement with their temporary differences."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    async with tenant_conn(x_tenant_id) as conn:
+        comp_rows = await conn.fetch(
+            """SELECT * FROM afs_tax_computations
+               WHERE tenant_id = $1 AND engagement_id = $2
+               ORDER BY created_at DESC""",
+            x_tenant_id, engagement_id,
+        )
+        items = []
+        for comp in comp_rows:
+            item = dict(comp)
+            diff_rows = await conn.fetch(
+                """SELECT * FROM afs_temporary_differences
+                   WHERE tenant_id = $1 AND computation_id = $2
+                   ORDER BY description""",
+                x_tenant_id, comp["computation_id"],
+            )
+            item["temporary_differences"] = [dict(d) for d in diff_rows]
+            items.append(item)
+        return {"items": items}
+
+
+@router.post("/engagements/{engagement_id}/tax/{computation_id}/differences", status_code=201)
+async def add_temporary_difference(
+    engagement_id: str,
+    computation_id: str,
+    body: TemporaryDifferenceBody,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict[str, Any]:
+    """Add a temporary difference to a tax computation."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    if body.diff_type not in VALID_DIFF_TYPES:
+        raise HTTPException(400, f"Invalid diff_type '{body.diff_type}'. Must be 'asset' or 'liability'")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        comp = await conn.fetchrow(
+            "SELECT * FROM afs_tax_computations WHERE tenant_id = $1 AND computation_id = $2 AND engagement_id = $3",
+            x_tenant_id, computation_id, engagement_id,
+        )
+        if not comp:
+            raise HTTPException(404, f"Tax computation {computation_id} not found")
+
+        difference = round(body.carrying_amount - body.tax_base, 2)
+        deferred_tax_effect = round(difference * float(comp["statutory_rate"]), 2)
+
+        did = _temp_difference_id()
+        row = await conn.fetchrow(
+            """INSERT INTO afs_temporary_differences
+               (tenant_id, difference_id, computation_id, description,
+                carrying_amount, tax_base, difference, deferred_tax_effect, diff_type)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING *""",
+            x_tenant_id, did, computation_id, body.description,
+            body.carrying_amount, body.tax_base, difference, deferred_tax_effect, body.diff_type,
+        )
+
+        # Update deferred_tax_json totals on the computation
+        all_diffs = await conn.fetch(
+            "SELECT * FROM afs_temporary_differences WHERE tenant_id = $1 AND computation_id = $2",
+            x_tenant_id, computation_id,
+        )
+        total_assets = sum(float(d["deferred_tax_effect"]) for d in all_diffs if d["diff_type"] == "asset")
+        total_liabilities = sum(float(d["deferred_tax_effect"]) for d in all_diffs if d["diff_type"] == "liability")
+        deferred_json = {
+            "total_deferred_tax_asset": round(total_assets, 2),
+            "total_deferred_tax_liability": round(total_liabilities, 2),
+            "net_deferred_tax": round(total_assets - total_liabilities, 2),
+        }
+        await conn.execute(
+            "UPDATE afs_tax_computations SET deferred_tax_json = $1::jsonb, updated_at = now() WHERE tenant_id = $2 AND computation_id = $3",
+            json.dumps(deferred_json), x_tenant_id, computation_id,
+        )
+
+        return dict(row)
+
+
+@router.post("/engagements/{engagement_id}/tax/{computation_id}/generate-note")
+async def generate_tax_note(
+    engagement_id: str,
+    computation_id: str,
+    body: GenerateTaxNoteBody | None = None,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    llm: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """Generate an AI-drafted tax note for a computation."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        # Load computation
+        comp = await conn.fetchrow(
+            "SELECT * FROM afs_tax_computations WHERE tenant_id = $1 AND computation_id = $2 AND engagement_id = $3",
+            x_tenant_id, computation_id, engagement_id,
+        )
+        if not comp:
+            raise HTTPException(404, f"Tax computation {computation_id} not found")
+
+        # Load engagement + framework
+        eng = await conn.fetchrow(
+            """SELECT e.*, f.name AS framework_name, f.standard
+               FROM afs_engagements e
+               JOIN afs_frameworks f ON e.tenant_id = f.tenant_id AND e.framework_id = f.framework_id
+               WHERE e.tenant_id = $1 AND e.engagement_id = $2""",
+            x_tenant_id, engagement_id,
+        )
+        _validate_engagement(eng, engagement_id)
+
+        # Load temporary differences
+        diff_rows = await conn.fetch(
+            "SELECT * FROM afs_temporary_differences WHERE tenant_id = $1 AND computation_id = $2 ORDER BY description",
+            x_tenant_id, computation_id,
+        )
+        differences = [dict(d) for d in diff_rows]
+
+        # Import and call AI drafter
+        from apps.api.app.services.afs.tax_note_drafter import draft_tax_note
+
+        nl_instruction = body.nl_instruction if body else None
+        llm_result = await draft_tax_note(
+            llm_router=llm,
+            tenant_id=x_tenant_id,
+            framework_name=eng["framework_name"],
+            standard=eng["standard"],
+            computation=dict(comp),
+            differences=differences,
+            nl_instruction=nl_instruction,
+        )
+
+        tax_note = {**llm_result.content}
+
+        # Save to computation
+        row = await conn.fetchrow(
+            """UPDATE afs_tax_computations
+               SET tax_note_json = $1::jsonb, updated_at = now()
+               WHERE tenant_id = $2 AND computation_id = $3
+               RETURNING *""",
+            json.dumps(tax_note), x_tenant_id, computation_id,
+        )
+        result = dict(row)
+        result["temporary_differences"] = differences
+        result["llm_cost_usd"] = llm_result.cost_estimate_usd
+        result["llm_tokens"] = llm_result.tokens.total_tokens
         return result

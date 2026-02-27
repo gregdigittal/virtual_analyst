@@ -183,6 +183,12 @@ export default function SectionEditorPage() {
           </h1>
         </div>
         <div className="flex gap-2">
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/tax`)}>
+            Tax
+          </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/review`)}>
+            Review
+          </VAButton>
           <VAButton variant="secondary" onClick={handleValidate} disabled={validating || sections.length === 0}>
             {validating ? "Validating..." : "Validate Disclosures"}
           </VAButton>

@@ -39,6 +39,8 @@ DEFAULT_POLICY = {
         {"task_label": "afs_disclosure_draft", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 8192, "temperature": 0.3},
         {"task_label": "afs_disclosure_validate", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.1},
         {"task_label": "afs_disclosure_validate", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.1},
+        {"task_label": "afs_tax_note", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 8192, "temperature": 0.3},
+        {"task_label": "afs_tax_note", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 8192, "temperature": 0.3},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }
