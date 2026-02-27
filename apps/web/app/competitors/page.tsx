@@ -1,20 +1,21 @@
 import { PublicHeader } from "@/components/PublicHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import Link from "next/link";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "Compare | Virtual Analyst",
+export const metadata: Metadata = {
+  title: "How Virtual Analyst Compares",
   description: "See how Virtual Analyst compares to spreadsheets and enterprise FP&A tools.",
 };
 
 function CheckIcon() {
-  return <span className="text-va-success">&#10003;</span>;
+  return <span className="text-va-success" role="img" aria-label="Supported">&#10003;</span>;
 }
 function XIcon() {
-  return <span className="text-va-danger">&#10007;</span>;
+  return <span className="text-va-danger" role="img" aria-label="Not supported">&#10007;</span>;
 }
 function PartialIcon() {
-  return <span className="text-va-warning">~</span>;
+  return <span className="text-va-warning" role="img" aria-label="Partial support">~</span>;
 }
 
 interface ComparisonRow {

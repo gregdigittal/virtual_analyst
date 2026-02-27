@@ -1676,11 +1676,13 @@ git commit -m "feat(landing): replace feature cards with workflow-organized show
 
 ## Task 12: Competitor Comparison Page
 
-**Files:**
-- Create: `apps/web/app/compare/page.tsx`
-- Modify: `apps/web/app/page.tsx` (add link to /compare in footer and CTA)
+> **Implementation note:** The page lives at `/competitors` (not `/compare` as originally planned) because the existing authenticated KPI comparison page at `(app)/compare/page.tsx` causes a Next.js route conflict. The `PublicFooter` links to `/competitors` accordingly.
 
-**Context:** New public page at `/compare` with a two-tier comparison: Virtual Analyst vs. Spreadsheets and vs. Enterprise FP&A tools. This is a public page (NOT in the `(app)` route group — no auth required).
+**Files:**
+- Create: `apps/web/app/competitors/page.tsx` (was `/compare` — see note above)
+- Modify: `apps/web/app/page.tsx` (add link to /competitors in footer and CTA)
+
+**Context:** New public page at `/competitors` with a two-tier comparison: Virtual Analyst vs. Spreadsheets and vs. Enterprise FP&A tools. This is a public page (NOT in the `(app)` route group — no auth required).
 
 **Step 1: Create the comparison page**
 

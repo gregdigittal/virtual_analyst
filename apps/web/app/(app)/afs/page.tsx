@@ -16,7 +16,8 @@ import {
 } from "@/components/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 const STATUS_OPTIONS = [
   { value: "setup", label: "Setup" },
@@ -120,47 +121,16 @@ export default function AFSPage() {
   /* ------------------------------------------------------------------ */
   /*  Create dialog accessibility                                        */
   /* ------------------------------------------------------------------ */
-  const createFormRef = useRef<HTMLFormElement>(null);
-  const prevFocusRef = useRef<HTMLElement | null>(null);
+  const closeCreate = useCallback(() => setShowCreate(false), []);
+  const dialogId = useId();
+  const dialogTitleId = `${dialogId}-title`;
+  const dialogDescId = `${dialogId}-desc`;
+  const { ref: createFormRef, handleKeyDown: handleCreateKeyDown } =
+    useFocusTrap<HTMLFormElement>(showCreate, closeCreate, { initialFocus: "input" });
 
   useEffect(() => {
-    if (showCreate) {
-      setFormErrors({});
-      prevFocusRef.current = document.activeElement as HTMLElement;
-      requestAnimationFrame(() => {
-        createFormRef.current?.querySelector<HTMLElement>("input")?.focus();
-      });
-    } else if (prevFocusRef.current) {
-      prevFocusRef.current.focus();
-      prevFocusRef.current = null;
-    }
+    if (showCreate) setFormErrors({});
   }, [showCreate]);
-
-  useEffect(() => {
-    if (!showCreate) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setShowCreate(false);
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [showCreate]);
-
-  const handleCreateKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key !== "Tab" || !createFormRef.current) return;
-    const focusable = createFormRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }, []);
 
   /* ------------------------------------------------------------------ */
   /*  Create handler                                                     */
@@ -322,7 +292,7 @@ export default function AFSPage() {
                               ? `/afs/${eng.engagement_id}/review`
                               : `/afs/${eng.engagement_id}/sections`
                       }
-                      className="group cursor-pointer"
+                      className="group"
                     >
                       <VACard className="h-full p-5 transition-colors group-hover:border-va-blue/50">
                         <div className="flex items-start justify-between gap-2">
@@ -377,8 +347,8 @@ export default function AFSPage() {
             ref={createFormRef}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="afs-create-title"
-            aria-describedby="afs-create-desc"
+            aria-labelledby={dialogTitleId}
+            aria-describedby={dialogDescId}
             onSubmit={(e) => {
               e.preventDefault();
               handleCreate();
@@ -387,10 +357,10 @@ export default function AFSPage() {
             onKeyDown={handleCreateKeyDown}
             className="mx-4 w-full max-w-md rounded-va-lg border border-va-border bg-va-panel p-6 shadow-va-md"
           >
-            <h3 id="afs-create-title" className="text-lg font-semibold text-va-text">
+            <h3 id={dialogTitleId} className="text-lg font-semibold text-va-text">
               New AFS Engagement
             </h3>
-            <p id="afs-create-desc" className="mt-2 text-sm text-va-text2">
+            <p id={dialogDescId} className="mt-2 text-sm text-va-text2">
               Create an engagement to start generating financial statements.
             </p>
 

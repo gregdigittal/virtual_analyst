@@ -1,11 +1,9 @@
 """Test that classification response includes industry detection fields."""
-import pytest
+from app.services.excel_ingestion import SHEET_CLASSIFICATION_SCHEMA
 
 
 def test_classification_schema_has_detection_fields():
     """Verify the classification JSON schema requests industry detection."""
-    from app.services.excel_ingestion import SHEET_CLASSIFICATION_SCHEMA
-
     model_summary = SHEET_CLASSIFICATION_SCHEMA["properties"]["model_summary"]
     props = model_summary["properties"]
     assert "naics_code" in props, "model_summary should have naics_code"
@@ -16,8 +14,6 @@ def test_classification_schema_has_detection_fields():
 
 def test_classification_schema_has_entity_detection():
     """Verify the classification JSON schema supports multi-entity detection."""
-    from app.services.excel_ingestion import SHEET_CLASSIFICATION_SCHEMA
-
     model_summary = SHEET_CLASSIFICATION_SCHEMA["properties"]["model_summary"]
     props = model_summary["properties"]
     assert "detected_entities" in props, "model_summary should have detected_entities"

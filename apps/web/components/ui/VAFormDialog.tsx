@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { VAButton } from "./VAButton";
 import { VAInput } from "./VAInput";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface FormField {
   name: string;
@@ -33,53 +34,16 @@ export function VAFormDialog({
   loading = false,
 }: VAFormDialogProps) {
   const [values, setValues] = useState<Record<string, string>>({});
-  const formRef = useRef<HTMLFormElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const instanceId = useId();
+  const titleId = `${instanceId}-title`;
+  const descId = `${instanceId}-desc`;
+  const { ref, handleKeyDown } = useFocusTrap<HTMLFormElement>(open, onCancel, {
+    initialFocus: "input",
+  });
 
   useEffect(() => {
-    if (open) {
-      setValues({});
-      previousFocusRef.current = document.activeElement as HTMLElement;
-      // Focus first input on open
-      requestAnimationFrame(() => {
-        const firstInput = formRef.current?.querySelector<HTMLElement>("input");
-        firstInput?.focus();
-      });
-    } else if (previousFocusRef.current) {
-      previousFocusRef.current.focus();
-      previousFocusRef.current = null;
-    }
+    if (open) setValues({});
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onCancel]);
-
-  // Focus trap
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key !== "Tab" || !formRef.current) return;
-      const focusable = formRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    },
-    [],
-  );
 
   if (!open) return null;
 
@@ -94,21 +58,21 @@ export function VAFormDialog({
       onClick={onCancel}
     >
       <form
-        ref={formRef}
+        ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="va-form-title"
-        aria-describedby={description ? "va-form-desc" : undefined}
+        aria-labelledby={titleId}
+        aria-describedby={description ? descId : undefined}
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
         className="mx-4 w-full max-w-md rounded-va-lg border border-va-border bg-va-panel p-6 shadow-va-md"
       >
-        <h3 id="va-form-title" className="text-lg font-semibold text-va-text">
+        <h3 id={titleId} className="text-lg font-semibold text-va-text">
           {title}
         </h3>
         {description && (
-          <p id="va-form-desc" className="mt-2 text-sm text-va-text2">
+          <p id={descId} className="mt-2 text-sm text-va-text2">
             {description}
           </p>
         )}

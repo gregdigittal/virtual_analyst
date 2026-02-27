@@ -297,7 +297,7 @@ export default function ExcelImportPage() {
     const cls = classification as Record<string, unknown> | null;
     const summary = cls?.model_summary as Record<string, unknown> | undefined;
     const entities = summary?.detected_entities as DetectedEntity[] | undefined;
-    if (entities && entities.length > 0) {
+    if (Array.isArray(entities) && entities.length > 0) {
       setDetectedEntities(entities);
     }
   }, [classification]);
