@@ -124,7 +124,7 @@ export default function BoardPacksPage() {
               <li key={p.pack_id}>
                 <Link
                   href={`/board-packs/${p.pack_id}`}
-                  className="block rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
+                  className="block cursor-pointer rounded-va-lg border border-va-border bg-va-panel/80 p-4 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-va-text">{p.label}</span>

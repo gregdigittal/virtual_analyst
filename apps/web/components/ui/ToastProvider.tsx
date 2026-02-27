@@ -74,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       {toasts.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        <div aria-live="polite" aria-atomic="false" className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
           {toasts.map((t) => (
             <ToastCard key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
           ))}
@@ -105,7 +105,8 @@ function ToastCard({
 
   return (
     <div
-      className={`flex min-w-[280px] max-w-sm items-start gap-2 rounded-va-sm border px-4 py-3 text-sm shadow-va-md transition-all duration-200 ${variantStyles} ${
+      role="status"
+      className={`flex min-w-[280px] max-w-sm items-start gap-2 rounded-va-sm border px-4 py-3 text-sm shadow-va-md transition-all duration-200 motion-reduce:transition-none ${variantStyles} ${
         visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
       }`}
     >

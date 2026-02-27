@@ -228,7 +228,7 @@ export default function SectionEditorPage() {
                   className={`w-full rounded-va-sm border p-3 text-left transition-colors ${
                     selectedId === s.section_id
                       ? "border-va-blue bg-va-blue/10"
-                      : "border-va-border bg-va-panel hover:border-va-text2"
+                      : "border-va-border bg-va-panel hover:border-va-text2 cursor-pointer"
                   }`}
                 >
                   <div className="flex items-center justify-between">

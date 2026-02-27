@@ -372,7 +372,7 @@ export default function ReviewWorkflowPage() {
                     className={`relative cursor-pointer p-4 transition-colors ${
                       isSelected
                         ? "border-va-blue bg-va-blue/10"
-                        : "hover:border-va-text2"
+                        : "hover:border-va-text2 cursor-pointer"
                     }`}
                     onClick={() =>
                       review

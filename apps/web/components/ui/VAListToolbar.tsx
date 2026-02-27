@@ -76,7 +76,7 @@ export function VAListToolbar({
         <button
           type="button"
           onClick={onClearFilters}
-          className="text-sm text-va-blue hover:text-va-blue/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue rounded-va-xs px-2 py-1"
+          className="cursor-pointer text-sm text-va-blue hover:text-va-blue/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue rounded-va-xs px-2 py-1"
         >
           Clear filters
         </button>

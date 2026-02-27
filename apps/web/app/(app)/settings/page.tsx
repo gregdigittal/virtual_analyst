@@ -31,7 +31,7 @@ export default function SettingsPage() {
             href={item.href}
             className="rounded-va-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
           >
-            <VACard className="h-full p-5 transition hover:bg-white/5">
+            <VACard className="h-full p-5 cursor-pointer transition hover:bg-white/5">
               <h2 className="text-lg font-medium text-va-text">
                 {item.title}
               </h2>

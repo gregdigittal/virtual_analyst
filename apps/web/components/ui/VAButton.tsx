@@ -13,7 +13,7 @@ export function VAButton({
   ...props
 }: VAButtonProps) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-va-sm px-4 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight disabled:opacity-50";
+    "inline-flex items-center justify-center gap-2 rounded-va-sm px-4 py-2 text-sm font-medium cursor-pointer transition focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
     primary:
       "bg-va-blue text-va-text hover:bg-va-blue/90 shadow-va-glow-blue",

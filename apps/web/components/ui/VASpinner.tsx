@@ -9,7 +9,7 @@ export function VASpinner({ label, className = "" }: VASpinnerProps) {
   return (
     <div className={`flex items-center gap-2 text-va-text2 ${className}`}>
       <svg
-        className="h-5 w-5 animate-spin text-va-blue"
+        className="h-5 w-5 animate-spin motion-reduce:animate-none text-va-blue"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"

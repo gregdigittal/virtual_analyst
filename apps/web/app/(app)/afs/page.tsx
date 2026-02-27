@@ -264,7 +264,7 @@ export default function AFSPage() {
                               ? `/afs/${eng.engagement_id}/review`
                               : `/afs/${eng.engagement_id}/sections`
                       }
-                      className="group"
+                      className="group cursor-pointer"
                     >
                       <VACard className="h-full p-5 transition-colors group-hover:border-va-blue/50">
                         <div className="flex items-start justify-between gap-2">
