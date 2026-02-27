@@ -36,6 +36,18 @@ def _load_benchmarks() -> dict:
     return _BENCHMARKS_CACHE
 
 
+_SCHEMAS_PATH = Path(__file__).resolve().parent.parent / "data" / "framework_schemas.json"
+_SCHEMAS_CACHE: dict | None = None
+
+
+def _load_schemas() -> dict:
+    global _SCHEMAS_CACHE
+    if _SCHEMAS_CACHE is None:
+        with open(_SCHEMAS_PATH) as f:
+            _SCHEMAS_CACHE = json.load(f)
+    return _SCHEMAS_CACHE
+
+
 router = APIRouter(prefix="/afs", tags=["afs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
 # ---------------------------------------------------------------------------
@@ -197,6 +209,7 @@ async def seed_builtin_frameworks(
         raise HTTPException(400, "X-Tenant-ID required")
 
     seeded = 0
+    schemas = _load_schemas()
     async with tenant_conn(x_tenant_id) as conn:
         for fw in BUILTIN_FRAMEWORKS:
             fid = _framework_id()
@@ -216,6 +229,35 @@ async def seed_builtin_frameworks(
             # asyncpg returns "INSERT 0 1" or "INSERT 0 0"
             if result and result.endswith("1"):
                 seeded += 1
+
+                # Populate disclosure schema & statement templates from built-in data
+                standard_key = fw["standard"]
+                if standard_key in schemas:
+                    schema_data = schemas[standard_key]
+                    await conn.execute(
+                        """UPDATE afs_frameworks
+                           SET disclosure_schema_json = $1, statement_templates_json = $2
+                           WHERE tenant_id = $3 AND framework_id = $4""",
+                        json.dumps(schema_data.get("disclosure_schema")),
+                        json.dumps(schema_data.get("statement_templates")),
+                        x_tenant_id,
+                        fid,
+                    )
+                    # Seed individual disclosure items for checklist tracking
+                    for section in schema_data.get("disclosure_schema", {}).get("sections", []):
+                        await conn.execute(
+                            """INSERT INTO afs_disclosure_items
+                               (tenant_id, item_id, framework_id, section, reference, description, required)
+                               VALUES ($1, $2, $3, $4, $5, $6, $7)
+                               ON CONFLICT DO NOTHING""",
+                            x_tenant_id,
+                            _disclosure_item_id(),
+                            fid,
+                            section["type"],
+                            section.get("reference", ""),
+                            section["title"],
+                            section.get("required", True),
+                        )
 
     return {"seeded": seeded, "message": f"Seeded {seeded} built-in framework(s)"}
 

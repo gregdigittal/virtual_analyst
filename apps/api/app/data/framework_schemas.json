@@ -1,0 +1,1331 @@
+{
+  "ifrs": {
+    "disclosure_schema": {
+      "sections": [
+        {
+          "type": "statement",
+          "title": "Statement of Financial Position",
+          "reference": "IAS 1.54",
+          "required": true,
+          "sub_items": [
+            "Property, plant and equipment",
+            "Investment property",
+            "Intangible assets",
+            "Right-of-use assets",
+            "Goodwill",
+            "Financial assets",
+            "Deferred tax assets",
+            "Inventories",
+            "Trade and other receivables",
+            "Cash and cash equivalents",
+            "Assets held for sale",
+            "Share capital",
+            "Retained earnings",
+            "Other reserves",
+            "Non-controlling interests",
+            "Long-term borrowings",
+            "Deferred tax liabilities",
+            "Provisions",
+            "Trade and other payables",
+            "Current tax liabilities",
+            "Lease liabilities"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Profit or Loss and Other Comprehensive Income",
+          "reference": "IAS 1.81A",
+          "required": true,
+          "sub_items": [
+            "Revenue",
+            "Cost of sales",
+            "Gross profit",
+            "Other income",
+            "Distribution costs",
+            "Administrative expenses",
+            "Other expenses",
+            "Finance income",
+            "Finance costs",
+            "Share of profit of associates",
+            "Tax expense",
+            "Profit for the period",
+            "Other comprehensive income items",
+            "Total comprehensive income"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Changes in Equity",
+          "reference": "IAS 1.106",
+          "required": true,
+          "sub_items": [
+            "Opening balance",
+            "Total comprehensive income",
+            "Dividends declared",
+            "Share-based payment transactions",
+            "Issue of share capital",
+            "Treasury share transactions",
+            "Changes in ownership interests",
+            "Closing balance"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Cash Flows",
+          "reference": "IAS 7",
+          "required": true,
+          "sub_items": [
+            "Cash generated from operations",
+            "Interest paid",
+            "Tax paid",
+            "Net cash from operating activities",
+            "Acquisition of property, plant and equipment",
+            "Proceeds from disposal of assets",
+            "Acquisition of subsidiaries",
+            "Net cash from investing activities",
+            "Proceeds from borrowings",
+            "Repayment of borrowings",
+            "Lease payments",
+            "Dividends paid",
+            "Net cash from financing activities"
+          ]
+        },
+        {
+          "type": "accounting_policy",
+          "title": "Material Accounting Policy Information",
+          "reference": "IAS 1.117",
+          "required": true,
+          "sub_items": [
+            "Basis of preparation",
+            "Basis of consolidation",
+            "Foreign currency translation",
+            "Revenue recognition",
+            "Property, plant and equipment",
+            "Intangible assets",
+            "Impairment of non-financial assets",
+            "Financial instruments",
+            "Inventories",
+            "Leases",
+            "Employee benefits",
+            "Provisions",
+            "Income tax",
+            "Earnings per share"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Property, Plant and Equipment",
+          "reference": "IAS 16.73",
+          "required": true,
+          "sub_items": [
+            "Gross carrying amount",
+            "Accumulated depreciation and impairment",
+            "Reconciliation of carrying amount",
+            "Depreciation methods and useful lives",
+            "Capitalised borrowing costs",
+            "Assets pledged as security",
+            "Contractual commitments for acquisition"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Intangible Assets",
+          "reference": "IAS 38.118",
+          "required": true,
+          "sub_items": [
+            "Gross carrying amount",
+            "Accumulated amortisation and impairment",
+            "Reconciliation of carrying amount",
+            "Amortisation methods and useful lives",
+            "Internally generated intangible assets",
+            "Indefinite-life intangible assets",
+            "Research and development expenditure"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Investment Property",
+          "reference": "IAS 40.75",
+          "required": true,
+          "sub_items": [
+            "Fair value or cost model applied",
+            "Reconciliation of carrying amount",
+            "Fair value measurement inputs",
+            "Rental income and operating expenses",
+            "Restrictions on realisability",
+            "Contractual obligations"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Financial Instruments",
+          "reference": "IFRS 7.7",
+          "required": true,
+          "sub_items": [
+            "Categories of financial assets and liabilities",
+            "Fair value hierarchy",
+            "Credit risk management and ECL",
+            "Liquidity risk analysis",
+            "Market risk sensitivity analysis",
+            "Hedge accounting disclosures",
+            "Offsetting financial assets and liabilities"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Revenue from Contracts with Customers",
+          "reference": "IFRS 15.113",
+          "required": true,
+          "sub_items": [
+            "Disaggregation of revenue",
+            "Contract balances",
+            "Performance obligations",
+            "Significant judgements",
+            "Transaction price allocated to remaining obligations",
+            "Costs to obtain or fulfil contracts"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Leases",
+          "reference": "IFRS 16.47",
+          "required": true,
+          "sub_items": [
+            "Right-of-use assets by class",
+            "Depreciation of right-of-use assets",
+            "Interest on lease liabilities",
+            "Short-term and low-value lease expenses",
+            "Variable lease payment expenses",
+            "Maturity analysis of lease liabilities",
+            "Sale and leaseback transactions"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Employee Benefits",
+          "reference": "IAS 19.135",
+          "required": true,
+          "sub_items": [
+            "Defined contribution plan expense",
+            "Defined benefit obligation reconciliation",
+            "Plan assets reconciliation",
+            "Actuarial assumptions",
+            "Sensitivity analysis",
+            "Expected future contributions",
+            "Share-based payment arrangements"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Income Tax",
+          "reference": "IAS 12.79",
+          "required": true,
+          "sub_items": [
+            "Tax expense components",
+            "Reconciliation of effective tax rate",
+            "Deferred tax assets and liabilities by type",
+            "Unrecognised deferred tax assets",
+            "Tax losses carried forward",
+            "Tax consequences of dividends"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Related Party Disclosures",
+          "reference": "IAS 24.13",
+          "required": true,
+          "sub_items": [
+            "Parent and ultimate controlling party",
+            "Key management compensation",
+            "Related party transactions",
+            "Outstanding balances with related parties",
+            "Terms and conditions",
+            "Provisions for doubtful debts from related parties"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Events After the Reporting Period",
+          "reference": "IAS 10.21",
+          "required": true,
+          "sub_items": [
+            "Adjusting events",
+            "Non-adjusting events",
+            "Dividends declared after reporting period",
+            "Going concern considerations"
+          ]
+        },
+        {
+          "type": "directors_report",
+          "title": "Directors' Report",
+          "reference": "IAS 1.138",
+          "required": true,
+          "sub_items": [
+            "Nature of business and principal activities",
+            "Review of operations and financial results",
+            "Dividend declaration",
+            "Directorate and secretary",
+            "Share capital structure",
+            "Events after the reporting period",
+            "Going concern statement",
+            "Auditor appointment"
+          ]
+        }
+      ]
+    },
+    "statement_templates": {
+      "sofp": {
+        "title": "Statement of Financial Position",
+        "line_items": [
+          "property_plant_equipment",
+          "investment_property",
+          "intangible_assets",
+          "right_of_use_assets",
+          "goodwill",
+          "investments_in_associates",
+          "financial_assets_non_current",
+          "deferred_tax_assets",
+          "other_non_current_assets",
+          "total_non_current_assets",
+          "inventories",
+          "trade_and_other_receivables",
+          "contract_assets",
+          "current_tax_receivable",
+          "financial_assets_current",
+          "cash_and_cash_equivalents",
+          "assets_held_for_sale",
+          "total_current_assets",
+          "total_assets",
+          "share_capital",
+          "share_premium",
+          "retained_earnings",
+          "other_reserves",
+          "equity_attributable_to_owners",
+          "non_controlling_interests",
+          "total_equity",
+          "long_term_borrowings",
+          "lease_liabilities_non_current",
+          "deferred_tax_liabilities",
+          "provisions_non_current",
+          "retirement_benefit_obligations",
+          "other_non_current_liabilities",
+          "total_non_current_liabilities",
+          "trade_and_other_payables",
+          "contract_liabilities",
+          "short_term_borrowings",
+          "lease_liabilities_current",
+          "current_tax_payable",
+          "provisions_current",
+          "bank_overdraft",
+          "total_current_liabilities",
+          "total_liabilities",
+          "total_equity_and_liabilities"
+        ]
+      },
+      "sopl": {
+        "title": "Statement of Profit or Loss and Other Comprehensive Income",
+        "line_items": [
+          "revenue",
+          "cost_of_sales",
+          "gross_profit",
+          "other_income",
+          "distribution_costs",
+          "administrative_expenses",
+          "other_expenses",
+          "impairment_losses",
+          "operating_profit",
+          "finance_income",
+          "finance_costs",
+          "share_of_profit_of_associates",
+          "profit_before_tax",
+          "income_tax_expense",
+          "profit_for_the_period",
+          "items_that_will_not_be_reclassified",
+          "revaluation_surplus",
+          "remeasurement_of_defined_benefit",
+          "items_that_may_be_reclassified",
+          "foreign_currency_translation",
+          "cash_flow_hedges",
+          "other_comprehensive_income",
+          "total_comprehensive_income",
+          "earnings_per_share_basic",
+          "earnings_per_share_diluted"
+        ]
+      },
+      "soce": {
+        "title": "Statement of Changes in Equity",
+        "line_items": [
+          "opening_balance",
+          "profit_for_the_period",
+          "other_comprehensive_income",
+          "total_comprehensive_income",
+          "dividends_declared",
+          "share_based_payments",
+          "issue_of_shares",
+          "treasury_shares",
+          "changes_in_ownership_interests",
+          "transfers_between_reserves",
+          "closing_balance"
+        ]
+      },
+      "socf": {
+        "title": "Statement of Cash Flows",
+        "line_items": [
+          "profit_before_tax",
+          "depreciation_and_amortisation",
+          "impairment_losses",
+          "finance_income_adjustment",
+          "finance_cost_adjustment",
+          "working_capital_changes",
+          "cash_generated_from_operations",
+          "interest_paid",
+          "income_tax_paid",
+          "net_cash_from_operating_activities",
+          "acquisition_of_ppe",
+          "proceeds_from_disposal_of_ppe",
+          "acquisition_of_intangible_assets",
+          "acquisition_of_subsidiaries",
+          "proceeds_from_disposal_of_investments",
+          "interest_received",
+          "dividends_received",
+          "net_cash_from_investing_activities",
+          "proceeds_from_borrowings",
+          "repayment_of_borrowings",
+          "payment_of_lease_liabilities",
+          "dividends_paid",
+          "proceeds_from_issue_of_shares",
+          "net_cash_from_financing_activities",
+          "net_increase_in_cash",
+          "cash_at_beginning_of_period",
+          "exchange_rate_effects",
+          "cash_at_end_of_period"
+        ]
+      }
+    }
+  },
+  "ifrs_sme": {
+    "disclosure_schema": {
+      "sections": [
+        {
+          "type": "statement",
+          "title": "Statement of Financial Position",
+          "reference": "Section 4.2",
+          "required": true,
+          "sub_items": [
+            "Property, plant and equipment",
+            "Intangible assets",
+            "Financial assets",
+            "Inventories",
+            "Trade and other receivables",
+            "Cash and cash equivalents",
+            "Share capital and reserves",
+            "Long-term borrowings",
+            "Trade and other payables",
+            "Current tax liabilities",
+            "Provisions"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Comprehensive Income",
+          "reference": "Section 5.2",
+          "required": true,
+          "sub_items": [
+            "Revenue",
+            "Cost of sales",
+            "Gross profit",
+            "Other income",
+            "Operating expenses",
+            "Finance costs",
+            "Tax expense",
+            "Profit or loss for the period",
+            "Other comprehensive income",
+            "Total comprehensive income"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Changes in Equity",
+          "reference": "Section 6.2",
+          "required": true,
+          "sub_items": [
+            "Opening balance",
+            "Total comprehensive income",
+            "Dividends",
+            "Issue of shares",
+            "Closing balance"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Cash Flows",
+          "reference": "Section 7.1",
+          "required": true,
+          "sub_items": [
+            "Cash from operating activities",
+            "Cash from investing activities",
+            "Cash from financing activities",
+            "Net change in cash"
+          ]
+        },
+        {
+          "type": "accounting_policy",
+          "title": "Accounting Policies and Notes",
+          "reference": "Section 8.2",
+          "required": true,
+          "sub_items": [
+            "Statement of compliance",
+            "Basis of preparation",
+            "Significant accounting policies",
+            "Judgements and estimation uncertainty"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Property, Plant and Equipment",
+          "reference": "Section 17.31",
+          "required": true,
+          "sub_items": [
+            "Carrying amount reconciliation",
+            "Depreciation methods and useful lives",
+            "Impairment losses",
+            "Assets pledged as security"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Revenue",
+          "reference": "Section 23.30",
+          "required": true,
+          "sub_items": [
+            "Accounting policy for revenue recognition",
+            "Revenue by category",
+            "Construction contracts"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Financial Instruments",
+          "reference": "Section 11.39",
+          "required": true,
+          "sub_items": [
+            "Carrying amounts by category",
+            "Credit risk",
+            "Liquidity risk",
+            "Fair value information"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Employee Benefits",
+          "reference": "Section 28.40",
+          "required": true,
+          "sub_items": [
+            "Short-term employee benefits",
+            "Post-employment benefits",
+            "Defined contribution plan expense"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Income Tax",
+          "reference": "Section 29.31",
+          "required": true,
+          "sub_items": [
+            "Tax expense components",
+            "Tax rate reconciliation",
+            "Deferred tax balances"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Related Party Disclosures",
+          "reference": "Section 33.5",
+          "required": true,
+          "sub_items": [
+            "Key management compensation",
+            "Related party transactions",
+            "Outstanding balances"
+          ]
+        },
+        {
+          "type": "directors_report",
+          "title": "Directors' Report",
+          "reference": "Section 3.17",
+          "required": false,
+          "sub_items": [
+            "Nature of business",
+            "Review of operations",
+            "Directorate",
+            "Going concern"
+          ]
+        }
+      ]
+    },
+    "statement_templates": {
+      "sofp": {
+        "title": "Statement of Financial Position",
+        "line_items": [
+          "property_plant_equipment",
+          "intangible_assets",
+          "financial_assets_non_current",
+          "deferred_tax_assets",
+          "total_non_current_assets",
+          "inventories",
+          "trade_and_other_receivables",
+          "cash_and_cash_equivalents",
+          "total_current_assets",
+          "total_assets",
+          "share_capital",
+          "retained_earnings",
+          "total_equity",
+          "long_term_borrowings",
+          "deferred_tax_liabilities",
+          "provisions",
+          "total_non_current_liabilities",
+          "trade_and_other_payables",
+          "short_term_borrowings",
+          "current_tax_payable",
+          "bank_overdraft",
+          "total_current_liabilities",
+          "total_liabilities",
+          "total_equity_and_liabilities"
+        ]
+      },
+      "sopl": {
+        "title": "Statement of Comprehensive Income",
+        "line_items": [
+          "revenue",
+          "cost_of_sales",
+          "gross_profit",
+          "other_income",
+          "operating_expenses",
+          "operating_profit",
+          "finance_income",
+          "finance_costs",
+          "profit_before_tax",
+          "income_tax_expense",
+          "profit_for_the_period",
+          "other_comprehensive_income",
+          "total_comprehensive_income"
+        ]
+      },
+      "soce": {
+        "title": "Statement of Changes in Equity",
+        "line_items": [
+          "opening_balance",
+          "profit_for_the_period",
+          "other_comprehensive_income",
+          "total_comprehensive_income",
+          "dividends",
+          "issue_of_shares",
+          "closing_balance"
+        ]
+      },
+      "socf": {
+        "title": "Statement of Cash Flows",
+        "line_items": [
+          "profit_before_tax",
+          "depreciation_and_amortisation",
+          "working_capital_changes",
+          "cash_generated_from_operations",
+          "interest_paid",
+          "tax_paid",
+          "net_cash_from_operating_activities",
+          "acquisition_of_ppe",
+          "proceeds_from_disposals",
+          "net_cash_from_investing_activities",
+          "proceeds_from_borrowings",
+          "repayment_of_borrowings",
+          "dividends_paid",
+          "net_cash_from_financing_activities",
+          "net_increase_in_cash",
+          "cash_at_beginning_of_period",
+          "cash_at_end_of_period"
+        ]
+      }
+    }
+  },
+  "us_gaap": {
+    "disclosure_schema": {
+      "sections": [
+        {
+          "type": "statement",
+          "title": "Balance Sheet",
+          "reference": "ASC 210-10-45",
+          "required": true,
+          "sub_items": [
+            "Cash and cash equivalents",
+            "Short-term investments",
+            "Accounts receivable, net",
+            "Inventories",
+            "Prepaid expenses",
+            "Total current assets",
+            "Property, plant and equipment, net",
+            "Goodwill",
+            "Intangible assets, net",
+            "Operating lease right-of-use assets",
+            "Other non-current assets",
+            "Total assets",
+            "Accounts payable",
+            "Accrued liabilities",
+            "Current portion of long-term debt",
+            "Current operating lease liabilities",
+            "Total current liabilities",
+            "Long-term debt",
+            "Non-current operating lease liabilities",
+            "Deferred tax liabilities",
+            "Other non-current liabilities",
+            "Total liabilities",
+            "Common stock",
+            "Additional paid-in capital",
+            "Retained earnings",
+            "Accumulated other comprehensive income (loss)",
+            "Treasury stock",
+            "Total stockholders' equity"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Income Statement",
+          "reference": "ASC 220-10-45",
+          "required": true,
+          "sub_items": [
+            "Net revenues",
+            "Cost of goods sold",
+            "Gross profit",
+            "Selling, general and administrative expenses",
+            "Research and development expenses",
+            "Depreciation and amortization",
+            "Restructuring charges",
+            "Operating income",
+            "Interest income",
+            "Interest expense",
+            "Other income (expense), net",
+            "Income before income taxes",
+            "Income tax provision",
+            "Net income",
+            "Earnings per share — basic",
+            "Earnings per share — diluted"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Comprehensive Income",
+          "reference": "ASC 220-10-45-1",
+          "required": true,
+          "sub_items": [
+            "Net income",
+            "Foreign currency translation adjustments",
+            "Unrealized gains (losses) on securities",
+            "Pension and post-retirement benefit adjustments",
+            "Cash flow hedge adjustments",
+            "Other comprehensive income (loss)",
+            "Comprehensive income"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Stockholders' Equity",
+          "reference": "ASC 505-10-50",
+          "required": true,
+          "sub_items": [
+            "Beginning balance",
+            "Net income",
+            "Other comprehensive income",
+            "Stock-based compensation",
+            "Common stock issued",
+            "Treasury stock repurchased",
+            "Dividends declared",
+            "Ending balance"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Cash Flows",
+          "reference": "ASC 230-10-45",
+          "required": true,
+          "sub_items": [
+            "Net income",
+            "Depreciation and amortization",
+            "Stock-based compensation expense",
+            "Deferred income taxes",
+            "Changes in operating assets and liabilities",
+            "Net cash from operating activities",
+            "Capital expenditures",
+            "Acquisitions, net of cash acquired",
+            "Purchases of investments",
+            "Proceeds from sales of investments",
+            "Net cash from investing activities",
+            "Proceeds from debt",
+            "Repayments of debt",
+            "Repurchases of common stock",
+            "Dividends paid",
+            "Net cash from financing activities",
+            "Effect of exchange rates on cash",
+            "Net change in cash"
+          ]
+        },
+        {
+          "type": "accounting_policy",
+          "title": "Summary of Significant Accounting Policies",
+          "reference": "ASC 235-10-50",
+          "required": true,
+          "sub_items": [
+            "Basis of presentation",
+            "Principles of consolidation",
+            "Use of estimates",
+            "Revenue recognition",
+            "Cash and cash equivalents",
+            "Accounts receivable and allowance for credit losses",
+            "Inventories",
+            "Property, plant and equipment",
+            "Goodwill and intangible assets",
+            "Leases",
+            "Income taxes",
+            "Stock-based compensation",
+            "Earnings per share"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Revenue from Contracts with Customers",
+          "reference": "ASC 606-10-50",
+          "required": true,
+          "sub_items": [
+            "Disaggregation of revenue",
+            "Contract balances",
+            "Performance obligations",
+            "Significant judgments",
+            "Remaining performance obligations"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Leases",
+          "reference": "ASC 842-10-50",
+          "required": true,
+          "sub_items": [
+            "Operating lease costs",
+            "Finance lease costs",
+            "Right-of-use assets and lease liabilities",
+            "Maturity analysis of lease liabilities",
+            "Weighted-average remaining lease term and discount rate"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Income Taxes",
+          "reference": "ASC 740-10-50",
+          "required": true,
+          "sub_items": [
+            "Components of income tax expense",
+            "Effective tax rate reconciliation",
+            "Deferred tax assets and liabilities",
+            "Valuation allowance",
+            "Unrecognized tax benefits",
+            "Tax loss and credit carryforwards"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Debt and Credit Facilities",
+          "reference": "ASC 470-10-50",
+          "required": true,
+          "sub_items": [
+            "Outstanding debt by type",
+            "Maturity schedule of long-term debt",
+            "Credit facility terms",
+            "Debt covenants",
+            "Interest expense"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Stock-Based Compensation",
+          "reference": "ASC 718-10-50",
+          "required": true,
+          "sub_items": [
+            "Compensation expense recognized",
+            "Stock option activity",
+            "Restricted stock unit activity",
+            "Fair value assumptions",
+            "Unrecognized compensation cost"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Fair Value Measurements",
+          "reference": "ASC 820-10-50",
+          "required": true,
+          "sub_items": [
+            "Assets and liabilities measured at fair value",
+            "Fair value hierarchy (Level 1, 2, 3)",
+            "Transfers between levels",
+            "Valuation techniques",
+            "Unobservable inputs reconciliation"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Commitments and Contingencies",
+          "reference": "ASC 450-20-50",
+          "required": true,
+          "sub_items": [
+            "Litigation and legal proceedings",
+            "Purchase obligations",
+            "Environmental obligations",
+            "Guarantee obligations",
+            "Indemnification agreements"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Segment Reporting",
+          "reference": "ASC 280-10-50",
+          "required": true,
+          "sub_items": [
+            "Description of reportable segments",
+            "Segment revenue and profit measures",
+            "Segment assets",
+            "Geographic information",
+            "Major customers"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Related Party Transactions",
+          "reference": "ASC 850-10-50",
+          "required": true,
+          "sub_items": [
+            "Nature of related party relationships",
+            "Transaction amounts and terms",
+            "Outstanding balances",
+            "Due to/from related parties"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Subsequent Events",
+          "reference": "ASC 855-10-50",
+          "required": true,
+          "sub_items": [
+            "Recognized subsequent events",
+            "Non-recognized subsequent events",
+            "Date through which events were evaluated"
+          ]
+        }
+      ]
+    },
+    "statement_templates": {
+      "sofp": {
+        "title": "Balance Sheet",
+        "line_items": [
+          "cash_and_cash_equivalents",
+          "short_term_investments",
+          "accounts_receivable_net",
+          "inventories",
+          "prepaid_expenses",
+          "other_current_assets",
+          "total_current_assets",
+          "property_plant_equipment_net",
+          "goodwill",
+          "intangible_assets_net",
+          "operating_lease_rou_assets",
+          "deferred_tax_assets",
+          "other_non_current_assets",
+          "total_assets",
+          "accounts_payable",
+          "accrued_liabilities",
+          "current_portion_long_term_debt",
+          "current_operating_lease_liabilities",
+          "deferred_revenue_current",
+          "total_current_liabilities",
+          "long_term_debt",
+          "non_current_operating_lease_liabilities",
+          "deferred_tax_liabilities",
+          "other_non_current_liabilities",
+          "total_liabilities",
+          "common_stock",
+          "additional_paid_in_capital",
+          "retained_earnings",
+          "accumulated_other_comprehensive_income",
+          "treasury_stock",
+          "total_stockholders_equity",
+          "total_liabilities_and_equity"
+        ]
+      },
+      "sopl": {
+        "title": "Income Statement",
+        "line_items": [
+          "net_revenues",
+          "cost_of_goods_sold",
+          "gross_profit",
+          "selling_general_administrative",
+          "research_and_development",
+          "depreciation_and_amortization",
+          "restructuring_charges",
+          "operating_income",
+          "interest_income",
+          "interest_expense",
+          "other_income_expense_net",
+          "income_before_taxes",
+          "income_tax_provision",
+          "net_income",
+          "earnings_per_share_basic",
+          "earnings_per_share_diluted"
+        ]
+      },
+      "soce": {
+        "title": "Statement of Stockholders' Equity",
+        "line_items": [
+          "beginning_balance",
+          "net_income",
+          "other_comprehensive_income",
+          "stock_based_compensation",
+          "common_stock_issued",
+          "treasury_stock_repurchased",
+          "dividends_declared",
+          "ending_balance"
+        ]
+      },
+      "socf": {
+        "title": "Statement of Cash Flows",
+        "line_items": [
+          "net_income",
+          "depreciation_and_amortization",
+          "stock_based_compensation",
+          "deferred_income_taxes",
+          "changes_in_operating_assets_liabilities",
+          "net_cash_from_operating_activities",
+          "capital_expenditures",
+          "acquisitions_net_of_cash",
+          "purchases_of_investments",
+          "proceeds_from_sales_of_investments",
+          "net_cash_from_investing_activities",
+          "proceeds_from_debt",
+          "repayments_of_debt",
+          "repurchases_of_common_stock",
+          "dividends_paid",
+          "net_cash_from_financing_activities",
+          "effect_of_exchange_rates",
+          "net_change_in_cash",
+          "cash_at_beginning_of_period",
+          "cash_at_end_of_period"
+        ]
+      }
+    }
+  },
+  "sa_companies_act": {
+    "disclosure_schema": {
+      "sections": [
+        {
+          "type": "statement",
+          "title": "Statement of Financial Position",
+          "reference": "IAS 1.54 / Companies Act s30",
+          "required": true,
+          "sub_items": [
+            "Property, plant and equipment",
+            "Investment property",
+            "Intangible assets",
+            "Goodwill",
+            "Financial assets",
+            "Deferred tax assets",
+            "Inventories",
+            "Trade and other receivables",
+            "Cash and cash equivalents",
+            "Share capital and premium",
+            "Retained income",
+            "Non-distributable reserves",
+            "Long-term borrowings",
+            "Deferred tax liabilities",
+            "Provisions",
+            "Trade and other payables"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Profit or Loss and Other Comprehensive Income",
+          "reference": "IAS 1.81A / Companies Act s30",
+          "required": true,
+          "sub_items": [
+            "Revenue",
+            "Cost of sales",
+            "Gross profit",
+            "Other income",
+            "Operating expenses",
+            "Operating profit",
+            "Finance income",
+            "Finance costs",
+            "Profit before taxation",
+            "Taxation",
+            "Profit for the year",
+            "Other comprehensive income",
+            "Total comprehensive income"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Changes in Equity",
+          "reference": "IAS 1.106 / Companies Act s30",
+          "required": true,
+          "sub_items": [
+            "Opening balance",
+            "Total comprehensive income",
+            "Dividends",
+            "Issue of shares",
+            "Share-based payments",
+            "Closing balance"
+          ]
+        },
+        {
+          "type": "statement",
+          "title": "Statement of Cash Flows",
+          "reference": "IAS 7 / Companies Act s30",
+          "required": true,
+          "sub_items": [
+            "Cash from operating activities",
+            "Cash from investing activities",
+            "Cash from financing activities",
+            "Net change in cash and cash equivalents"
+          ]
+        },
+        {
+          "type": "accounting_policy",
+          "title": "Accounting Policies",
+          "reference": "IAS 1.117 / IAS 8",
+          "required": true,
+          "sub_items": [
+            "Basis of preparation",
+            "Statement of compliance with IFRS",
+            "Going concern",
+            "Functional and presentation currency",
+            "Significant accounting policies",
+            "Judgements and estimates"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Property, Plant and Equipment",
+          "reference": "IAS 16.73",
+          "required": true,
+          "sub_items": [
+            "Carrying amount reconciliation",
+            "Depreciation rates and methods",
+            "Assets pledged as security",
+            "Capital commitments"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Financial Instruments and Risk Management",
+          "reference": "IFRS 7.7 / Companies Act s30(2)(b)(ii)",
+          "required": true,
+          "sub_items": [
+            "Categories of financial instruments",
+            "Credit risk",
+            "Liquidity risk",
+            "Interest rate risk",
+            "Foreign currency risk",
+            "Fair value information"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Revenue",
+          "reference": "IFRS 15.113",
+          "required": true,
+          "sub_items": [
+            "Disaggregation of revenue",
+            "Contract balances",
+            "Performance obligations"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Taxation",
+          "reference": "IAS 12.79 / SA Income Tax Act",
+          "required": true,
+          "sub_items": [
+            "Income tax expense",
+            "Tax rate reconciliation",
+            "Deferred tax balances",
+            "Secondary tax on companies (historical)",
+            "Dividends tax"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Related Parties",
+          "reference": "IAS 24.13 / Companies Act s30(4)",
+          "required": true,
+          "sub_items": [
+            "Directors' emoluments",
+            "Related party transactions",
+            "Key management compensation",
+            "Loans to directors (Companies Act s75)"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Share Capital and Reserves",
+          "reference": "IAS 1.79 / Companies Act s30(2)(a)",
+          "required": true,
+          "sub_items": [
+            "Authorised share capital",
+            "Issued share capital",
+            "Share premium",
+            "Treasury shares",
+            "Unissued shares under directors' control"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Events After the Reporting Period",
+          "reference": "IAS 10.21",
+          "required": true,
+          "sub_items": [
+            "Adjusting events",
+            "Non-adjusting events",
+            "Dividend declaration"
+          ]
+        },
+        {
+          "type": "directors_report",
+          "title": "Directors' Report",
+          "reference": "Companies Act s30(3)",
+          "required": true,
+          "sub_items": [
+            "Nature of business",
+            "Review of financial results and operations",
+            "Share capital",
+            "Dividends",
+            "Directorate",
+            "Directors' interests in contracts",
+            "Company secretary",
+            "Registered office and business address",
+            "Auditors",
+            "Special resolutions",
+            "Events after the reporting date",
+            "Going concern"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "B-BBEE Compliance",
+          "reference": "B-BBEE Act / Companies Act s30(5)",
+          "required": false,
+          "sub_items": [
+            "B-BBEE level",
+            "Black ownership percentage",
+            "Enterprise and supplier development",
+            "Skills development"
+          ]
+        },
+        {
+          "type": "note",
+          "title": "Directors' Emoluments",
+          "reference": "Companies Act s30(4)-(5) / King IV",
+          "required": true,
+          "sub_items": [
+            "Executive directors' remuneration",
+            "Non-executive directors' fees",
+            "Share options and incentive schemes",
+            "Prescribed officers' remuneration"
+          ]
+        }
+      ]
+    },
+    "statement_templates": {
+      "sofp": {
+        "title": "Statement of Financial Position",
+        "line_items": [
+          "property_plant_equipment",
+          "investment_property",
+          "intangible_assets",
+          "goodwill",
+          "investments_in_subsidiaries",
+          "financial_assets_non_current",
+          "deferred_tax_assets",
+          "total_non_current_assets",
+          "inventories",
+          "trade_and_other_receivables",
+          "current_tax_receivable",
+          "cash_and_cash_equivalents",
+          "total_current_assets",
+          "total_assets",
+          "share_capital_and_premium",
+          "retained_income",
+          "non_distributable_reserves",
+          "total_equity",
+          "long_term_borrowings",
+          "deferred_tax_liabilities",
+          "provisions",
+          "total_non_current_liabilities",
+          "trade_and_other_payables",
+          "short_term_borrowings",
+          "current_tax_payable",
+          "bank_overdraft",
+          "total_current_liabilities",
+          "total_liabilities",
+          "total_equity_and_liabilities"
+        ]
+      },
+      "sopl": {
+        "title": "Statement of Profit or Loss and Other Comprehensive Income",
+        "line_items": [
+          "revenue",
+          "cost_of_sales",
+          "gross_profit",
+          "other_income",
+          "operating_expenses",
+          "operating_profit",
+          "finance_income",
+          "finance_costs",
+          "profit_before_taxation",
+          "taxation",
+          "profit_for_the_year",
+          "other_comprehensive_income",
+          "total_comprehensive_income"
+        ]
+      },
+      "soce": {
+        "title": "Statement of Changes in Equity",
+        "line_items": [
+          "opening_balance",
+          "profit_for_the_year",
+          "other_comprehensive_income",
+          "total_comprehensive_income",
+          "dividends",
+          "issue_of_shares",
+          "share_based_payments",
+          "closing_balance"
+        ]
+      },
+      "socf": {
+        "title": "Statement of Cash Flows",
+        "line_items": [
+          "profit_before_taxation",
+          "depreciation_and_amortisation",
+          "working_capital_changes",
+          "cash_generated_from_operations",
+          "interest_paid",
+          "taxation_paid",
+          "dividends_received",
+          "net_cash_from_operating_activities",
+          "acquisition_of_ppe",
+          "proceeds_from_disposal_of_ppe",
+          "acquisition_of_investments",
+          "net_cash_from_investing_activities",
+          "proceeds_from_borrowings",
+          "repayment_of_borrowings",
+          "dividends_paid",
+          "net_cash_from_financing_activities",
+          "net_increase_in_cash",
+          "cash_at_beginning_of_year",
+          "cash_at_end_of_year"
+        ]
+      }
+    }
+  }
+}
