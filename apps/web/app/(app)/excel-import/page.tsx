@@ -60,7 +60,14 @@ interface MappingPayload {
 
 interface ClassificationPayload {
   entity_name?: string;
-  model_summary?: { entity_name?: string };
+  model_summary?: {
+    entity_name?: string;
+    industry?: string;
+    matched_template_id?: string;
+    detection_confidence?: number;
+    detected_revenue_drivers?: string[];
+    detected_entities?: DetectedEntity[];
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -429,6 +436,28 @@ export default function ExcelImportPage() {
               )}
             </ChatThread>
           </VACard>
+
+          {/* Industry detection results */}
+          {isComplete && cls?.model_summary?.matched_template_id && (
+            <VACard className="p-4">
+              <div className="rounded-va-sm border border-va-success/40 bg-va-success/10 p-4">
+                <p className="text-sm font-medium text-va-success">
+                  Industry detected: {cls.model_summary.industry}
+                  {cls.model_summary.detection_confidence != null &&
+                    ` (${Math.round(cls.model_summary.detection_confidence * 100)}% confidence)`
+                  }
+                </p>
+                <p className="mt-1 text-sm text-va-text2">
+                  Suggested template: <strong className="text-va-text">{cls.model_summary.matched_template_id}</strong>
+                </p>
+                {(cls.model_summary.detected_revenue_drivers?.length ?? 0) > 0 && (
+                  <p className="mt-1 text-sm text-va-text2">
+                    Revenue drivers: {cls.model_summary.detected_revenue_drivers!.join(", ")}
+                  </p>
+                )}
+              </div>
+            </VACard>
+          )}
 
           {/* Detected entities (when classification has multi-entity data) */}
           {isComplete && detectedEntities.length > 0 && (

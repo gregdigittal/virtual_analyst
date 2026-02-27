@@ -1,313 +1,117 @@
-import { PublicFooter } from "@/components/PublicFooter";
 import { PublicHeader } from "@/components/PublicHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 import Link from "next/link";
-import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "How Virtual Analyst Compares",
-  description:
-    "See how Virtual Analyst stacks up against spreadsheets and enterprise FP&A tools for financial modeling.",
+export const metadata = {
+  title: "Compare | Virtual Analyst",
+  description: "See how Virtual Analyst compares to spreadsheets and enterprise FP&A tools.",
 };
 
-/* ------------------------------------------------------------------ */
-/*  Indicator icons                                                    */
-/* ------------------------------------------------------------------ */
-
 function CheckIcon() {
-  return (
-    <svg
-      className="h-5 w-5 text-va-success"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-label="Strength"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  );
+  return <span className="text-va-success">&#10003;</span>;
 }
-
 function XIcon() {
-  return (
-    <svg
-      className="h-5 w-5 text-va-danger"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-label="Weakness"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
+  return <span className="text-va-danger">&#10007;</span>;
 }
-
-function TildeIcon() {
-  return (
-    <span className="inline-flex h-5 w-5 items-center justify-center text-va-warning font-bold text-lg" aria-label="Partial">
-      ~
-    </span>
-  );
+function PartialIcon() {
+  return <span className="text-va-warning">~</span>;
 }
-
-/* ------------------------------------------------------------------ */
-/*  Indicator helper                                                   */
-/* ------------------------------------------------------------------ */
-
-type Indicator = "check" | "x" | "partial";
-
-function IndicatorIcon({ type }: { type: Indicator }) {
-  switch (type) {
-    case "check":
-      return <CheckIcon />;
-    case "x":
-      return <XIcon />;
-    case "partial":
-      return <TildeIcon />;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  ComparisonTable                                                    */
-/* ------------------------------------------------------------------ */
 
 interface ComparisonRow {
   feature: string;
-  competitor: string;
-  competitorIndicator: Indicator;
-  va: string;
-  vaIndicator: Indicator;
+  competitor: React.ReactNode;
+  va: React.ReactNode;
 }
 
-function ComparisonTable({
-  title,
-  description,
-  rows,
-  competitorLabel,
-}: {
+function ComparisonTable({ title, description, rows, competitorLabel }: {
   title: string;
   description: string;
   rows: ComparisonRow[];
   competitorLabel: string;
 }) {
   return (
-    <div className="rounded-va-lg border border-va-border bg-va-panel/80 overflow-hidden">
-      <div className="px-6 py-5 border-b border-va-border">
-        <h2 className="font-brand text-xl font-bold text-va-text">{title}</h2>
-        <p className="mt-1 text-sm text-va-text2">{description}</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] text-sm">
+    <section className="mt-12">
+      <h2 className="font-brand text-xl font-bold text-va-text sm:text-2xl">{title}</h2>
+      <p className="mt-2 text-va-text2">{description}</p>
+      <div className="mt-6 overflow-x-auto">
+        <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-va-border bg-va-midnight/50">
-              <th className="px-6 py-3 text-left font-medium text-va-text2">Feature</th>
-              <th className="px-6 py-3 text-left font-medium text-va-text2">{competitorLabel}</th>
-              <th className="px-6 py-3 text-left font-medium text-va-text2">Virtual Analyst</th>
+            <tr className="border-b border-va-border">
+              <th className="py-3 pr-4 text-left font-medium text-va-text2">Feature</th>
+              <th className="px-4 py-3 text-center font-medium text-va-text2">{competitorLabel}</th>
+              <th className="px-4 py-3 text-center font-medium text-va-blue">Virtual Analyst</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <tr
-                key={row.feature}
-                className={
-                  i % 2 === 0
-                    ? "border-b border-va-border/50"
-                    : "border-b border-va-border/50 bg-va-surface/30"
-                }
-              >
-                <td className="px-6 py-3 font-medium text-va-text">{row.feature}</td>
-                <td className="px-6 py-3 text-va-text2">
-                  <span className="flex items-center gap-2">
-                    <IndicatorIcon type={row.competitorIndicator} />
-                    {row.competitor}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-va-text">
-                  <span className="flex items-center gap-2">
-                    <IndicatorIcon type={row.vaIndicator} />
-                    {row.va}
-                  </span>
-                </td>
+            {rows.map((row) => (
+              <tr key={row.feature} className="border-b border-va-border/50">
+                <td className="py-3 pr-4 text-va-text">{row.feature}</td>
+                <td className="px-4 py-3 text-center">{row.competitor}</td>
+                <td className="px-4 py-3 text-center">{row.va}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Data                                                               */
-/* ------------------------------------------------------------------ */
-
-const spreadsheetRows: ComparisonRow[] = [
-  {
-    feature: "Monte Carlo simulation",
-    competitor: "Manual VBA macros",
-    competitorIndicator: "x",
-    va: "Built-in, one click",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Scenario comparison",
-    competitor: "Copy worksheets",
-    competitorIndicator: "x",
-    va: "Side-by-side diff",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Collaboration",
-    competitor: "File sharing",
-    competitorIndicator: "partial",
-    va: "Real-time, versioned",
-    vaIndicator: "check",
-  },
-  {
-    feature: "AI assistance",
-    competitor: "None",
-    competitorIndicator: "x",
-    va: "Industry detection, driver analysis",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Audit trail",
-    competitor: "None",
-    competitorIndicator: "x",
-    va: "Full version history",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Sensitivity analysis",
-    competitor: "Manual data tables",
-    competitorIndicator: "partial",
-    va: "Tornado charts, heatmaps",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Board pack generation",
-    competitor: "Manual",
-    competitorIndicator: "x",
-    va: "Automated, drag-and-drop",
-    vaIndicator: "check",
-  },
-];
-
-const enterpriseRows: ComparisonRow[] = [
-  {
-    feature: "Time to first model",
-    competitor: "Weeks to months",
-    competitorIndicator: "x",
-    va: "Minutes",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Pricing",
-    competitor: "$50K-500K+/year",
-    competitorIndicator: "x",
-    va: "Fraction of the cost",
-    vaIndicator: "check",
-  },
-  {
-    feature: "AI-native",
-    competitor: "Bolt-on",
-    competitorIndicator: "partial",
-    va: "Built from ground up",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Monte Carlo",
-    competitor: "Limited or add-on",
-    competitorIndicator: "partial",
-    va: "Core feature",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Template marketplace",
-    competitor: "Vendor-locked",
-    competitorIndicator: "x",
-    va: "Open, community-driven",
-    vaIndicator: "check",
-  },
-  {
-    feature: "Implementation support",
-    competitor: "Requires consultants",
-    competitorIndicator: "x",
-    va: "Self-service with AI guidance",
-    vaIndicator: "check",
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/*  Page                                                               */
-/* ------------------------------------------------------------------ */
-
-export default function CompareLandingPage() {
+export default function ComparePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-va-midnight">
+    <div className="min-h-screen flex flex-col">
       <PublicHeader />
 
       <main className="flex-1">
-        {/* Page heading */}
-        <section className="border-b border-va-border bg-gradient-to-b from-va-panel/50 to-va-midnight py-16 sm:py-24">
-          <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
-            <h1 className="font-brand text-3xl font-bold tracking-tight text-va-text sm:text-4xl md:text-5xl">
-              How Virtual Analyst Compares
-            </h1>
-            <p className="mt-4 text-lg text-va-text2">
-              Whether you&apos;re outgrowing spreadsheets or looking for a leaner alternative to enterprise FP&amp;A, see how we stack up.
-            </p>
+        <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-24">
+          <h1 className="font-brand text-3xl font-bold text-va-text sm:text-4xl text-center">
+            How Virtual Analyst Compares
+          </h1>
+          <p className="mt-4 text-center text-lg text-va-text2">
+            Whether you are upgrading from spreadsheets or looking for a modern alternative to enterprise FP&amp;A tools.
+          </p>
+
+          <ComparisonTable
+            title="vs. Spreadsheets"
+            description="Excel and Google Sheets are flexible but lack the automation and rigor that financial modeling demands."
+            competitorLabel="Excel / Sheets"
+            rows={[
+              { feature: "Monte Carlo simulation", competitor: <span className="text-va-text2">Manual VBA macros</span>, va: <><CheckIcon /> Built-in, one click</> },
+              { feature: "Scenario comparison", competitor: <span className="text-va-text2">Copy worksheets</span>, va: <><CheckIcon /> Side-by-side diff</> },
+              { feature: "Collaboration", competitor: <span className="text-va-text2">File sharing</span>, va: <><CheckIcon /> Real-time, versioned</> },
+              { feature: "AI assistance", competitor: <><XIcon /> None</>, va: <><CheckIcon /> Industry detection, driver analysis</> },
+              { feature: "Audit trail", competitor: <><XIcon /> None</>, va: <><CheckIcon /> Full version history</> },
+              { feature: "Sensitivity analysis", competitor: <span className="text-va-text2">Manual data tables</span>, va: <><CheckIcon /> Tornado charts, heatmaps</> },
+              { feature: "Board pack generation", competitor: <><XIcon /> Manual</>, va: <><CheckIcon /> Automated, drag-and-drop</> },
+            ]}
+          />
+
+          <ComparisonTable
+            title="vs. Enterprise FP&amp;A"
+            description="Anaplan, Adaptive Planning, and Vena are powerful but come with enterprise complexity and cost."
+            competitorLabel="Enterprise FP&amp;A"
+            rows={[
+              { feature: "Time to first model", competitor: <span className="text-va-text2">Weeks to months</span>, va: <><CheckIcon /> Minutes</> },
+              { feature: "Pricing", competitor: <span className="text-va-text2">$50K-500K+/year</span>, va: <><CheckIcon /> Fraction of the cost</> },
+              { feature: "AI-native", competitor: <><PartialIcon /> Bolt-on</>, va: <><CheckIcon /> Built from ground up</> },
+              { feature: "Monte Carlo simulation", competitor: <><PartialIcon /> Limited or add-on</>, va: <><CheckIcon /> Core feature</> },
+              { feature: "Template marketplace", competitor: <span className="text-va-text2">Vendor-locked</span>, va: <><CheckIcon /> Open, community-driven</> },
+              { feature: "Implementation support", competitor: <span className="text-va-text2">Requires consultants</span>, va: <><CheckIcon /> Self-service with AI guidance</> },
+            ]}
+          />
+
+          <div className="mt-16 text-center">
+            <Link
+              href="/signup"
+              className="inline-flex items-center rounded-va-sm bg-va-blue px-6 py-3 text-base font-medium text-white hover:bg-va-blue/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight shadow-va-glow-blue"
+            >
+              Start your free trial
+            </Link>
           </div>
-        </section>
-
-        {/* Comparison tables */}
-        <section className="py-16 sm:py-24">
-          <div className="mx-auto max-w-5xl space-y-12 px-4 sm:px-6">
-            <ComparisonTable
-              title="vs. Spreadsheets"
-              description="Excel and Google Sheets are flexible, but financial modeling demands more."
-              competitorLabel="Excel / Sheets"
-              rows={spreadsheetRows}
-            />
-
-            <ComparisonTable
-              title="vs. Enterprise FP&A"
-              description="Legacy platforms are powerful but come with heavyweight implementations and price tags."
-              competitorLabel="Enterprise FP&A"
-              rows={enterpriseRows}
-            />
-          </div>
-        </section>
-
-        {/* CTA */}
-        <section className="border-t border-va-border bg-va-midnight py-16 sm:py-24">
-          <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-            <h2 className="font-brand text-2xl font-bold text-va-text sm:text-3xl">
-              Ready to see the difference?
-            </h2>
-            <p className="mt-4 text-va-text2">
-              Create your free account and build your first model in minutes.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link
-                href="/signup"
-                className="inline-flex items-center rounded-va-sm bg-va-blue px-6 py-3 text-base font-medium text-white hover:bg-va-blue/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight shadow-va-glow-blue"
-              >
-                Get started free
-              </Link>
-              <Link
-                href="/"
-                className="inline-flex items-center rounded-va-sm border border-va-border bg-transparent px-6 py-3 text-base font-medium text-va-text hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight"
-              >
-                Back to home
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <PublicFooter />
+        </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }
