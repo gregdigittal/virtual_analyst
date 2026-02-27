@@ -137,7 +137,7 @@ export function VAFormDialog({
           <VAButton type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </VAButton>
-          <VAButton type="submit" variant="primary" disabled={loading}>
+          <VAButton type="submit" variant="primary" loading={loading}>
             {loading ? "Saving..." : submitLabel}
           </VAButton>
         </div>

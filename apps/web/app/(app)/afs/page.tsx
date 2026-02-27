@@ -15,7 +15,7 @@ import {
 } from "@/components/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const STATUS_OPTIONS = [
   { value: "setup", label: "Setup" },
@@ -70,6 +70,7 @@ export default function AFSPage() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [priorEngagementId, setPriorEngagementId] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   /* ------------------------------------------------------------------ */
   /*  Data loading                                                       */
@@ -113,11 +114,63 @@ export default function AFSPage() {
   }, [router]);
 
   /* ------------------------------------------------------------------ */
+  /*  Create dialog accessibility                                        */
+  /* ------------------------------------------------------------------ */
+  const createFormRef = useRef<HTMLFormElement>(null);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (showCreate) {
+      setFormErrors({});
+      prevFocusRef.current = document.activeElement as HTMLElement;
+      requestAnimationFrame(() => {
+        createFormRef.current?.querySelector<HTMLElement>("input")?.focus();
+      });
+    } else if (prevFocusRef.current) {
+      prevFocusRef.current.focus();
+      prevFocusRef.current = null;
+    }
+  }, [showCreate]);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowCreate(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [showCreate]);
+
+  const handleCreateKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || !createFormRef.current) return;
+    const focusable = createFormRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
+
+  /* ------------------------------------------------------------------ */
   /*  Create handler                                                     */
   /* ------------------------------------------------------------------ */
   async function handleCreate() {
-    if (!tenantId || !entityName || !frameworkId || !periodStart || !periodEnd)
-      return;
+    const errors: Record<string, string> = {};
+    if (!entityName.trim()) errors.entityName = "Entity name is required";
+    if (!frameworkId) errors.frameworkId = "Select an accounting framework";
+    if (!periodStart) errors.periodStart = "Start date is required";
+    if (!periodEnd) errors.periodEnd = "End date is required";
+    if (periodStart && periodEnd && periodStart >= periodEnd)
+      errors.periodEnd = "End date must be after start date";
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0 || !tenantId) return;
     setCreating(true);
     try {
       const eng = await api.afs.createEngagement(tenantId, {
@@ -134,6 +187,7 @@ export default function AFSPage() {
       setPeriodStart("");
       setPeriodEnd("");
       setPriorEngagementId("");
+      setFormErrors({});
       router.push(`/afs/${eng.engagement_id}/setup`);
     } catch (e) {
       toast.error(
@@ -311,44 +365,56 @@ export default function AFSPage() {
       {/*  Create engagement dialog                                        */}
       {/* ---------------------------------------------------------------- */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setShowCreate(false)}
+        >
           <form
+            ref={createFormRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="afs-create-title"
+            aria-describedby="afs-create-desc"
             onSubmit={(e) => {
               e.preventDefault();
               handleCreate();
             }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={handleCreateKeyDown}
             className="mx-4 w-full max-w-md rounded-va-lg border border-va-border bg-va-panel p-6 shadow-va-md"
           >
-            <h3 className="text-lg font-semibold text-va-text">
+            <h3 id="afs-create-title" className="text-lg font-semibold text-va-text">
               New AFS Engagement
             </h3>
-            <p className="mt-2 text-sm text-va-text2">
+            <p id="afs-create-desc" className="mt-2 text-sm text-va-text2">
               Create an engagement to start generating financial statements.
             </p>
 
             <div className="mt-4 space-y-3">
               {/* Entity name */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-va-text">
+                <label htmlFor="afs-entity" className="mb-1 block text-sm font-medium text-va-text">
                   Entity Name
                 </label>
                 <VAInput
+                  id="afs-entity"
                   value={entityName}
-                  onChange={(e) => setEntityName(e.target.value)}
+                  onChange={(e) => { setEntityName(e.target.value); setFormErrors((p) => ({ ...p, entityName: "" })); }}
                   placeholder="e.g. Acme Holdings (Pty) Ltd"
-                  required
+                  error={formErrors.entityName}
                 />
               </div>
 
               {/* Framework */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-va-text">
+                <label htmlFor="afs-framework" className="mb-1 block text-sm font-medium text-va-text">
                   Accounting Framework
                 </label>
                 <VASelect
+                  id="afs-framework"
                   value={frameworkId}
-                  onChange={(e) => setFrameworkId(e.target.value)}
-                  required
+                  onChange={(e) => { setFrameworkId(e.target.value); setFormErrors((p) => ({ ...p, frameworkId: "" })); }}
+                  error={formErrors.frameworkId}
                 >
                   <option value="">Select framework...</option>
                   {frameworks.map((fw) => (
@@ -361,27 +427,29 @@ export default function AFSPage() {
 
               {/* Period start */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-va-text">
+                <label htmlFor="afs-start" className="mb-1 block text-sm font-medium text-va-text">
                   Period Start
                 </label>
                 <VAInput
+                  id="afs-start"
                   type="date"
                   value={periodStart}
-                  onChange={(e) => setPeriodStart(e.target.value)}
-                  required
+                  onChange={(e) => { setPeriodStart(e.target.value); setFormErrors((p) => ({ ...p, periodStart: "" })); }}
+                  error={formErrors.periodStart}
                 />
               </div>
 
               {/* Period end */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-va-text">
+                <label htmlFor="afs-end" className="mb-1 block text-sm font-medium text-va-text">
                   Period End
                 </label>
                 <VAInput
+                  id="afs-end"
                   type="date"
                   value={periodEnd}
-                  onChange={(e) => setPeriodEnd(e.target.value)}
-                  required
+                  onChange={(e) => { setPeriodEnd(e.target.value); setFormErrors((p) => ({ ...p, periodEnd: "" })); }}
+                  error={formErrors.periodEnd}
                 />
               </div>
 
@@ -425,7 +493,7 @@ export default function AFSPage() {
               >
                 Cancel
               </VAButton>
-              <VAButton type="submit" variant="primary" disabled={creating}>
+              <VAButton type="submit" variant="primary" loading={creating}>
                 {creating ? "Creating..." : "Create Engagement"}
               </VAButton>
             </div>
