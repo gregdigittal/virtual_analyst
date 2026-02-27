@@ -2,7 +2,7 @@
 
 import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VAEmptyState, VAInput, VAListToolbar, VASpinner } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAErrorAlert, VAInput, VAListSkeleton, VAListToolbar } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,12 +27,15 @@ export default function OrgStructuresPage() {
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [newName, setNewName] = useState("");
   const [newCurrency, setNewCurrency] = useState("USD");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
+      setError(null);
       const ctx = await getAuthContext();
       if (!ctx) return;
       api.setAccessToken(ctx.accessToken);
@@ -50,7 +53,7 @@ export default function OrgStructuresPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryCount]);
 
   async function handleCreate() {
     if (!tenantId || !newName.trim()) return;
@@ -93,12 +96,11 @@ export default function OrgStructuresPage() {
         </VAButton>
       </div>
       {error && (
-        <div
-          className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
-          role="alert"
-        >
-          {error}
-        </div>
+        <VAErrorAlert
+          message={error}
+          onRetry={() => setRetryCount((c) => c + 1)}
+          className="mb-4"
+        />
       )}
       {showCreate && (
         <VACard className="mb-6 p-4">
@@ -164,7 +166,7 @@ export default function OrgStructuresPage() {
         </VACard>
       )}
       {loading ? (
-        <VASpinner label="Loading..." />
+        <VAListSkeleton count={4} />
       ) : items.length === 0 ? (
         <VAEmptyState
           icon="users"

@@ -2,7 +2,7 @@
 
 import { api, type BudgetSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VASpinner, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
+import { VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -100,7 +100,7 @@ export default function BudgetsPage() {
         </div>
       )}
       {loading ? (
-        <VASpinner label="Loading budgets…" />
+        <VAListSkeleton count={4} />
       ) : items.length === 0 ? (
         <VAEmptyState
           icon="dollar"

@@ -2,7 +2,7 @@
 
 import { api, type BoardPackSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VASpinner, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
+import { VACard, VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -87,7 +87,7 @@ export default function BoardPacksPage() {
         </div>
       )}
       {loading ? (
-        <VASpinner label="Loading board packs…" />
+        <VAListSkeleton count={4} />
       ) : items.length === 0 ? (
         <VAEmptyState
           icon="briefcase"

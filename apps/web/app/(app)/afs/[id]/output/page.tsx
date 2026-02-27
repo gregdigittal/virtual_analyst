@@ -15,6 +15,7 @@ import {
   VABadge,
   VASpinner,
   VAEmptyState,
+  VABreadcrumb,
   useToast,
 } from "@/components/ui";
 
@@ -239,15 +240,13 @@ export default function AFSOutputPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-va-border px-6 py-3">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push(`/afs/${engagementId}/sections`)}
-            className="text-va-text2 hover:text-va-text"
-          >
-            &larr;
-          </button>
-          <h1 className="text-lg font-semibold text-va-text">
-            {engagement?.entity_name} — Output
-          </h1>
+          <VABreadcrumb
+            items={[
+              { label: "AFS", href: "/afs" },
+              { label: engagement?.entity_name ?? "\u2026", href: `/afs/${engagementId}/setup` },
+              { label: "Output" },
+            ]}
+          />
         </div>
         <div className="flex gap-2">
           <VAButton

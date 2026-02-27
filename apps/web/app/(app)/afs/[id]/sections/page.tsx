@@ -16,6 +16,7 @@ import {
   VABadge,
   VASpinner,
   VAEmptyState,
+  VABreadcrumb,
   useToast,
 } from "@/components/ui";
 
@@ -40,6 +41,7 @@ export default function SectionEditorPage() {
   const [drafting, setDrafting] = useState(false);
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<AFSValidationResult | null>(null);
+  const [mobileShowContent, setMobileShowContent] = useState(false);
 
   // New section form
   const [showNewForm, setShowNewForm] = useState(false);
@@ -173,36 +175,33 @@ export default function SectionEditorPage() {
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-va-border px-6 py-3">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push(`/afs/${engagementId}/setup`)} className="text-va-text2 hover:text-va-text">
-            &larr;
-          </button>
-          <h1 className="text-lg font-semibold text-va-text">
-            {engagement?.entity_name} — Section Editor
-          </h1>
-        </div>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-2 border-b border-va-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <VABreadcrumb items={[
+          { label: "AFS", href: "/afs" },
+          { label: engagement?.entity_name ?? "…", href: `/afs/${engagementId}/setup` },
+          { label: "Sections" },
+        ]} />
+        <div className="flex flex-wrap gap-2">
           <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/tax`)}>
             Tax
           </VAButton>
           <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/review`)}>
             Review
           </VAButton>
-          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/consolidation`)}>
+          <VAButton variant="secondary" className="hidden sm:inline-flex" onClick={() => router.push(`/afs/${engagementId}/consolidation`)}>
             Consolidation
           </VAButton>
-          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/output`)}>
+          <VAButton variant="secondary" className="hidden sm:inline-flex" onClick={() => router.push(`/afs/${engagementId}/output`)}>
             Output
           </VAButton>
-          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/analytics`)}>
+          <VAButton variant="secondary" className="hidden sm:inline-flex" onClick={() => router.push(`/afs/${engagementId}/analytics`)}>
             Analytics
           </VAButton>
           <VAButton variant="secondary" onClick={handleValidate} disabled={validating || sections.length === 0}>
-            {validating ? "Validating..." : "Validate Disclosures"}
+            {validating ? "Validating..." : "Validate"}
           </VAButton>
           <VAButton variant="primary" onClick={() => setShowNewForm(true)}>
-            + New Section
+            + New
           </VAButton>
         </div>
       </div>
@@ -210,21 +209,21 @@ export default function SectionEditorPage() {
       {/* Split panel */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Section list */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-va-border bg-va-surface p-4">
+        <div className={`w-full flex-shrink-0 overflow-y-auto border-r border-va-border bg-va-surface p-4 md:w-80 ${mobileShowContent ? "hidden md:block" : ""}`}>
           {sections.length === 0 ? (
             <VAEmptyState
               icon="file-text"
               title="No sections yet"
               description="Draft your first section using AI"
               actionLabel="New Section"
-              onAction={() => setShowNewForm(true)}
+              onAction={() => { setShowNewForm(true); setMobileShowContent(true); }}
             />
           ) : (
             <div className="space-y-2">
               {sections.map((s) => (
                 <button
                   key={s.section_id}
-                  onClick={() => { setSelectedId(s.section_id); setFeedbackText(""); }}
+                  onClick={() => { setSelectedId(s.section_id); setFeedbackText(""); setMobileShowContent(true); }}
                   className={`w-full rounded-va-sm border p-3 text-left transition-colors ${
                     selectedId === s.section_id
                       ? "border-va-blue bg-va-blue/10"
@@ -252,7 +251,16 @@ export default function SectionEditorPage() {
         </div>
 
         {/* Right: Content + feedback */}
-        <div className="flex flex-1 flex-col overflow-y-auto p-6">
+        <div className={`flex flex-1 flex-col overflow-y-auto p-4 sm:p-6 ${!mobileShowContent ? "hidden md:flex" : ""}`}>
+          {/* Mobile back button */}
+          {mobileShowContent && (
+            <button
+              onClick={() => setMobileShowContent(false)}
+              className="mb-3 inline-flex items-center gap-1 text-sm text-va-text2 hover:text-va-text md:hidden"
+            >
+              &larr; Back to sections
+            </button>
+          )}
           {showNewForm ? (
             <VACard className="mx-auto max-w-2xl p-6">
               <h2 className="text-lg font-semibold text-va-text">Draft New Section</h2>

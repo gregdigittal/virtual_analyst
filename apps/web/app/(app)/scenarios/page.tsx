@@ -2,7 +2,7 @@
 
 import { api, type BaselineSummary, type ScenarioItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VACard, VAInput, VASelect, VASpinner, VAPagination, useToast, VAEmptyState, VAListToolbar } from "@/components/ui";
+import { VAButton, VACard, VAInput, VASelect, VAListSkeleton, VAPagination, useToast, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -178,7 +178,7 @@ export default function ScenariosPage() {
         </div>
       )}
       {loading ? (
-        <VASpinner label="Loading scenarios…" />
+        <VAListSkeleton count={4} />
       ) : (
         <div className="space-y-8">
           <section>

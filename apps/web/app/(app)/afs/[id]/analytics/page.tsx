@@ -11,6 +11,7 @@ import {
   VASpinner,
   VASelect,
   VAEmptyState,
+  VABreadcrumb,
   useToast,
 } from "@/components/ui";
 
@@ -233,15 +234,13 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <button
-            onClick={() => router.push(`/afs/${engagementId}/sections`)}
-            className="text-sm text-va-blue hover:underline mb-1"
-          >
-            &larr; Back to Sections
-          </button>
-          <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
-            {entityName} &mdash; Analytics
-          </h1>
+          <VABreadcrumb
+            items={[
+              { label: "AFS", href: "/afs" },
+              { label: entityName || "\u2026", href: `/afs/${engagementId}/setup` },
+              { label: "Analytics" },
+            ]}
+          />
         </div>
         <div className="flex gap-2">
           <VAButton

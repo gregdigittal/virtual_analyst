@@ -1,6 +1,6 @@
 "use client";
 
-import { VAButton, VACard, VAEmptyState, VAInput, VAListToolbar, VASpinner, VAPagination, useToast } from "@/components/ui";
+import { VAButton, VACard, VAEmptyState, VAErrorAlert, VAInput, VAListSkeleton, VAListToolbar, VAPagination, useToast } from "@/components/ui";
 import { api, type MarketplaceTemplate } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { useCallback, useEffect, useState } from "react";
@@ -19,6 +19,7 @@ export default function MarketplacePage() {
   const [forms, setForms] = useState<Record<string, { label: string; fiscal_year: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -41,7 +42,7 @@ export default function MarketplacePage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, filters, page]);
+  }, [tenantId, filters, page, retryCount]);
 
   useEffect(() => {
     (async () => {
@@ -97,12 +98,11 @@ export default function MarketplacePage() {
       </div>
 
       {error && (
-        <div
-          className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
-          role="alert"
-        >
-          {error}
-        </div>
+        <VAErrorAlert
+          message={error}
+          onRetry={() => setRetryCount((c) => c + 1)}
+          className="mb-4"
+        />
       )}
 
       <VAListToolbar
@@ -136,7 +136,7 @@ export default function MarketplacePage() {
       />
 
       {loading ? (
-        <VASpinner label="Loading marketplace..." />
+        <VAListSkeleton count={4} />
       ) : templates.length === 0 ? (
         <VAEmptyState
           icon="store"

@@ -2,7 +2,7 @@
 
 import { api, type BaselineSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VASpinner, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
+import { VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar, VAErrorAlert } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -23,6 +23,7 @@ export default function RunsPage() {
   const [baselineFilter, setBaselineFilter] = useState("");
   const [search, setSearch] = useState("");
   const [baselines, setBaselines] = useState<BaselineSummary[]>([]);
+  const [retryCount, setRetryCount] = useState(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -42,7 +43,7 @@ export default function RunsPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, page, statusFilter, baselineFilter]);
+  }, [tenantId, page, statusFilter, baselineFilter, retryCount]);
 
   useEffect(() => {
     (async () => {
@@ -129,15 +130,14 @@ export default function RunsPage() {
       />
 
       {error && (
-        <div
-          className="mb-4 rounded-va-xs border border-va-danger/50 bg-va-danger/10 px-3 py-2 text-sm text-va-danger"
-          role="alert"
-        >
-          {error}
-        </div>
+        <VAErrorAlert
+          message={error}
+          onRetry={() => setRetryCount((c) => c + 1)}
+          className="mb-4"
+        />
       )}
       {loading ? (
-        <VASpinner label="Loading runs…" />
+        <VAListSkeleton count={4} />
       ) : items.length === 0 ? (
         <VAEmptyState
           icon="play"

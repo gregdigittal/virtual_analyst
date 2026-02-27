@@ -17,6 +17,7 @@ import {
   VAInput,
   VASelect,
   VASpinner,
+  VABreadcrumb,
   useToast,
 } from "@/components/ui";
 import { useParams, useRouter } from "next/navigation";
@@ -163,6 +164,14 @@ export default function AFSSetupPage() {
   /* ------------------------------------------------------------------ */
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
+      <VABreadcrumb
+        items={[
+          { label: "AFS", href: "/afs" },
+          { label: engagement.entity_name ?? "\u2026" },
+          { label: "Setup" },
+        ]}
+      />
+
       {/* Page heading */}
       <div className="mb-6">
         <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">

@@ -2,7 +2,7 @@
 
 import { api, type DraftSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAButton, VASpinner, StatePill, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
+import { VAButton, VAListSkeleton, StatePill, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -151,7 +151,7 @@ export default function DraftsPage() {
         </div>
       )}
       {loading ? (
-        <VASpinner label="Loading drafts…" />
+        <VAListSkeleton count={4} />
       ) : items.length === 0 ? (
         <VAEmptyState
           icon="edit"

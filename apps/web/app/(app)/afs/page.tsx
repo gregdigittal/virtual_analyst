@@ -10,7 +10,8 @@ import {
   VAInput,
   VAListToolbar,
   VASelect,
-  VASpinner,
+  VAListSkeleton,
+  VAErrorAlert,
   useToast,
 } from "@/components/ui";
 import Link from "next/link";
@@ -59,6 +60,7 @@ export default function AFSPage() {
   // Search & filter
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
 
   // Create dialog
   const [showCreate, setShowCreate] = useState(false);
@@ -77,6 +79,8 @@ export default function AFSPage() {
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     (async () => {
       const ctx = await getAuthContext();
       if (!ctx) {
@@ -111,7 +115,7 @@ export default function AFSPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, retryCount]);
 
   /* ------------------------------------------------------------------ */
   /*  Create dialog accessibility                                        */
@@ -247,16 +251,16 @@ export default function AFSPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-20">
-          <VASpinner />
-        </div>
+        <VAListSkeleton count={3} />
       )}
 
       {/* Error */}
       {!loading && error && (
-        <VACard className="p-6">
-          <p className="text-sm text-va-danger">{error}</p>
-        </VACard>
+        <VAErrorAlert
+          message={error}
+          onRetry={() => setRetryCount((c) => c + 1)}
+          className="mb-4"
+        />
       )}
 
       {/* Loaded content */}
