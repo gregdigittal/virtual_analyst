@@ -69,6 +69,7 @@ export default function AFSPage() {
   const [frameworkId, setFrameworkId] = useState("");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+  const [priorEngagementId, setPriorEngagementId] = useState("");
 
   /* ------------------------------------------------------------------ */
   /*  Data loading                                                       */
@@ -124,6 +125,7 @@ export default function AFSPage() {
         framework_id: frameworkId,
         period_start: periodStart,
         period_end: periodEnd,
+        prior_engagement_id: priorEngagementId || undefined,
       });
       toast.success("Engagement created");
       setShowCreate(false);
@@ -131,6 +133,7 @@ export default function AFSPage() {
       setFrameworkId("");
       setPeriodStart("");
       setPeriodEnd("");
+      setPriorEngagementId("");
       router.push(`/afs/${eng.engagement_id}/setup`);
     } catch (e) {
       toast.error(
@@ -268,9 +271,14 @@ export default function AFSPage() {
                           <h3 className="text-sm font-semibold text-va-text line-clamp-2">
                             {eng.entity_name}
                           </h3>
-                          <VABadge variant={statusBadgeVariant(eng.status)}>
-                            {eng.status}
-                          </VABadge>
+                          <div className="flex items-center gap-1">
+                            {eng.prior_engagement_id && (
+                              <VABadge variant="violet">Linked</VABadge>
+                            )}
+                            <VABadge variant={statusBadgeVariant(eng.status)}>
+                              {eng.status}
+                            </VABadge>
+                          </div>
                         </div>
                         <p className="mt-2 text-xs text-va-text2">
                           {frameworkName(eng.framework_id)}
@@ -375,6 +383,37 @@ export default function AFSPage() {
                   onChange={(e) => setPeriodEnd(e.target.value)}
                   required
                 />
+              </div>
+
+              {/* Prior engagement (optional) */}
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-va-text">
+                  Prior Engagement (optional)
+                </label>
+                <VASelect
+                  value={priorEngagementId}
+                  onChange={(e) => setPriorEngagementId(e.target.value)}
+                >
+                  <option value="">None (fresh engagement)</option>
+                  {engagements
+                    .filter(
+                      (e) =>
+                        e.status === "approved" || e.status === "published",
+                    )
+                    .map((e) => (
+                      <option
+                        key={e.engagement_id}
+                        value={e.engagement_id}
+                      >
+                        {e.entity_name} ({e.period_start} &ndash;{" "}
+                        {e.period_end})
+                      </option>
+                    ))}
+                </VASelect>
+                <p className="mt-1 text-xs text-va-muted">
+                  Link to a prior period to enable roll-forward of sections
+                  and comparatives.
+                </p>
               </div>
             </div>
 

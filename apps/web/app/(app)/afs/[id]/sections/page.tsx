@@ -233,9 +233,14 @@ export default function SectionEditorPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-va-text">{s.title}</span>
-                    <VABadge variant={s.status === "locked" ? "success" : s.status === "reviewed" ? "violet" : "default"}>
-                      {s.status}
-                    </VABadge>
+                    <div className="flex items-center gap-1">
+                      {s.rolled_forward_from && (
+                        <VABadge variant="violet">Carried Forward</VABadge>
+                      )}
+                      <VABadge variant={s.status === "locked" ? "success" : s.status === "reviewed" ? "violet" : "default"}>
+                        {s.status}
+                      </VABadge>
+                    </div>
                   </div>
                   <span className="mt-1 block text-xs text-va-text2">
                     {s.section_type} · v{s.version}
