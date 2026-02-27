@@ -323,6 +323,12 @@ export default function ConsolidationPage() {
           >
             Output
           </VAButton>
+          <VAButton
+            variant="secondary"
+            onClick={() => router.push(`/afs/${engagementId}/analytics`)}
+          >
+            Analytics
+          </VAButton>
         </div>
       </div>
 

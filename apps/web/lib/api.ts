@@ -1514,6 +1514,18 @@ export const api = {
       request<{ items: AFSOutput[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/outputs`, { tenantId }),
     downloadOutput: (tenantId: string, engagementId: string, outputId: string) =>
       request<Blob>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/outputs/${encodeURIComponent(outputId)}/download`, { tenantId }),
+
+    // Analytics
+    computeAnalytics: (tenantId: string, engagementId: string, body: { industry_segment?: string }) =>
+      request<AFSAnalytics>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/analytics/compute`, { tenantId, method: "POST", body }),
+    getAnalytics: (tenantId: string, engagementId: string) =>
+      request<AFSAnalytics>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/analytics`, { tenantId }),
+    getAnalyticsRatios: (tenantId: string, engagementId: string) =>
+      request<Record<string, number | null>>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/analytics/ratios`, { tenantId }),
+    getAnalyticsAnomalies: (tenantId: string, engagementId: string) =>
+      request<{ anomalies: { ratio_key: string; severity: string; description: string; disclosure_impact: string }[] }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/analytics/anomalies`, { tenantId }),
+    getGoingConcern: (tenantId: string, engagementId: string) =>
+      request<{ risk_level: string; factors: { factor: string; indicator: string; detail: string }[]; recommendation: string; disclosure_required: boolean }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/analytics/going-concern`, { tenantId }),
   },
 };
 
@@ -2144,4 +2156,45 @@ export interface AFSOutput {
   error_message: string | null;
   generated_by: string | null;
   generated_at: string;
+}
+
+export interface AFSAnalytics {
+  analytics_id: string;
+  engagement_id: string;
+  computed_at: string;
+  ratios_json: Record<string, number | null>;
+  benchmark_comparison_json: Record<string, {
+    value: number;
+    p25: number;
+    median: number;
+    p75: number;
+    position: string;
+  }>;
+  anomalies_json: {
+    anomalies: {
+      ratio_key: string;
+      severity: string;
+      description: string;
+      disclosure_impact: string;
+    }[];
+  };
+  commentary_json: {
+    key_highlights: string[];
+    risk_factors: string[];
+    outlook_points: string[];
+  } | null;
+  going_concern_json: {
+    risk_level: string;
+    factors: {
+      factor: string;
+      indicator: string;
+      detail: string;
+    }[];
+    recommendation: string;
+    disclosure_required: boolean;
+  } | null;
+  industry_segment: string | null;
+  status: string;
+  error_message: string | null;
+  computed_by: string | null;
 }

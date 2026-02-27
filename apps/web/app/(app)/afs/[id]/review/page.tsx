@@ -298,6 +298,9 @@ export default function ReviewWorkflowPage() {
           <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/output`)}>
             Output
           </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/analytics`)}>
+            Analytics
+          </VAButton>
           <VAButton
             variant="primary"
             onClick={handleSubmitReview}

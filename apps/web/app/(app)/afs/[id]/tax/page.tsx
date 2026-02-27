@@ -201,6 +201,9 @@ export default function TaxComputationPage() {
           <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/output`)}>
             Output
           </VAButton>
+          <VAButton variant="secondary" onClick={() => router.push(`/afs/${engagementId}/analytics`)}>
+            Analytics
+          </VAButton>
         </div>
       </div>
 

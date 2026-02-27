@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import re
@@ -17,8 +18,23 @@ from apps.api.app.services.afs.tb_parser import parse_excel_tb, parse_csv_tb, tb
 from apps.api.app.services.afs.pdf_extractor import extract_pdf, sections_to_json
 from apps.api.app.services.afs.disclosure_drafter import draft_section, validate_sections
 from apps.api.app.services.afs.output_generator import generate_pdf_html, generate_docx, generate_ixbrl
+from apps.api.app.services.afs.ratio_calculator import compute_from_tb
+from apps.api.app.services.afs.analytics_ai import detect_anomalies, generate_commentary, assess_going_concern
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.storage import ArtifactStore
+from pathlib import Path
+
+_BENCHMARKS_PATH = Path(__file__).resolve().parent.parent / "data" / "industry_benchmarks.json"
+_BENCHMARKS_CACHE: dict | None = None
+
+
+def _load_benchmarks() -> dict:
+    global _BENCHMARKS_CACHE
+    if _BENCHMARKS_CACHE is None:
+        with open(_BENCHMARKS_PATH) as f:
+            _BENCHMARKS_CACHE = json.load(f)
+    return _BENCHMARKS_CACHE
+
 
 router = APIRouter(prefix="/afs", tags=["afs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
