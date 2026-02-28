@@ -103,8 +103,8 @@ export const SEEDED_IDS = {
   workflowTemplateId: '${WF_TEMPLATE_ID}',
 };
 
-export const BASE_URL = 'http://localhost:3000';
-export const API_URL = 'http://localhost:8000/api/v1';
+export const BASE_URL = '${BASE_URL:-http://localhost:3000}';
+export const API_URL = '${API_URL:-http://localhost:8000/api/v1}';
 EOF
 
 echo ""

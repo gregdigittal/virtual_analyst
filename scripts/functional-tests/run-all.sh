@@ -2,16 +2,23 @@
 # run-all.sh — Master runner for TDD Red-Green functional test suite
 #
 # Usage:
-#   ./scripts/functional-tests/run-all.sh              # Run all 6 phases
+#   ./scripts/functional-tests/run-all.sh              # Run all 6 phases (localhost)
 #   ./scripts/functional-tests/run-all.sh --phase 3    # Run only phase 3
 #   ./scripts/functional-tests/run-all.sh --no-seed    # Skip seeding (data already exists)
 #   ./scripts/functional-tests/run-all.sh --no-cleanup  # Skip cleanup (keep test data)
 #
+# Environment variables:
+#   BASE_URL  — Frontend URL (default: http://localhost:3000)
+#   API_URL   — API URL      (default: http://localhost:8000/api/v1)
+#
+# Production example:
+#   BASE_URL=https://www.virtual-analyst.ai API_URL=https://virtual-analyst-api.onrender.com/api/v1 \
+#     ./scripts/functional-tests/run-all.sh --no-seed --no-cleanup
+#
 # Prerequisites:
-#   - Dev server running at localhost:3000 (Next.js) and localhost:8000 (FastAPI)
+#   - Target servers reachable (localhost or production)
 #   - Claude Code CLI installed and authenticated
 #   - Node.js and npx available
-#   - Database with migrations applied
 #
 # TDD Philosophy:
 #   Each test encodes a claim from docs/user-manual/ (the specification).
@@ -57,14 +64,17 @@ if ! command -v claude &>/dev/null; then
 fi
 echo -e "  ${GREEN_CLR}✓ Claude Code CLI available${NC}"
 
-if ! curl -s http://localhost:3000 > /dev/null 2>&1; then
-    echo -e "${RED_CLR}✗ Web server not responding at localhost:3000${NC}"
+if ! curl -s "${BASE_URL}" > /dev/null 2>&1; then
+    echo -e "${RED_CLR}✗ Web server not responding at ${BASE_URL}${NC}"
     exit 1
 fi
-echo -e "  ${GREEN_CLR}✓ Web server running at localhost:3000${NC}"
+echo -e "  ${GREEN_CLR}✓ Web server reachable at ${BASE_URL}${NC}"
 
-if ! curl -s http://localhost:8000/docs > /dev/null 2>&1; then
-    echo -e "${YELLOW_CLR}⚠ API server may not be running at localhost:8000 (non-critical for UI tests)${NC}"
+API_CHECK_URL="${API_URL%/api/v1}/docs"
+if ! curl -s "${API_CHECK_URL}" > /dev/null 2>&1; then
+    echo -e "${YELLOW_CLR}⚠ API server may not be reachable at ${API_URL} (non-critical for UI tests)${NC}"
+else
+    echo -e "  ${GREEN_CLR}✓ API server reachable${NC}"
 fi
 
 # Ensure Playwright is ready

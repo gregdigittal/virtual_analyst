@@ -18,6 +18,10 @@ if [ -z "${_TEST_HELPERS_LOADED:-}" ]; then
     declare -a RESULTS=()
 fi
 
+# Configurable URLs (override via env vars for production)
+BASE_URL="${BASE_URL:-http://localhost:3000}"
+API_URL="${API_URL:-http://localhost:8000/api/v1}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
@@ -46,7 +50,7 @@ run_tdd_test() {
 ${spec}
 
 TEST CONSTRAINTS:
-- Base URL: http://localhost:3000
+- Base URL: ${BASE_URL}
 - Test user email: functional-test@va.dev
 - Test user password: TestPass123!
 - Write the test in TypeScript using @playwright/test
