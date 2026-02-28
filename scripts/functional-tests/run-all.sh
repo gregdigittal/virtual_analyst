@@ -115,11 +115,11 @@ run_phase 6
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
-MINUTES=$((DURATION / 60))
-SECONDS=$((DURATION % 60))
+MINS=$((DURATION / 60))
+SECS=$((DURATION % 60))
 
 echo ""
-echo -e "${CYAN_CLR}Total execution time: ${MINUTES}m ${SECONDS}s${NC}"
+echo -e "${CYAN_CLR}Total execution time: ${MINS}m ${SECS}s${NC}"
 
 # Cleanup
 if $CLEANUP; then

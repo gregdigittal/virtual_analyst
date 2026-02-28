@@ -8,10 +8,15 @@ CYAN_CLR='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-PASS_COUNT=0
-FAIL_COUNT=0
-SKIP_COUNT=0
-declare -a RESULTS=()
+# Include guard: prevent counter reset when re-sourced by phase scripts
+# inside run-all.sh orchestration
+if [ -z "${_TEST_HELPERS_LOADED:-}" ]; then
+    _TEST_HELPERS_LOADED=1
+    PASS_COUNT=0
+    FAIL_COUNT=0
+    SKIP_COUNT=0
+    declare -a RESULTS=()
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
