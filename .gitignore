@@ -46,6 +46,7 @@ htmlcov/
 playwright-report/
 test-results/
 blob-report/
+scripts/functional-tests/results/*.log
 
 # Secrets
 *.pem
