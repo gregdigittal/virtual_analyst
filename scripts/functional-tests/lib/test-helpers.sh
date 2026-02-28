@@ -68,7 +68,10 @@ TEST CONSTRAINTS:
 
     local output
     # Unset CLAUDECODE to allow nested claude -p invocations
-    output=$(cd "$PROJECT_DIR" && env -u CLAUDECODE claude -p "$prompt" 2>&1) || true
+    # Use --allowedTools to auto-approve Bash and file operations needed for Playwright
+    output=$(cd "$PROJECT_DIR" && env -u CLAUDECODE claude -p "$prompt" \
+        --allowedTools "Bash(npx:*) Bash(cd:*) Bash(cat:*) Bash(mkdir:*) Write Read Edit Glob Grep" \
+        2>&1) || true
 
     # Save full output
     echo "$output" > "$SCRIPT_DIR/results/${test_name}.log"
