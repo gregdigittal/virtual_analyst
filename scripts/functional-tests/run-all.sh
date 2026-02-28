@@ -108,8 +108,8 @@ run_phase() {
     if [[ -n "$PHASE_FILTER" && "$PHASE_FILTER" != "$phase_num" ]]; then
         return
     fi
-    local phase_script="$SCRIPT_DIR/phase-${phase_num}-"*.sh
-    for script in $phase_script; do
+    # Glob directly in for-loop to handle spaces in path correctly
+    for script in "$SCRIPT_DIR"/phase-"${phase_num}"-*.sh; do
         if [[ -f "$script" ]]; then
             source "$script"
         fi
