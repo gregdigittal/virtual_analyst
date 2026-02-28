@@ -67,7 +67,8 @@ TEST CONSTRAINTS:
   RESULT: RED — ${test_name} — FAIL — <one-line reason>"
 
     local output
-    output=$(cd "$PROJECT_DIR" && claude -p "$prompt" 2>&1) || true
+    # Unset CLAUDECODE to allow nested claude -p invocations
+    output=$(cd "$PROJECT_DIR" && env -u CLAUDECODE claude -p "$prompt" 2>&1) || true
 
     # Save full output
     echo "$output" > "$SCRIPT_DIR/results/${test_name}.log"
