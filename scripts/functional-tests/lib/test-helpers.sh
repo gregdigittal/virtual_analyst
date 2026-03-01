@@ -58,13 +58,14 @@ TEST CONSTRAINTS:
 - Use page.waitForSelector() or expect(locator).toBeVisible() for async content
 - Assert on visible UI text and elements, not CSS classes or implementation details
 - Each test must be independently runnable (login fresh if needed)
-- Do not modify application source code
+- CRITICAL: Do NOT modify any application source code, .env files, configs, or any file outside apps/web/e2e/functional/
 - If you need seeded data IDs, import from apps/web/e2e/functional/fixtures/test-constants.ts
 - Run with: cd apps/web && npx playwright test e2e/functional/${test_name}.spec.ts --project=chromium
-- Report the result on the LAST LINE in this EXACT format:
+- After running, report the result on the LAST LINE in this EXACT format:
   RESULT: GREEN — ${test_name} — PASS
   or
-  RESULT: RED — ${test_name} — FAIL — <one-line reason>"
+  RESULT: RED — ${test_name} — FAIL — <one-line reason>
+- The LAST LINE of your output MUST be a RESULT: line. Nothing else."
 
     local output
     # Unset CLAUDECODE to allow nested claude -p invocations
