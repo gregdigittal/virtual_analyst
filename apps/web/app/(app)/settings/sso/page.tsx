@@ -18,6 +18,7 @@ export default function SsoSettingsPage() {
     attribute_mapping: "{}",
   });
   const [saving, setSaving] = useState(false);
+  const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +29,7 @@ export default function SsoSettingsPage() {
     try {
       const res = await api.sso.getConfig(tenantId);
       setConfig(res);
+      setEnabled(res.enabled ?? res.configured ?? false);
       if (res.configured) {
         setForm((prev) => ({
           ...prev,
@@ -64,6 +66,7 @@ export default function SsoSettingsPage() {
     try {
       const mapping = JSON.parse(form.attribute_mapping || "{}");
       await api.sso.updateConfig(tenantId, {
+        enabled,
         idp_metadata_url: form.idp_metadata_url || null,
         idp_metadata_xml: form.idp_metadata_xml || null,
         entity_id: form.entity_id,
@@ -109,6 +112,27 @@ export default function SsoSettingsPage() {
             <span className={config?.configured ? "text-va-success" : "text-va-warning"}>
               {config?.configured ? "Configured" : "Not configured"}
             </span>
+          </div>
+          <div className="mb-4 flex items-center gap-3">
+            <label htmlFor="sso-toggle" className="text-sm font-medium text-va-text">
+              Enable SSO
+            </label>
+            <button
+              id="sso-toggle"
+              role="switch"
+              aria-checked={enabled}
+              aria-label="Enable SSO"
+              onClick={() => setEnabled((prev) => !prev)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight ${
+                enabled ? "bg-va-blue" : "bg-va-border"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                  enabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
           </div>
           <div className="grid gap-3">
             <div>
