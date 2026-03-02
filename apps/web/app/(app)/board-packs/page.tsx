@@ -2,7 +2,7 @@
 
 import { api, type BoardPackSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VACard, VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
+import { VAButton, VACard, VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -61,13 +61,18 @@ export default function BoardPacksPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6">
-        <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
-          Board packs
-        </h1>
-        <p className="mt-1 text-sm text-va-text2">
-          Create and generate board packs; export as PDF, PPTX, or HTML.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
+            Board packs
+          </h1>
+          <p className="mt-1 text-sm text-va-text2">
+            Create and generate board packs; export as PDF, PPTX, or HTML.
+          </p>
+        </div>
+        <Link href="/runs">
+          <VAButton aria-label="Create board pack">Create Board Pack</VAButton>
+        </Link>
       </div>
 
       {!loading && !hasBaselines && (
