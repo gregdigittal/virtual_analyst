@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 API_URL="${API_URL:-http://localhost:8000/api/v1}"
+TENANT_ID="${TENANT_ID:-test-tenant-001}"
 FIXTURES_FILE="$PROJECT_DIR/apps/web/e2e/functional/fixtures/test-constants.ts"
 
 echo "Seeding test data via ${API_URL}..."
@@ -31,7 +32,7 @@ api() {
     shift 2
     curl -s -X "$method" "${API_URL}${path}" \
         -H "Content-Type: application/json" \
-        -H "X-Tenant-ID: test-tenant-001" \
+        -H "X-Tenant-ID: ${TENANT_ID}" \
         -H "$AUTH_HEADER" \
         "$@"
 }
@@ -92,7 +93,7 @@ export const TEST_USER = {
 };
 
 export const SEEDED_IDS = {
-  tenantId: 'test-tenant-001',
+  tenantId: '${TENANT_ID}',
   baselineId: '${BASELINE_ID}',
   draftId: '${DRAFT_ID}',
   runId: '${RUN_ID}',
