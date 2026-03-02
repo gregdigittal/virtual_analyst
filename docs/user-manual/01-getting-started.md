@@ -19,7 +19,7 @@ flowchart LR
     C -->|Email| D[Verify Email]
     C -->|OAuth| E[Log In Automatically]
     D --> F[Log In]
-    E --> G[Dashboard]
+    E --> G[Baselines]
     F --> G
     G --> H[Choose Onboarding Path]
     H --> I[Create First Baseline]
