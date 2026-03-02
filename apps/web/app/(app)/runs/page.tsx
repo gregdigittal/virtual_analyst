@@ -2,7 +2,7 @@
 
 import { api, type BaselineSummary, type RunSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar, VAErrorAlert } from "@/components/ui";
+import { VAButton, VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar, VAErrorAlert } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -76,13 +76,20 @@ export default function RunsPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6">
-        <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
-          Runs
-        </h1>
-        <p className="mt-1 text-sm text-va-text2">
-          View run results, statements, and KPIs.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
+            Runs
+          </h1>
+          <p className="mt-1 text-sm text-va-text2">
+            View run results, statements, and KPIs.
+          </p>
+        </div>
+        {baselines.length > 0 && (
+          <Link href="/baselines">
+            <VAButton aria-label="New run">New Run</VAButton>
+          </Link>
+        )}
       </div>
 
       {!loading && baselines.length === 0 && (
