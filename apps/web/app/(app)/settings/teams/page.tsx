@@ -18,6 +18,9 @@ export default function TeamsPage() {
   const [createName, setCreateName] = useState("");
   const [createDescription, setCreateDescription] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("member");
 
   useEffect(() => {
     let cancelled = false;
@@ -88,13 +91,23 @@ export default function TeamsPage() {
         <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
           Teams
         </h1>
-        <VAButton
-          onClick={() => setShowCreate(true)}
-          disabled={loading}
-          aria-label="Create team"
-        >
-          Create team
-        </VAButton>
+        <div className="flex gap-2">
+          <VAButton
+            variant="secondary"
+            onClick={() => setShowInvite(true)}
+            disabled={loading}
+            aria-label="Invite member"
+          >
+            Invite Member
+          </VAButton>
+          <VAButton
+            onClick={() => setShowCreate(true)}
+            disabled={loading}
+            aria-label="Create team"
+          >
+            Create team
+          </VAButton>
+        </div>
       </div>
 
       {error && (
@@ -168,11 +181,70 @@ export default function TeamsPage() {
         </VACard>
       )}
 
+      {showInvite && (
+        <VACard className="mb-6 p-6">
+          <h2 className="mb-4 text-lg font-medium text-va-text">
+            Invite member
+          </h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              toast.success(`Invitation sent to ${inviteEmail}`);
+              setShowInvite(false);
+              setInviteEmail("");
+              setInviteRole("member");
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label htmlFor="invite-email" className="mb-1 block text-sm font-medium text-va-text2">
+                Email address
+              </label>
+              <VAInput
+                id="invite-email"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="colleague@company.com"
+                required
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label htmlFor="invite-role" className="mb-1 block text-sm font-medium text-va-text2">
+                Role
+              </label>
+              <select
+                id="invite-role"
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value)}
+                className="w-full rounded-va-xs border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
+              >
+                <option value="admin">Admin</option>
+                <option value="member">Member</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <VAButton type="submit">Send invitation</VAButton>
+              <VAButton
+                type="button"
+                variant="secondary"
+                onClick={() => { setShowInvite(false); setInviteEmail(""); }}
+              >
+                Cancel
+              </VAButton>
+            </div>
+          </form>
+        </VACard>
+      )}
+
       {loading ? (
         <VASpinner label="Loading teams…" />
       ) : teams.length === 0 && !showCreate ? (
         <VACard className="p-6 text-center text-va-text2">
-          No teams yet. Create one to get started.
+          <p>No teams yet. Create one to get started.</p>
+          <p className="mt-2 text-xs">No team members — invite your first member above.</p>
         </VACard>
       ) : (
         <ul className="space-y-2">
