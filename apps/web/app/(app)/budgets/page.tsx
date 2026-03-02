@@ -2,7 +2,7 @@
 
 import { api, type BudgetSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
-import { VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
+import { VAButton, VAListSkeleton, VAPagination, VAEmptyState, VAListToolbar } from "@/components/ui";
 import { SoftGateBanner } from "@/components/SoftGateBanner";
 import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -67,13 +67,18 @@ export default function BudgetsPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6">
-        <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
-          Budgets
-        </h1>
-        <p className="mt-1 text-sm text-va-text2">
-          List budgets with status; open for variance and reforecast.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="font-brand text-2xl font-semibold tracking-tight text-va-text">
+            Budgets
+          </h1>
+          <p className="mt-1 text-sm text-va-text2">
+            List budgets with status; open for variance and reforecast.
+          </p>
+        </div>
+        <Link href="/marketplace">
+          <VAButton aria-label="Create budget">Create Budget</VAButton>
+        </Link>
       </div>
 
       {!loading && !hasBaselines && (
