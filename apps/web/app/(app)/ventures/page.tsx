@@ -12,6 +12,7 @@ export default function VenturesPage() {
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [ventureId, setVentureId] = useState<string | null>(null);
   const [questionPlan, setQuestionPlan] = useState<Record<string, unknown>[]>([]);
+  const [templates, setTemplates] = useState<{ template_id: string; label: string }[]>([]);
   const [form, setForm] = useState({ template_id: "", entity_name: "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -24,6 +25,13 @@ export default function VenturesPage() {
       api.setAccessToken(ctx.accessToken);
       setTenantId(ctx.tenantId);
       setUserId(ctx.userId);
+        try {
+          const catalog = await api.ventures.templates(ctx.tenantId);
+          setTemplates(Array.isArray(catalog) ? catalog : []);
+          if (catalog.length > 0) {
+            setForm((prev) => ({ ...prev, template_id: catalog[0].template_id }));
+          }
+        } catch { /* templates fetch non-critical */ }
     })();
   }, [router]);
 
@@ -88,13 +96,19 @@ export default function VenturesPage() {
       <VACard className="p-5">
         <h2 className="text-lg font-medium text-va-text">New venture</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <VAInput
-            placeholder="Template ID"
+          <select
             value={form.template_id}
             onChange={(e) =>
               setForm((prev) => ({ ...prev, template_id: e.target.value }))
             }
-          />
+            className="rounded-va-xs border border-va-border bg-va-panel px-3 py-2 text-sm text-va-text focus:border-va-blue focus:outline-none focus:ring-1 focus:ring-va-blue"
+            aria-label="Template"
+          >
+            <option value="" disabled>Select a template…</option>
+            {templates.map((t) => (
+              <option key={t.template_id} value={t.template_id}>{t.label}</option>
+            ))}
+          </select>
           <VAInput
             placeholder="Entity name"
             value={form.entity_name}

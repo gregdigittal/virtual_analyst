@@ -101,6 +101,17 @@ def _deep_merge_assumptions(base: dict[str, Any], override: dict[str, Any]) -> d
     return out
 
 
+@router.get("/templates")
+async def list_templates():
+    """Return the list of available venture templates (id + label only)."""
+    from apps.api.app.data.catalog import load_catalog
+    catalog = load_catalog()
+    return [
+        {"template_id": t["template_id"], "label": t.get("label", t["template_id"])}
+        for t in catalog.get("templates", [])
+    ]
+
+
 @router.post("", status_code=201)
 async def create_venture(
     body: CreateVentureBody,

@@ -1324,6 +1324,11 @@ export const api = {
       request<void>(`/api/v1/excel/connections/${encodeURIComponent(connectionId)}`, { tenantId, method: "DELETE" }),
   },
   ventures: {
+    templates: (tenantId: string) =>
+      request<{ template_id: string; label: string }[]>(
+        "/api/v1/ventures/templates",
+        { tenantId }
+      ),
     create: (tenantId: string, body: { template_id: string; entity_name?: string }) =>
       request<{ venture_id: string; template_id: string; entity_name: string; question_plan: Record<string, unknown>[] }>(
         "/api/v1/ventures",
