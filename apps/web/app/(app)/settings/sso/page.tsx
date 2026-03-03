@@ -29,7 +29,7 @@ export default function SsoSettingsPage() {
     try {
       const res = await api.sso.getConfig(tenantId);
       setConfig(res);
-      setEnabled(res.enabled ?? res.configured ?? false);
+      setEnabled(Boolean(res.enabled ?? res.configured ?? false));
       if (res.configured) {
         setForm((prev) => ({
           ...prev,
@@ -66,7 +66,6 @@ export default function SsoSettingsPage() {
     try {
       const mapping = JSON.parse(form.attribute_mapping || "{}");
       await api.sso.updateConfig(tenantId, {
-        enabled,
         idp_metadata_url: form.idp_metadata_url || null,
         idp_metadata_xml: form.idp_metadata_xml || null,
         entity_id: form.entity_id,

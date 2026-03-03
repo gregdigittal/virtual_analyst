@@ -16,8 +16,8 @@ describe("SoftGateBanner wiring – Runs page", () => {
   });
 
   it("shows banner when baselines.list returns empty", async () => {
-    mockApi.baselines.list.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
-    mockApi.runs.list.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    mockApi.baselines.list.mockResolvedValue({ items: [], limit: 50, offset: 0 } as any);
+    mockApi.runs.list.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 } as any);
 
     render(<RunsPage />);
 
@@ -30,12 +30,11 @@ describe("SoftGateBanner wiring – Runs page", () => {
 
   it("hides banner when baselines exist", async () => {
     mockApi.baselines.list.mockResolvedValue({
-      items: [{ baseline_id: "b-1", baseline_version: 1 }],
-      total: 1,
+      items: [{ baseline_id: "b-1", baseline_version: "1", status: "active", is_active: true, created_at: null }],
       limit: 50,
       offset: 0,
-    });
-    mockApi.runs.list.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    } as any);
+    mockApi.runs.list.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 } as any);
 
     render(<RunsPage />);
 
