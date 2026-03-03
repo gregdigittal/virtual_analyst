@@ -45,6 +45,10 @@ async def auth_middleware(request: Request, call_next):
     """When SUPABASE_JWT_SECRET is set, require Authorization: Bearer and verify the JWT;
     set X-Tenant-ID / X-User-ID from the token. Invalid or missing token returns 401.
     """
+    # Allow CORS preflight requests through without auth so CORSMiddleware can handle them
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     path = request.url.path
     if _should_skip_auth(path):
         return await call_next(request)
