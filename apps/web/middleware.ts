@@ -43,7 +43,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirect);
   }
 
-  if ((request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup") && user) {
+  const publicAuthPages = ["/login", "/signup", "/forgot-password"];
+  if (publicAuthPages.includes(request.nextUrl.pathname) && user) {
     return NextResponse.redirect(new URL("/baselines", request.url));
   }
 
@@ -55,6 +56,8 @@ export const config = {
     "/",
     "/login",
     "/signup",
+    "/forgot-password",
+    "/reset-password",
     "/baselines/:path*",
     "/runs/:path*",
     "/dashboard/:path*",

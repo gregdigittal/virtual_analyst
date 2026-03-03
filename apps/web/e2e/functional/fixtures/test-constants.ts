@@ -1,7 +1,12 @@
-// test-constants.ts — Populated by seed-test-data.sh before test execution
+// test-constants.ts — Production E2E test user
+// For local dev seeding, run: scripts/functional-tests/seed-test-data.sh
+//
+// Override with environment variables for custom test users:
+//   E2E_USER_EMAIL=greg@disruptiveconsult.com E2E_USER_PASSWORD=xxx npx playwright test
+
 export const TEST_USER = {
-  email: 'functional-test@va.dev',
-  password: 'TestPass123!',
+  email: process.env.E2E_USER_EMAIL || 'greg@disruptiveconsult.com',
+  password: process.env.E2E_USER_PASSWORD || 'Test1234',
 };
 
 export const SEEDED_IDS = {
@@ -16,5 +21,5 @@ export const SEEDED_IDS = {
   workflowTemplateId: '',
 };
 
-export const BASE_URL = 'http://localhost:3000';
-export const API_URL = 'http://localhost:8000/api/v1';
+export const BASE_URL = 'https://www.virtual-analyst.ai';
+export const API_URL = 'https://www.virtual-analyst.ai/api/v1';

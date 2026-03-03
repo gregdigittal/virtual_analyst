@@ -150,6 +150,14 @@ function LoginForm() {
               required
             />
           </div>
+          <div className="flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-va-blue hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-va-blue focus-visible:ring-offset-2 focus-visible:ring-offset-va-midnight rounded-va-xs"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <VAButton
             type="submit"
             variant="primary"
