@@ -85,11 +85,9 @@ export default function RunsPage() {
             View run results, statements, and KPIs.
           </p>
         </div>
-        {baselines.length > 0 && (
-          <Link href="/baselines">
-            <VAButton aria-label="New run">New Run</VAButton>
-          </Link>
-        )}
+        <Link href="/baselines">
+          <VAButton aria-label="New run">New Run</VAButton>
+        </Link>
       </div>
 
       {!loading && baselines.length === 0 && (
