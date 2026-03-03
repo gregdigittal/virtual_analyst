@@ -61,14 +61,6 @@ if settings.sentry_dsn:
         environment=settings.environment,
     )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_allowed_origins_list(),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Request-ID"],
-)
-
 MAX_BODY_SIZE = 10 * 1024 * 1024  # 10MB
 
 
@@ -86,6 +78,17 @@ app.middleware("http")(limit_body_size)
 app.middleware("http")(metrics_middleware)
 app.middleware("http")(security_headers_middleware)
 app.middleware("http")(auth_middleware)
+
+# CORSMiddleware MUST wrap auth so that error responses (401/403) include CORS
+# headers. Otherwise browsers block auth errors as CORS failures ("Failed to fetch").
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allowed_origins_list(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Request-ID"],
+)
+
 app.middleware("http")(logging_middleware)
 
 init_rate_limiting(app, settings.rate_limit)
