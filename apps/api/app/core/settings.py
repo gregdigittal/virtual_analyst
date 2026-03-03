@@ -129,7 +129,15 @@ class Settings(BaseSettings):
         return self
 
     def cors_allowed_origins_list(self) -> list[str]:
-        return [item.strip() for item in self.cors_allowed_origins.split(",") if item.strip()]
+        origins = [item.strip() for item in self.cors_allowed_origins.split(",") if item.strip()]
+        # Always include production domains so CORS works regardless of env var config
+        for prod_origin in (
+            "https://www.virtual-analyst.ai",
+            "https://virtual-analyst.ai",
+        ):
+            if prod_origin not in origins:
+                origins.append(prod_origin)
+        return origins
 
 
 @lru_cache
