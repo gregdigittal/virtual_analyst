@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import time
+
+import httpx
 import structlog
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -14,6 +17,42 @@ except ImportError:
     jose_jwt = None  # type: ignore[assignment]
 
 logger = structlog.get_logger()
+
+# ──────────────────────────────────────────────────────────────────────
+# JWKS cache for ES256 verification (Supabase migrated JWT signing keys)
+# ──────────────────────────────────────────────────────────────────────
+_jwks_cache: dict | None = None
+_jwks_cache_time: float = 0.0
+_JWKS_CACHE_TTL = 3600  # refresh JWKS every hour
+
+
+def _get_jwks(supabase_url: str) -> dict:
+    """Fetch and cache JWKS from Supabase for ES256 token verification."""
+    global _jwks_cache, _jwks_cache_time
+    now = time.monotonic()
+    if _jwks_cache and (now - _jwks_cache_time) < _JWKS_CACHE_TTL:
+        return _jwks_cache
+    jwks_url = f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+    try:
+        resp = httpx.get(jwks_url, timeout=10.0)
+        resp.raise_for_status()
+        _jwks_cache = resp.json()
+        _jwks_cache_time = now
+        logger.info("jwks_fetched", url=jwks_url, keys=len(_jwks_cache.get("keys", [])))
+        return _jwks_cache
+    except Exception as e:
+        logger.error("jwks_fetch_failed", url=jwks_url, error=str(e))
+        if _jwks_cache:
+            return _jwks_cache  # return stale cache on failure
+        raise
+
+
+def _find_jwk_for_kid(jwks: dict, kid: str) -> dict | None:
+    """Find a JWK matching the given key ID."""
+    for key in jwks.get("keys", []):
+        if key.get("kid") == kid:
+            return key
+    return None
 
 # Paths that do not require or override tenant/user (health, metrics, public docs, cron, SAML, Stripe webhook, public catalog)
 SKIP_AUTH_PATHS = (
@@ -78,15 +117,44 @@ async def auth_middleware(request: Request, call_next):
             content={"detail": "JWT verification not available"},
         )
 
+    alg = "unknown"
     try:
-        # python-jose 3.x requires audience as a string; decode without audience
-        # check first, then verify manually to support both "authenticated" and "va-saml".
-        payload = jose_jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            options={"verify_exp": True, "verify_aud": False},
-        )
+        # Peek at the token header to determine the algorithm.
+        # Supabase projects may use legacy HS256 or migrated ES256 signing keys.
+        unverified_header = jose_jwt.get_unverified_header(token)
+        alg = unverified_header.get("alg", "HS256")
+
+        if alg == "ES256":
+            # ES256 (ECDSA) — fetch public key from Supabase JWKS endpoint
+            kid = unverified_header.get("kid")
+            if not kid:
+                raise ValueError("ES256 token missing kid in header")
+            jwks = _get_jwks(settings.supabase_url)
+            jwk_data = _find_jwk_for_kid(jwks, kid)
+            if not jwk_data:
+                # Force refresh cache in case keys rotated
+                global _jwks_cache_time
+                _jwks_cache_time = 0.0
+                jwks = _get_jwks(settings.supabase_url)
+                jwk_data = _find_jwk_for_kid(jwks, kid)
+            if not jwk_data:
+                raise ValueError(f"No JWKS key found for kid={kid}")
+            payload = jose_jwt.decode(
+                token,
+                jwk_data,
+                algorithms=["ES256"],
+                options={"verify_exp": True, "verify_aud": False},
+            )
+        else:
+            # Legacy HS256 — use the shared JWT secret
+            payload = jose_jwt.decode(
+                token,
+                settings.supabase_jwt_secret,
+                algorithms=["HS256"],
+                options={"verify_exp": True, "verify_aud": False},
+            )
+
+        # Verify audience for both algorithm paths
         token_aud = payload.get("aud")
         allowed_audiences = {"authenticated", "va-saml"}
         if isinstance(token_aud, list):
@@ -95,7 +163,7 @@ async def auth_middleware(request: Request, call_next):
         elif token_aud not in allowed_audiences:
             raise ValueError("Invalid audience")
     except Exception as e:
-        logger.warning("auth_jwt_invalid", path=path, error=str(e))
+        logger.warning("auth_jwt_invalid", path=path, alg=alg, error=str(e))
         return JSONResponse(
             status_code=401,
             content={"detail": "Invalid or expired token"},
