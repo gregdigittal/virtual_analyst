@@ -178,18 +178,14 @@ async def auth_middleware(request: Request, call_next):
 
     app_meta = payload.get("app_metadata") or {}
     user_meta = payload.get("user_metadata") or {}
-    settings = get_settings()
     tenant_id = app_meta.get("tenant_id") or user_meta.get("tenant_id")
     if not tenant_id:
-        if settings.environment in ("development", "test"):
-            tenant_id = user_id
-        else:
-            return JSONResponse(status_code=403, content={"error": "No tenant_id in token"})
+        # Fallback: use user_id as tenant_id for single-tenant-per-user setups.
+        # Auth Hooks can inject tenant_id into app_metadata for multi-tenant use.
+        tenant_id = user_id
+        logger.info("auth_tenant_fallback", user_id=user_id, msg="Using user_id as tenant_id")
     if not isinstance(tenant_id, str):
-        if settings.environment in ("development", "test"):
-            tenant_id = str(tenant_id) if tenant_id else user_id
-        else:
-            return JSONResponse(status_code=403, content={"error": "Invalid tenant_id type in token"})
+        tenant_id = str(tenant_id) if tenant_id else user_id
 
     # Overwrite request scope headers so downstream Header() deps see verified values
     headers = list(request.scope.get("headers") or [])
