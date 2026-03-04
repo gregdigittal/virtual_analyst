@@ -51,11 +51,22 @@ async function request<T>(
     ...(userId && { "X-User-ID": userId }),
     ...(_accessToken && { Authorization: `Bearer ${_accessToken}` }),
   };
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    ...(body !== undefined && { body: JSON.stringify(body) }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      ...(body !== undefined && { body: JSON.stringify(body) }),
+    });
+  } catch (err) {
+    // Network-level failures: Safari reports "Load failed", Chrome "Failed to fetch".
+    // Replace with a user-friendly message so pages don't show cryptic browser errors.
+    throw new ApiError(
+      "Unable to connect to the server. Please check your connection and try again.",
+      0,
+      { originalError: err instanceof Error ? err.message : String(err) }
+    );
+  }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({ detail: res.statusText }));
   if (!res.ok) {
@@ -78,11 +89,20 @@ async function requestForm<T>(
     ...(userId && { "X-User-ID": userId }),
     ...(_accessToken && { Authorization: `Bearer ${_accessToken}` }),
   };
-  const res = await fetch(`${API_URL}${path}`, {
-    method: "POST",
-    headers,
-    body,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers,
+      body,
+    });
+  } catch (err) {
+    throw new ApiError(
+      "Unable to connect to the server. Please check your connection and try again.",
+      0,
+      { originalError: err instanceof Error ? err.message : String(err) }
+    );
+  }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({ detail: res.statusText }));
   if (!res.ok) {
