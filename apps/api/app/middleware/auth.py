@@ -226,7 +226,8 @@ async def auth_middleware(request: Request, call_next):
                 request.state.role = "owner"
                 logger.info("auth_user_provisioned", user_id=user_id, tenant_id=tenant_id, role="owner")
     except Exception as e:
-        logger.warning("auth_role_lookup_failed", user_id=user_id, error=str(e))
+        import traceback
+        logger.warning("auth_role_lookup_failed", user_id=user_id, tenant_id=tenant_id, error=str(e), traceback=traceback.format_exc())
         request.state.role = "investor"
 
     return await call_next(request)
