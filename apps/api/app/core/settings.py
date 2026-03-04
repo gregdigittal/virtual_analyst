@@ -1,9 +1,24 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _clean_env_url(value: str) -> str:
+    """Strip accidental shell-style assignment wrapping from env var values.
+
+    Hosting dashboards sometimes produce values like:
+        REDIS_URL="rediss://user:pass@host:6379"
+    instead of the bare URL. This helper strips the prefix and quotes.
+    """
+    # Strip pattern like  VAR_NAME="..." or VAR_NAME='...'
+    cleaned = re.sub(r"^[A-Z_]+=(?:\"|')(.+?)(?:\"|')$", r"\1", value.strip())
+    # Also handle VAR_NAME=value (no quotes)
+    cleaned = re.sub(r"^[A-Z_]+=", "", cleaned)
+    return cleaned
 
 
 class Settings(BaseSettings):
@@ -100,6 +115,17 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
     stripe_price_id_professional: str | None = Field(default=None, alias="STRIPE_PRICE_ID_PROFESSIONAL")
     stripe_price_id_starter: str | None = Field(default=None, alias="STRIPE_PRICE_ID_STARTER")
+
+    @model_validator(mode="after")
+    def _clean_urls(self) -> "Settings":
+        """Strip accidental shell-style assignment wrapping from URL env vars.
+
+        Some hosting dashboards (e.g. Render) produce values like
+        ``REDIS_URL="rediss://..."`` instead of the bare URL.
+        """
+        self.redis_url = _clean_env_url(self.redis_url)
+        self.database_url = _clean_env_url(self.database_url)
+        return self
 
     @model_validator(mode="after")
     def _validate_production_secrets(self) -> "Settings":
