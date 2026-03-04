@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
@@ -8,6 +10,11 @@ from apps.api.app.core.settings import get_settings
 from apps.api.app.db.connection import tenant_conn
 
 router = APIRouter()
+
+
+def _mask_url(url: str) -> str:
+    """Mask password in connection URL for safe diagnostics."""
+    return re.sub(r"://([^:]+):([^@]+)@", r"://\1:***@", url)
 
 
 @router.get("/health/live")
@@ -19,13 +26,15 @@ async def liveness() -> dict:
 async def readiness() -> JSONResponse:
     settings = get_settings()
     checks: dict[str, str] = {}
+    errors: dict[str, str] = {}
 
     try:
         async with tenant_conn("") as conn:
             await conn.execute("SELECT 1")
         checks["database"] = "ok"
-    except Exception:
+    except Exception as e:
         checks["database"] = "error"
+        errors["database"] = f"{type(e).__name__}: {e}"
 
     try:
         redis_client = Redis.from_url(settings.redis_url)
@@ -34,13 +43,19 @@ async def readiness() -> JSONResponse:
             checks["redis"] = "ok"
         finally:
             await redis_client.close()
-    except Exception:
+    except Exception as e:
         checks["redis"] = "error"
+        errors["redis"] = f"{type(e).__name__}: {e}"
 
     all_ok = all(value == "ok" for value in checks.values())
     status_code = 200 if all_ok else 503
 
-    return JSONResponse(
-        status_code=status_code,
-        content={"status": "ok" if all_ok else "degraded", "checks": checks},
-    )
+    content: dict = {"status": "ok" if all_ok else "degraded", "checks": checks}
+    if errors:
+        content["errors"] = errors
+        content["hints"] = {
+            "database_url": _mask_url(settings.database_url) if settings.database_url else "(not set)",
+            "redis_url": _mask_url(settings.redis_url) if settings.redis_url else "(not set)",
+        }
+
+    return JSONResponse(status_code=status_code, content=content)
