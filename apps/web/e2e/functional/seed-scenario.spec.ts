@@ -637,7 +637,11 @@ test.describe('Seed Scenario — API-Driven Data Seeding', () => {
                     `${API_BASE}/api/v1/marketplace/templates/${templateId}/use`,
                     {
                       headers: apiHeaders,
-                      data: { entity_name: 'E2E Seed Company', currency: 'USD' },
+                      data: {
+                        label: 'E2E Seed Company',
+                        fiscal_year: '2025',
+                        answers: {},
+                      },
                       timeout: 30_000,
                     },
                   );
@@ -648,7 +652,11 @@ test.describe('Seed Scenario — API-Driven Data Seeding', () => {
                 })()
               : await browserApiPost(
                   `/api/v1/marketplace/templates/${templateId}/use`,
-                  { entity_name: 'E2E Seed Company', currency: 'USD' },
+                  {
+                    label: 'E2E Seed Company',
+                    fiscal_year: '2025',
+                    answers: {},
+                  },
                 );
             console.log(`  POST template use → ${useRes.status}`);
 

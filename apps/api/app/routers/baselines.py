@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
+
+_log = logging.getLogger(__name__)
 
 _HTML_TAG_RE = re.compile(r"<\s*/?[a-zA-Z][^>]*>")
 
@@ -83,12 +86,19 @@ async def create_baseline(
                 baseline_version,
                 storage_path,
             )
-            store.save(
-                x_tenant_id,
-                "model_config_v1",
-                f"{baseline_id}_{baseline_version}",
-                body.model_config_payload,
-            )
+            try:
+                store.save(
+                    x_tenant_id,
+                    "model_config_v1",
+                    f"{baseline_id}_{baseline_version}",
+                    body.model_config_payload,
+                )
+            except Exception as storage_err:
+                _log.warning(
+                    "baseline_artifact_save_failed: %s — baseline %s will exist in DB without artifact",
+                    storage_err,
+                    baseline_id,
+                )
             await create_audit_event(
                 conn,
                 x_tenant_id,

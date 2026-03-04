@@ -45,10 +45,18 @@ class ArtifactStore:
         path = _path(tenant_id, artifact_type, artifact_id)
         body = json.dumps(data).encode("utf-8")
         if self._client:
-            bucket = self._client.storage.from_("artifacts")
-            bucket.upload(
-                path, body, file_options={"content-type": "application/json", "upsert": "true"}
-            )
+            try:
+                bucket = self._client.storage.from_("artifacts")
+                bucket.upload(
+                    path, body, file_options={"content-type": "application/json", "upsert": "true"}
+                )
+            except Exception as exc:
+                _log.warning(
+                    "artifact_upload_failed, falling back to in-memory: %s (path=%s)",
+                    exc,
+                    path,
+                )
+                self._memory[path] = body
         else:
             self._memory[path] = body
         return path
