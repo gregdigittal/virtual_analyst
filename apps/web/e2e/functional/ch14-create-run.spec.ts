@@ -48,14 +48,16 @@ test.describe('ch14 — Create Run', () => {
   });
 
   test('Create Run flow shows mode selection (Deterministic / Monte Carlo)', async ({ page }) => {
+    test.setTimeout(60000);
+
     // Navigate to baselines and find a baseline detail page with the run form
     await page.goto(`${BASE}/baselines`);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
     // Find a baseline link to click into
     const baselineLink = page.locator('a[href*="/baselines/"]').first();
-    const hasBaseline = await baselineLink.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasBaseline = await baselineLink.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (!hasBaseline) {
       test.skip(true, 'No baselines available for test user — cannot access run configuration form');
@@ -63,22 +65,41 @@ test.describe('ch14 — Create Run', () => {
     }
 
     await baselineLink.click();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(/\/baselines\/.+/, { timeout: 15000 });
+
+    // Wait for page to finish loading config (Run model button is disabled until config loads)
+    await page.waitForFunction(
+      () => {
+        const body = document.body.innerText;
+        return !body.includes('Loading');
+      },
+      { timeout: 30000 }
+    ).catch(() => {});
     await page.waitForTimeout(2000);
 
-    // The baseline detail page has a "Monte Carlo simulation" checkbox
+    // Click "Run model" to open the run configuration form
+    // The button is disabled={!config}, so wait for it to become enabled
+    const runModelBtn = page.getByRole('button', { name: /run model/i });
+    await expect(runModelBtn).toBeVisible({ timeout: 15000 });
+    await expect(runModelBtn).toBeEnabled({ timeout: 30000 });
+    await runModelBtn.click();
+    await page.waitForTimeout(1000);
+
+    // The run config form has a "Monte Carlo simulation" checkbox
     const monteCarloOption = page.getByText(/monte carlo/i);
     await expect(monteCarloOption.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Create Run flow shows Execute or Run button', async ({ page }) => {
+    test.setTimeout(60000);
+
     // Navigate to baselines and find a baseline detail page with the run form
     await page.goto(`${BASE}/baselines`);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
     const baselineLink = page.locator('a[href*="/baselines/"]').first();
-    const hasBaseline = await baselineLink.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasBaseline = await baselineLink.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (!hasBaseline) {
       test.skip(true, 'No baselines available for test user — cannot access run configuration form');
@@ -86,10 +107,27 @@ test.describe('ch14 — Create Run', () => {
     }
 
     await baselineLink.click();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(/\/baselines\/.+/, { timeout: 15000 });
+
+    // Wait for page to finish loading config (Run model button is disabled until config loads)
+    await page.waitForFunction(
+      () => {
+        const body = document.body.innerText;
+        return !body.includes('Loading');
+      },
+      { timeout: 30000 }
+    ).catch(() => {});
     await page.waitForTimeout(2000);
 
-    // The baseline detail page has a "Create run" button
+    // Click "Run model" to open the run configuration form
+    // The button is disabled={!config}, so wait for it to become enabled
+    const runModelBtn = page.getByRole('button', { name: /run model/i });
+    await expect(runModelBtn).toBeVisible({ timeout: 15000 });
+    await expect(runModelBtn).toBeEnabled({ timeout: 30000 });
+    await runModelBtn.click();
+    await page.waitForTimeout(1000);
+
+    // The run config form has a "Create run" submit button
     const executeBtn = page
       .getByRole('button', { name: /execute|run now|start run|create run|submit/i });
 

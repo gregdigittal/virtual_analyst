@@ -26,10 +26,10 @@ async function findEntityDetailLink(page: any) {
     await page.goto(`${BASE}${path}`);
     await page.waitForLoadState('domcontentloaded');
     // Wait for content to load
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
     const entityLink = page.locator(linkPattern).first();
-    const isVisible = await entityLink.isVisible({ timeout: 5000 }).catch(() => false);
+    const isVisible = await entityLink.isVisible({ timeout: 10000 }).catch(() => false);
     if (isVisible) {
       return entityLink;
     }
@@ -51,8 +51,8 @@ test.describe('ch25 — Collaboration Comments', () => {
 
     await entityLink.click();
 
-    // Verify we landed on a detail page (not redirected to login)
-    await page.waitForLoadState('domcontentloaded');
+    // Wait for client-side navigation to the detail page
+    await page.waitForURL(/\/(baselines|runs|drafts)\/.+/, { timeout: 15000 });
     const url = page.url();
     expect(url).not.toContain('/login');
     expect(url).toMatch(/\/(baselines|runs|drafts)\/.+/);
@@ -69,7 +69,21 @@ test.describe('ch25 — Collaboration Comments', () => {
     }
 
     await entityLink.click();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(/\/(baselines|runs|drafts)\/.+/, { timeout: 15000 });
+
+    // Wait for the page to finish loading its primary data (CommentThread is
+    // conditionally rendered only after the parent page's loading state is false)
+    await page.waitForFunction(
+      () => {
+        const body = document.body.innerText;
+        // Page shows "Loading…" or spinner while fetching main entity data
+        return !body.includes('Loading');
+      },
+      { timeout: 30000 }
+    ).catch(() => {});
+
+    // Extra wait for React re-render after loading state change
+    await page.waitForTimeout(2000);
 
     // Look for the CommentThread textarea (placeholder "Add a comment...")
     // or a contenteditable element for comments
@@ -78,7 +92,7 @@ test.describe('ch25 — Collaboration Comments', () => {
       .or(page.locator('textarea'))
       .or(page.locator('[contenteditable="true"]'));
 
-    const isVisible = await commentInput.first().isVisible({ timeout: 10000 }).catch(() => false);
+    const isVisible = await commentInput.first().isVisible({ timeout: 15000 }).catch(() => false);
     expect(isVisible).toBeTruthy();
   });
 
@@ -93,9 +107,22 @@ test.describe('ch25 — Collaboration Comments', () => {
     }
 
     await entityLink.click();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(/\/(baselines|runs|drafts)\/.+/, { timeout: 15000 });
 
-    // Wait for the CommentThread to finish loading
+    // Wait for the page to finish loading its primary data first
+    // (CommentThread is only rendered after parent page's loading state is false)
+    await page.waitForFunction(
+      () => {
+        const body = document.body.innerText;
+        return !body.includes('Loading');
+      },
+      { timeout: 30000 }
+    ).catch(() => {});
+
+    // Extra wait for React re-render after loading state change
+    await page.waitForTimeout(2000);
+
+    // Now wait for CommentThread's own loading to finish
     await page.waitForFunction(
       () => !document.body.innerText.includes('Loading comments'),
       { timeout: 15000 }
@@ -107,9 +134,9 @@ test.describe('ch25 — Collaboration Comments', () => {
     const commentCards = page.locator('textarea[placeholder*="Add a comment" i]');
     const postButton = page.getByRole('button', { name: /^post$/i });
 
-    const hasEmpty = await emptyState.isVisible({ timeout: 10000 }).catch(() => false);
-    const hasCommentInput = await commentCards.isVisible({ timeout: 5000 }).catch(() => false);
-    const hasPostButton = await postButton.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasEmpty = await emptyState.isVisible({ timeout: 15000 }).catch(() => false);
+    const hasCommentInput = await commentCards.isVisible({ timeout: 10000 }).catch(() => false);
+    const hasPostButton = await postButton.isVisible({ timeout: 10000 }).catch(() => false);
 
     // At least one of: empty state text, comment input, or Post button should be present
     // (all are rendered by CommentThread)
