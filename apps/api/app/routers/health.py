@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import re
 
+import asyncpg
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 
 from apps.api.app.core.settings import get_settings
-from apps.api.app.db.connection import tenant_conn
+from apps.api.app.db.connection import get_pool
 
 router = APIRouter()
 
@@ -29,8 +30,19 @@ async def readiness() -> JSONResponse:
     errors: dict[str, str] = {}
 
     try:
-        async with tenant_conn("") as conn:
-            await conn.execute("SELECT 1")
+        pool = get_pool()
+        if pool is not None:
+            conn = await pool.acquire()
+            try:
+                await conn.execute("SELECT 1")
+            finally:
+                await pool.release(conn)
+        else:
+            conn = await asyncpg.connect(settings.database_url, timeout=10)
+            try:
+                await conn.execute("SELECT 1")
+            finally:
+                await conn.close()
         checks["database"] = "ok"
     except Exception as e:
         checks["database"] = "error"
