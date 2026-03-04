@@ -200,9 +200,9 @@ async def auth_middleware(request: Request, call_next):
         user_id=user_id,
     )
 
-    # Load role from users table for RBAC; fallback to investor if no row (e.g. dev without sync)
+    # Load role from users table for RBAC; auto-provision tenant + user on first login
     try:
-        from apps.api.app.db.connection import tenant_conn
+        from apps.api.app.db.connection import ensure_tenant, tenant_conn
 
         async with tenant_conn(tenant_id) as conn:
             row = await conn.fetchrow(
@@ -210,7 +210,21 @@ async def auth_middleware(request: Request, call_next):
                 user_id,
                 tenant_id,
             )
-        request.state.role = row["role"] if row else "investor"
+            if row:
+                request.state.role = row["role"]
+            else:
+                # First login: auto-provision tenant + user as owner
+                await ensure_tenant(conn, tenant_id)
+                email = payload.get("email")
+                await conn.execute(
+                    "INSERT INTO users (id, tenant_id, email, role) VALUES ($1, $2, $3, 'owner') "
+                    "ON CONFLICT (id) DO UPDATE SET tenant_id = $2, email = COALESCE($3, users.email)",
+                    user_id,
+                    tenant_id,
+                    email,
+                )
+                request.state.role = "owner"
+                logger.info("auth_user_provisioned", user_id=user_id, tenant_id=tenant_id, role="owner")
     except Exception as e:
         logger.warning("auth_role_lookup_failed", user_id=user_id, error=str(e))
         request.state.role = "investor"
