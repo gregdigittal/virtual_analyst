@@ -245,10 +245,81 @@
       "business_model_family": "fintech_payments",
       "industry_context_tags": ["regulated","network_effects","multi_currency_optional","fraud_risk","device_supply_chain"],
       "gtm_motion_tags": ["merchant_acquisition","channel","embedded"],
-      "question_plan": [],
-      "required_inputs": [],
-      "default_distributions": [],
-      "scenario_templates": [],
+      "question_plan": [
+        { "section": "Merchant Acquisition & Network", "questions": [
+          { "id": "ma_1", "q": "Target merchant count at launch and monthly acquisition rate by channel (direct sales, agents, partnerships, self-serve)?" },
+          { "id": "ma_2", "q": "Average onboarding cost per merchant (sales commission, device deployment, integration support)?" },
+          { "id": "ma_3", "q": "Expected merchant churn rate? Key churn drivers and retention strategy?" }
+        ]},
+        { "section": "Transaction Volume & Pricing", "questions": [
+          { "id": "tv_1", "q": "Average transactions per merchant per day by segment (micro, SMB, enterprise)? Average ticket size?" },
+          { "id": "tv_2", "q": "Take rate structure: percentage component + fixed per-transaction fee? Tiered pricing?" },
+          { "id": "tv_3", "q": "Expected volume ramp curve over first 24 months? Seasonality patterns?" }
+        ]},
+        { "section": "Device & Supply Chain", "questions": [
+          { "id": "ds_1", "q": "POS device unit cost and expected lifespan (months)? Sourcing (import vs local assembly)?" },
+          { "id": "ds_2", "q": "Monthly rental fee per device? Maintenance and replacement rate assumptions?" },
+          { "id": "ds_3", "q": "NFC token/media cost per unit and selling price? Lead times and minimum order quantities?" }
+        ]},
+        { "section": "Risk & Compliance", "questions": [
+          { "id": "rc_1", "q": "Expected fraud/chargeback loss rate (bps on GPV)? Fraud detection tools and risk management costs?" },
+          { "id": "rc_2", "q": "Regulatory licensing costs and timeline by jurisdiction? Capital adequacy or float safeguarding requirements?" },
+          { "id": "rc_3", "q": "Settlement cycle assumptions (T+N)? Float income opportunity?" }
+        ]},
+        { "section": "Operations & Team", "questions": [
+          { "id": "ot_1", "q": "Agent/field force size and commission structure? Recruitment and training costs?" },
+          { "id": "ot_2", "q": "Technical team (engineering, DevOps, support) headcount ramp?" },
+          { "id": "ot_3", "q": "Payment processing infrastructure costs (switches, gateways, bank integrations)?" }
+        ]},
+        { "section": "USP / Competitive Edge", "questions": [
+          { "id": "usp_1", "q": "Unfair advantages: regulatory licenses, distribution network, technology stack, risk engine, partnerships?" },
+          { "id": "usp_2", "q": "Proof points: existing merchant base, transaction history, uptime metrics, compliance track record?" }
+        ]}
+      ],
+      "required_inputs": [
+        { "id": "reporting_currency", "section": "Basics", "type": "string", "required": true },
+        { "id": "country_iso", "section": "Basics", "type": "string", "required": true },
+        { "id": "starting_merchants", "section": "Merchant Acquisition", "type": "number", "required": true },
+        { "id": "new_merchants_per_month", "section": "Merchant Acquisition", "type": "number", "required": true },
+        { "id": "merchant_churn_rate", "section": "Merchant Acquisition", "type": "number", "required": true },
+        { "id": "txns_per_merchant_per_day", "section": "Transaction Volume", "type": "number", "required": true },
+        { "id": "avg_ticket", "section": "Transaction Volume", "type": "number", "required": true },
+        { "id": "take_rate_pct", "section": "Transaction Volume", "type": "number", "required": true },
+        { "id": "processing_cost_pct", "section": "Transaction Volume", "type": "number", "required": true },
+        { "id": "agent_commission_pct", "section": "Operations", "type": "number", "required": false },
+        { "id": "fraud_loss_pct", "section": "Risk", "type": "number", "required": true },
+        { "id": "active_devices_rented", "section": "Device", "type": "number", "required": false },
+        { "id": "device_rental_fee_per_month", "section": "Device", "type": "number", "required": false },
+        { "id": "device_unit_cost", "section": "Device", "type": "number", "required": false },
+        { "id": "device_lifespan_months", "section": "Device", "type": "number", "required": false },
+        { "id": "tokens_sold_per_month", "section": "Token Sales", "type": "number", "required": false },
+        { "id": "token_price", "section": "Token Sales", "type": "number", "required": false },
+        { "id": "token_unit_cost", "section": "Token Sales", "type": "number", "required": false }
+      ],
+      "default_distributions": [
+        { "ref": "drv:txns_per_merchant_per_day", "family": "triangular", "params": { "min": 5, "mode": 15, "max": 40 }, "notes": "Varies widely by merchant segment" },
+        { "ref": "drv:avg_ticket", "family": "triangular", "params": { "min": 8, "mode": 25, "max": 80 }, "notes": "Currency-specific; adjust for market" },
+        { "ref": "drv:take_rate_pct", "family": "triangular", "params": { "min": 0.010, "mode": 0.018, "max": 0.025 }, "notes": "Blended take rate across merchant mix" },
+        { "ref": "drv:merchant_churn_rate", "family": "triangular", "params": { "min": 0.02, "mode": 0.04, "max": 0.08 }, "notes": "Monthly merchant attrition" },
+        { "ref": "drv:fraud_loss_pct", "family": "triangular", "params": { "min": 0.0005, "mode": 0.002, "max": 0.008 }, "notes": "Fraud loss as % of GPV" },
+        { "ref": "drv:processing_cost_pct", "family": "triangular", "params": { "min": 0.003, "mode": 0.006, "max": 0.010 }, "notes": "Switch + gateway + bank settlement costs" },
+        { "ref": "drv:device_rental_fee_per_month", "family": "triangular", "params": { "min": 15, "mode": 30, "max": 50 } }
+      ],
+      "scenario_templates": [
+        { "scenario_id": "sc_base", "label": "Base Case", "overrides": [] },
+        { "scenario_id": "sc_downside_fraud_churn", "label": "Downside: Higher Fraud & Merchant Churn", "overrides": [
+          { "ref": "drv:fraud_loss_pct", "field": "multiplier", "value": 2.0, "target_ref_version": "v1", "notes": "Fraud doubles due to new attack vectors" },
+          { "ref": "drv:merchant_churn_rate", "field": "multiplier", "value": 1.5, "target_ref_version": "v1", "notes": "Churn increases 50% from competitive pressure" }
+        ]},
+        { "scenario_id": "sc_downside_regulatory", "label": "Downside: Regulatory Tightening", "overrides": [
+          { "ref": "drv:take_rate_pct", "field": "multiplier", "value": 0.85, "target_ref_version": "v1", "notes": "Fee caps imposed by regulator" },
+          { "ref": "drv:processing_cost_pct", "field": "multiplier", "value": 1.20, "target_ref_version": "v1", "notes": "Additional compliance costs" }
+        ]},
+        { "scenario_id": "sc_upside_network", "label": "Upside: Accelerated Network Growth", "overrides": [
+          { "ref": "drv:txns_per_merchant_per_day", "field": "multiplier", "value": 1.25, "target_ref_version": "v1", "notes": "Network effects drive higher transaction frequency" },
+          { "ref": "drv:merchant_churn_rate", "field": "multiplier", "value": 0.70, "target_ref_version": "v1", "notes": "Stickiness improves with scale" }
+        ]}
+      ],
       "usp_framework": {
         "unfair_advantages": ["local_execution_edge","distribution_access","regulatory_licenses","exclusive_partnerships","proprietary_process_or_ip","brand_trust","risk_control_advantage"],
         "moat_mechanisms": ["faster_rollout","higher_conversion","lower_unit_cost","lower_losses","higher_retention","network_effects_liquidity"],
@@ -271,13 +342,191 @@
           "supply_chain_profile": {"physical": true, "inputs": [{"input_id":"in_nfc_token","label":"NFC Token/Media","cogs_share_hint":0.0,"lead_time_days_ref":"sc:token_lead_time_days","fx_exposure":"import_optional"}]}
         }
       ],
-      "driver_blueprint": {"nodes": [], "edges": [], "formulas": []}
+      "driver_blueprint": {
+        "nodes": [
+          { "node_id": "n_merchants", "type": "driver", "label": "Active Merchants", "ref": "drv:active_merchants", "notes": "Stock variable: starting + new - churned" },
+          { "node_id": "n_new_merchants", "type": "driver", "label": "New Merchants / Month", "ref": "drv:new_merchants_per_month" },
+          { "node_id": "n_merchant_churn", "type": "driver", "label": "Merchant Churn Rate", "ref": "drv:merchant_churn_rate" },
+          { "node_id": "n_tpd", "type": "driver", "label": "Txns per Merchant per Day", "ref": "drv:txns_per_merchant_per_day" },
+          { "node_id": "n_avg_ticket", "type": "driver", "label": "Avg Ticket Size", "ref": "drv:avg_ticket" },
+          { "node_id": "n_take_rate", "type": "driver", "label": "Take Rate %", "ref": "drv:take_rate_pct" },
+          { "node_id": "n_gpv", "type": "formula", "label": "Gross Payment Volume" },
+          { "node_id": "n_txn_revenue", "type": "formula", "label": "Transaction Fee Revenue" },
+          { "node_id": "n_processing_cost_pct", "type": "driver", "label": "Processing Cost %", "ref": "drv:processing_cost_pct" },
+          { "node_id": "n_fraud_loss_pct", "type": "driver", "label": "Fraud Loss %", "ref": "drv:fraud_loss_pct" },
+          { "node_id": "n_direct_costs", "type": "formula", "label": "Direct Transaction Costs" },
+          { "node_id": "n_devices", "type": "driver", "label": "Active Devices Rented", "ref": "drv:active_devices_rented" },
+          { "node_id": "n_rental_fee", "type": "driver", "label": "Device Rental Fee / Month", "ref": "drv:device_rental_fee_per_month" },
+          { "node_id": "n_device_revenue", "type": "formula", "label": "Device Rental Revenue" },
+          { "node_id": "n_tokens_sold", "type": "driver", "label": "Tokens Sold / Month", "ref": "drv:tokens_sold_per_month" },
+          { "node_id": "n_token_price", "type": "driver", "label": "Token Selling Price", "ref": "drv:token_price" },
+          { "node_id": "n_token_revenue", "type": "formula", "label": "Token Sales Revenue" },
+          { "node_id": "n_total_revenue", "type": "output", "label": "Total Revenue" },
+          { "node_id": "n_gross_profit", "type": "output", "label": "Gross Profit" }
+        ],
+        "edges": [
+          { "from": "n_merchants", "to": "n_gpv" },
+          { "from": "n_tpd", "to": "n_gpv" },
+          { "from": "n_avg_ticket", "to": "n_gpv" },
+          { "from": "n_gpv", "to": "n_txn_revenue" },
+          { "from": "n_take_rate", "to": "n_txn_revenue" },
+          { "from": "n_gpv", "to": "n_direct_costs" },
+          { "from": "n_processing_cost_pct", "to": "n_direct_costs" },
+          { "from": "n_fraud_loss_pct", "to": "n_direct_costs" },
+          { "from": "n_devices", "to": "n_device_revenue" },
+          { "from": "n_rental_fee", "to": "n_device_revenue" },
+          { "from": "n_tokens_sold", "to": "n_token_revenue" },
+          { "from": "n_token_price", "to": "n_token_revenue" },
+          { "from": "n_txn_revenue", "to": "n_total_revenue" },
+          { "from": "n_device_revenue", "to": "n_total_revenue" },
+          { "from": "n_token_revenue", "to": "n_total_revenue" },
+          { "from": "n_total_revenue", "to": "n_gross_profit" },
+          { "from": "n_direct_costs", "to": "n_gross_profit" }
+        ],
+        "formulas": [
+          { "formula_id": "f_gpv", "output_node_id": "n_gpv", "expression": "active_merchants * txns_per_merchant_per_day * 30 * avg_ticket", "inputs": ["drv:active_merchants","drv:txns_per_merchant_per_day","drv:avg_ticket"], "notes": "Monthly GPV; merchant stock modeled with acquisition and churn each period" },
+          { "formula_id": "f_txn_rev", "output_node_id": "n_txn_revenue", "expression": "gpv * take_rate_pct", "inputs": ["n_gpv","drv:take_rate_pct"] },
+          { "formula_id": "f_direct_costs", "output_node_id": "n_direct_costs", "expression": "gpv * (processing_cost_pct + fraud_loss_pct)", "inputs": ["n_gpv","drv:processing_cost_pct","drv:fraud_loss_pct"], "notes": "Agent commissions added at implementation if applicable" },
+          { "formula_id": "f_device_rev", "output_node_id": "n_device_revenue", "expression": "active_devices_rented * device_rental_fee_per_month", "inputs": ["drv:active_devices_rented","drv:device_rental_fee_per_month"] },
+          { "formula_id": "f_token_rev", "output_node_id": "n_token_revenue", "expression": "tokens_sold_per_month * token_price", "inputs": ["drv:tokens_sold_per_month","drv:token_price"] },
+          { "formula_id": "f_total_rev", "output_node_id": "n_total_revenue", "expression": "txn_revenue + device_revenue + token_revenue", "inputs": ["n_txn_revenue","n_device_revenue","n_token_revenue"] },
+          { "formula_id": "f_gross_profit", "output_node_id": "n_gross_profit", "expression": "total_revenue - direct_costs", "inputs": ["n_total_revenue","n_direct_costs"], "notes": "Device depreciation and token COGS deducted at implementation level" }
+        ]
+      }
+    },
+    { "template_id": "financial_services_fee_spread", "label": "Financial Services (Fee & Spread Income)", "business_model_family": "financial_services",
+      "industry_context_tags": ["regulated","capital_intensive","aum_driven","credit_risk","interest_rate_sensitive"],
+      "gtm_motion_tags": ["relationship_management","referral","institutional","retail_banking"],
+      "question_plan": [
+        { "section": "Assets Under Management & Fee Revenue", "questions": [
+          { "id": "aum_1", "q": "Starting AUM/AUA and expected net inflow rate (monthly). Breakdown by client segment (retail, HNW, institutional)?" },
+          { "id": "aum_2", "q": "Fee schedule: management fee (bps) by tier or product? Performance fee structure and hurdle rate?" },
+          { "id": "aum_3", "q": "Other fee income: advisory, brokerage, custody, fund administration? Fixed vs variable components?" }
+        ]},
+        { "section": "Lending & Net Interest Income", "questions": [
+          { "id": "nii_1", "q": "Loan book size (starting balance) and expected growth rate? Breakdown by product (mortgages, corporate, consumer, margin lending)?" },
+          { "id": "nii_2", "q": "Weighted average lending rate and expected repricing? Fixed vs variable rate mix?" },
+          { "id": "nii_3", "q": "Cost of funds: deposit rate, wholesale funding cost, and mix? Interest rate sensitivity (NII at +/-100bps)?" }
+        ]},
+        { "section": "Credit Risk & Provisions", "questions": [
+          { "id": "cr_1", "q": "Expected credit loss (ECL) rate by portfolio segment (Stage 1, 2, 3 under IFRS 9)? Historical loss experience?" },
+          { "id": "cr_2", "q": "Non-performing loan (NPL) ratio and coverage ratio targets? Write-off and recovery assumptions?" }
+        ]},
+        { "section": "Compensation & Workforce", "questions": [
+          { "id": "cw_1", "q": "Front-office headcount and compensation structure (base + variable as % of revenue generated)?" },
+          { "id": "cw_2", "q": "Risk, compliance, operations, and technology headcount? Fully loaded cost per head?" },
+          { "id": "cw_3", "q": "Target compensation-to-revenue ratio? Expected wage inflation?" }
+        ]},
+        { "section": "Regulatory Capital & Compliance", "questions": [
+          { "id": "reg_1", "q": "Regulatory capital requirements: CET1 ratio target, leverage ratio, liquidity coverage ratio (LCR)?" },
+          { "id": "reg_2", "q": "Risk-weighted asset (RWA) density by portfolio? Expected RWA growth?" },
+          { "id": "reg_3", "q": "Compliance, AML/KYC, and regulatory reporting costs? Known remediation programs?" }
+        ]},
+        { "section": "USP / Competitive Edge", "questions": [
+          { "id": "usp_1", "q": "Competitive advantages: client relationships, product breadth, technology platform, brand trust, regulatory licenses, proprietary data/models?" },
+          { "id": "usp_2", "q": "Proof points: track record (returns vs benchmark), client retention rate, NPS, AUM growth history, credit quality history?" }
+        ]}
+      ],
+      "required_inputs": [
+        { "id": "reporting_currency", "section": "Basics", "type": "string", "required": true },
+        { "id": "country_iso", "section": "Basics", "type": "string", "required": true },
+        { "id": "starting_aum", "section": "AUM & Fees", "type": "number", "required": true },
+        { "id": "net_inflow_rate_monthly", "section": "AUM & Fees", "type": "number", "required": true },
+        { "id": "mgmt_fee_bps", "section": "AUM & Fees", "type": "number", "required": true },
+        { "id": "starting_loan_book", "section": "NII", "type": "number", "required": false },
+        { "id": "loan_growth_rate_monthly", "section": "NII", "type": "number", "required": false },
+        { "id": "avg_lending_rate", "section": "NII", "type": "number", "required": false },
+        { "id": "cost_of_funds", "section": "NII", "type": "number", "required": false },
+        { "id": "ecl_rate", "section": "Credit Risk", "type": "number", "required": false },
+        { "id": "comp_to_revenue_ratio", "section": "Compensation", "type": "number", "required": true },
+        { "id": "other_opex_per_month", "section": "Operations", "type": "number", "required": true }
+      ],
+      "default_distributions": [
+        { "ref": "drv:net_inflow_rate_monthly", "family": "triangular", "params": { "min": -0.005, "mode": 0.005, "max": 0.015 }, "notes": "Monthly net inflow as % of opening AUM" },
+        { "ref": "drv:mgmt_fee_bps", "family": "triangular", "params": { "min": 30, "mode": 60, "max": 100 }, "notes": "Annualized management fee in basis points" },
+        { "ref": "drv:avg_lending_rate", "family": "triangular", "params": { "min": 0.04, "mode": 0.065, "max": 0.09 }, "notes": "Annualized weighted average lending rate" },
+        { "ref": "drv:cost_of_funds", "family": "triangular", "params": { "min": 0.015, "mode": 0.035, "max": 0.055 }, "notes": "Annualized blended cost of funding" },
+        { "ref": "drv:ecl_rate", "family": "triangular", "params": { "min": 0.001, "mode": 0.005, "max": 0.015 }, "notes": "Annualized ECL provision rate on loan book" },
+        { "ref": "drv:comp_to_revenue_ratio", "family": "triangular", "params": { "min": 0.35, "mode": 0.45, "max": 0.55 }, "notes": "Total compensation as % of net revenue" },
+        { "ref": "drv:market_return_monthly", "family": "normal", "params": { "mean": 0.006, "std": 0.04 }, "notes": "Monthly market return affecting AUM mark-to-market" }
+      ],
+      "scenario_templates": [
+        { "scenario_id": "sc_base", "label": "Base Case", "overrides": [] },
+        { "scenario_id": "sc_downside_market", "label": "Downside: Market Correction & Outflows", "overrides": [
+          { "ref": "drv:market_return_monthly", "field": "params.mean", "value": -0.01, "target_ref_version": "v1", "notes": "Sustained negative market returns" },
+          { "ref": "drv:net_inflow_rate_monthly", "field": "params.mode", "value": -0.003, "target_ref_version": "v1", "notes": "Net outflows during downturn" }
+        ]},
+        { "scenario_id": "sc_downside_credit", "label": "Downside: Credit Deterioration", "overrides": [
+          { "ref": "drv:ecl_rate", "field": "multiplier", "value": 2.5, "target_ref_version": "v1", "notes": "Provisions spike on portfolio stress" },
+          { "ref": "drv:avg_lending_rate", "field": "multiplier", "value": 0.95, "target_ref_version": "v1", "notes": "Competitive pressure on loan pricing" }
+        ]},
+        { "scenario_id": "sc_upside_growth", "label": "Upside: Strong Inflows & Spread Expansion", "overrides": [
+          { "ref": "drv:net_inflow_rate_monthly", "field": "multiplier", "value": 1.5, "target_ref_version": "v1", "notes": "Strong organic growth" },
+          { "ref": "drv:avg_lending_rate", "field": "multiplier", "value": 1.05, "target_ref_version": "v1", "notes": "Rate rises benefit NIM" }
+        ]}
+      ],
+      "usp_framework": {
+        "unfair_advantages": ["brand_trust","regulatory_licenses","proprietary_process_or_ip","distribution_access","switching_costs","data_advantage","relationship_depth"],
+        "moat_mechanisms": ["lower_churn","higher_price_power","higher_conversion","lower_unit_cost","risk_adjusted_returns","regulatory_barrier"],
+        "proof_points_prompts": ["Investment track record vs benchmark?","Client retention and NPS?","Regulatory approvals and compliance history?","AUM growth trajectory?","Credit quality history through cycles?"]
+      },
+      "driver_blueprint": {
+        "nodes": [
+          { "node_id": "n_aum", "type": "driver", "label": "Assets Under Management", "ref": "drv:starting_aum", "notes": "Stock variable: opening + inflows + market return - outflows" },
+          { "node_id": "n_inflow_rate", "type": "driver", "label": "Net Inflow Rate (Monthly)", "ref": "drv:net_inflow_rate_monthly" },
+          { "node_id": "n_mkt_return", "type": "driver", "label": "Market Return (Monthly)", "ref": "drv:market_return_monthly" },
+          { "node_id": "n_fee_bps", "type": "driver", "label": "Mgmt Fee (bps, annualized)", "ref": "drv:mgmt_fee_bps" },
+          { "node_id": "n_fee_revenue", "type": "formula", "label": "Fee Revenue" },
+          { "node_id": "n_loan_book", "type": "driver", "label": "Loan Book Outstanding", "ref": "drv:starting_loan_book", "notes": "Stock variable with origination and runoff" },
+          { "node_id": "n_lending_rate", "type": "driver", "label": "Avg Lending Rate (Annual)", "ref": "drv:avg_lending_rate" },
+          { "node_id": "n_cost_of_funds", "type": "driver", "label": "Cost of Funds (Annual)", "ref": "drv:cost_of_funds" },
+          { "node_id": "n_nim", "type": "formula", "label": "Net Interest Margin" },
+          { "node_id": "n_nii", "type": "formula", "label": "Net Interest Income" },
+          { "node_id": "n_total_revenue", "type": "output", "label": "Total Revenue" },
+          { "node_id": "n_ecl_rate", "type": "driver", "label": "ECL Provision Rate (Annual)", "ref": "drv:ecl_rate" },
+          { "node_id": "n_provisions", "type": "formula", "label": "Provision for Credit Losses" },
+          { "node_id": "n_net_revenue", "type": "formula", "label": "Net Revenue After Provisions" },
+          { "node_id": "n_comp_ratio", "type": "driver", "label": "Compensation / Revenue Ratio", "ref": "drv:comp_to_revenue_ratio" },
+          { "node_id": "n_compensation", "type": "formula", "label": "Compensation & Benefits" },
+          { "node_id": "n_operating_profit", "type": "output", "label": "Operating Profit" }
+        ],
+        "edges": [
+          { "from": "n_aum", "to": "n_fee_revenue" },
+          { "from": "n_inflow_rate", "to": "n_aum" },
+          { "from": "n_mkt_return", "to": "n_aum" },
+          { "from": "n_fee_bps", "to": "n_fee_revenue" },
+          { "from": "n_lending_rate", "to": "n_nim" },
+          { "from": "n_cost_of_funds", "to": "n_nim" },
+          { "from": "n_loan_book", "to": "n_nii" },
+          { "from": "n_nim", "to": "n_nii" },
+          { "from": "n_fee_revenue", "to": "n_total_revenue" },
+          { "from": "n_nii", "to": "n_total_revenue" },
+          { "from": "n_loan_book", "to": "n_provisions" },
+          { "from": "n_ecl_rate", "to": "n_provisions" },
+          { "from": "n_total_revenue", "to": "n_net_revenue" },
+          { "from": "n_provisions", "to": "n_net_revenue" },
+          { "from": "n_net_revenue", "to": "n_compensation" },
+          { "from": "n_comp_ratio", "to": "n_compensation" },
+          { "from": "n_net_revenue", "to": "n_operating_profit" },
+          { "from": "n_compensation", "to": "n_operating_profit" }
+        ],
+        "formulas": [
+          { "formula_id": "f_fee_rev", "output_node_id": "n_fee_revenue", "expression": "aum * mgmt_fee_bps / 10000 / 12", "inputs": ["drv:starting_aum","drv:mgmt_fee_bps"], "notes": "Monthly fee revenue; AUM stock updated each period with inflows and market return" },
+          { "formula_id": "f_nim", "output_node_id": "n_nim", "expression": "avg_lending_rate - cost_of_funds", "inputs": ["drv:avg_lending_rate","drv:cost_of_funds"] },
+          { "formula_id": "f_nii", "output_node_id": "n_nii", "expression": "loan_book * nim / 12", "inputs": ["n_loan_book","n_nim"], "notes": "Monthly NII from annualized NIM" },
+          { "formula_id": "f_total_rev", "output_node_id": "n_total_revenue", "expression": "fee_revenue + nii", "inputs": ["n_fee_revenue","n_nii"] },
+          { "formula_id": "f_provisions", "output_node_id": "n_provisions", "expression": "loan_book * ecl_rate / 12", "inputs": ["n_loan_book","drv:ecl_rate"], "notes": "Monthly provision charge from annualized ECL rate" },
+          { "formula_id": "f_net_rev", "output_node_id": "n_net_revenue", "expression": "total_revenue - provisions", "inputs": ["n_total_revenue","n_provisions"] },
+          { "formula_id": "f_comp", "output_node_id": "n_compensation", "expression": "net_revenue * comp_to_revenue_ratio", "inputs": ["n_net_revenue","drv:comp_to_revenue_ratio"] },
+          { "formula_id": "f_op_profit", "output_node_id": "n_operating_profit", "expression": "net_revenue - compensation - other_opex", "inputs": ["n_net_revenue","n_compensation"], "notes": "Other OpEx added at implementation as fixed monthly amount" }
+        ]
+      }
     }
   ],
   "integrity": {
     "status": "passed",
     "checks": [
-      { "check_id": "I_CATALOG_STARTER_SET", "severity": "info", "message": "Starter templates included: manufacturing, distribution, services, SaaS, fintech multi-stream." }
+      { "check_id": "I_CATALOG_STARTER_SET", "severity": "info", "message": "Templates included: manufacturing, distribution, services, SaaS, fintech multi-stream (complete), financial services (fee & spread)." }
     ]
   }
 }

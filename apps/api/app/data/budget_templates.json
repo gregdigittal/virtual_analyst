@@ -289,6 +289,62 @@
         ]}
       ],
       "default_account_refs": ["Patient Service Revenue", "Other Operating Revenue", "Total Revenue", "Clinical Payroll", "Agency & Contract Labor", "Medical Supplies", "Facility Costs", "Regulatory & Compliance", "Depreciation", "EBITDA"]
+    },
+    {
+      "template_id": "financial_services",
+      "label": "Financial Services",
+      "industry": "financial_services",
+      "question_plan": [
+        { "section": "Revenue & Assets Under Management", "questions": [
+          { "id": "rev_1", "q": "Fee-based revenue streams (advisory, wealth management, fund management, brokerage)? AUM/AUA projections and fee schedule (bps by tier)?" },
+          { "id": "rev_2", "q": "Net interest income: loan book size, weighted average lending rate, cost of funds? Planned growth in the book?" },
+          { "id": "rev_3", "q": "Other revenue: trading, FX, insurance commissions, placement fees, performance fees? Material items and assumptions?" }
+        ]},
+        { "section": "Compensation & Headcount", "questions": [
+          { "id": "comp_1", "q": "Front-office headcount (relationship managers, advisors, traders, analysts). Base + variable compensation structure and targets?" },
+          { "id": "comp_2", "q": "Middle and back-office headcount (operations, compliance, risk, IT, admin). Fully loaded cost per head by function?" },
+          { "id": "comp_3", "q": "Compensation-to-revenue ratio target? Expected changes in incentive structures?" }
+        ]},
+        { "section": "Risk & Regulatory", "questions": [
+          { "id": "risk_1", "q": "Provision for credit losses or expected credit loss (ECL) rate assumptions? Portfolio quality trends and coverage ratios?" },
+          { "id": "risk_2", "q": "Regulatory capital requirements (CET1, leverage, liquidity ratios) and cost of capital? Buffer above minimums?" },
+          { "id": "risk_3", "q": "Compliance, legal, audit, and AML/KYC costs? Known regulatory changes or remediation programs?" }
+        ]},
+        { "section": "Technology & Operations", "questions": [
+          { "id": "tech_1", "q": "Core platform costs (banking system, portfolio management, trading infrastructure, custodian fees)?" },
+          { "id": "tech_2", "q": "Cybersecurity, data analytics, and digital transformation spend? Cloud migration plans?" },
+          { "id": "tech_3", "q": "Office occupancy, professional indemnity insurance, and general operational costs?" }
+        ]}
+      ],
+      "default_account_refs": ["Fee & Advisory Revenue", "Net Interest Income", "Trading & Other Revenue", "Total Revenue", "Provision for Credit Losses", "Net Revenue After Provisions", "Compensation & Benefits", "Technology & Data", "Occupancy", "Regulatory & Compliance", "Professional Services", "Other OpEx", "EBITDA"]
+    },
+    {
+      "template_id": "fintech",
+      "label": "Fintech",
+      "industry": "fintech",
+      "question_plan": [
+        { "section": "Revenue Streams & Unit Economics", "questions": [
+          { "id": "rev_1", "q": "Revenue model breakdown: transaction fees (take rate), subscription tiers, interchange, lending spread, FX margin? Fee structure by product?" },
+          { "id": "rev_2", "q": "Monthly active users or merchants? Growth trajectory and GMV/TPV assumptions?" },
+          { "id": "rev_3", "q": "Net revenue retention rate? Expansion revenue from existing customers (upsell, cross-sell)?" }
+        ]},
+        { "section": "Customer Acquisition & Retention", "questions": [
+          { "id": "cac_1", "q": "CAC by channel (paid, organic, partnerships, referral). Blended CAC and LTV/CAC ratio target?" },
+          { "id": "cac_2", "q": "Monthly churn rate by cohort? Expected improvement trajectory?" },
+          { "id": "cac_3", "q": "Sales and marketing headcount and spend allocation. Channel partnership costs?" }
+        ]},
+        { "section": "Technology & Infrastructure", "questions": [
+          { "id": "tech_1", "q": "Engineering and product headcount ramp plan? Build vs buy decisions on core infrastructure?" },
+          { "id": "tech_2", "q": "Cloud infrastructure, payment processing/gateway, and banking-as-a-service costs?" },
+          { "id": "tech_3", "q": "Third-party API costs (identity verification, credit bureau, data providers)?" }
+        ]},
+        { "section": "Risk & Compliance", "questions": [
+          { "id": "risk_1", "q": "Fraud and chargeback loss rate assumptions? Risk management headcount, tools, and insurance?" },
+          { "id": "risk_2", "q": "Regulatory licensing costs by jurisdiction? Capital adequacy or e-money safeguarding requirements?" },
+          { "id": "risk_3", "q": "Legal, audit, and ongoing compliance monitoring costs?" }
+        ]}
+      ],
+      "default_account_refs": ["Transaction Revenue", "Subscription Revenue", "Interchange & Other Fees", "Total Revenue", "Payment Processing Costs", "Gross Profit", "Engineering & Product", "Sales & Marketing", "Customer Support", "Fraud & Risk Costs", "Regulatory & Compliance", "G&A", "EBITDA"]
     }
   ]
 }
