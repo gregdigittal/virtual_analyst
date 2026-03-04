@@ -21,6 +21,38 @@ def _clean_env_url(value: str) -> str:
     return cleaned
 
 
+# Map Supabase project ref → region (used by _migrate_db_url)
+_SUPABASE_REGIONS: dict[str, str] = {
+    "hfbjypuoojstjquoyqid": "eu-west-1",
+}
+
+
+def _migrate_db_url(url: str) -> str:
+    """Rewrite deprecated Supabase direct-connection URLs to Supavisor pooler.
+
+    Supabase deprecated direct ``db.<ref>.supabase.co:5432`` connections.
+    The replacement is ``postgres.<ref>@aws-0-<region>.pooler.supabase.com:6543``.
+
+    Only rewrites URLs that match the deprecated pattern AND whose project ref
+    is in ``_SUPABASE_REGIONS``.  Unknown projects are left unchanged so the
+    operator notices the failure and can fix it manually.
+    """
+    m = re.match(
+        r"^(?P<scheme>postgres(?:ql)?://)(?P<user>[^:]+):(?P<pass>[^@]+)@db\.(?P<ref>[a-z]+)\.supabase\.co:5432/(?P<db>.+)$",
+        url,
+    )
+    if not m:
+        return url
+    ref = m.group("ref")
+    region = _SUPABASE_REGIONS.get(ref)
+    if not region:
+        return url  # unknown project — don't guess
+    return (
+        f"{m.group('scheme')}{m.group('user')}.{ref}:{m.group('pass')}"
+        f"@aws-0-{region}.pooler.supabase.com:6543/{m.group('db')}"
+    )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -118,13 +150,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _clean_urls(self) -> "Settings":
-        """Strip accidental shell-style assignment wrapping from URL env vars.
-
-        Some hosting dashboards (e.g. Render) produce values like
-        ``REDIS_URL="rediss://..."`` instead of the bare URL.
-        """
+        """Strip shell-style wrapping and migrate deprecated Supabase URLs."""
         self.redis_url = _clean_env_url(self.redis_url)
-        self.database_url = _clean_env_url(self.database_url)
+        self.database_url = _migrate_db_url(_clean_env_url(self.database_url))
         return self
 
     @model_validator(mode="after")
