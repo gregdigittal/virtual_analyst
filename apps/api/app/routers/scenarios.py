@@ -163,7 +163,9 @@ def _parse_overrides_json(val: Any) -> list[dict]:
         import json
         try:
             return json.loads(val)
-        except Exception:
+        except Exception as e:
+            import structlog
+            structlog.get_logger().warning("scenario_overrides_json_parse_failed", error=str(e))
             return []
     return []
 

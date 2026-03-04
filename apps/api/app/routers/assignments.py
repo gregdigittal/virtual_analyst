@@ -439,8 +439,9 @@ async def _generate_learning_points(
                     tenant_id,
                     summary_id,
                 )
-    except Exception:
-        pass  # leave learning_points_json as default []
+    except Exception as e:
+        import structlog
+        structlog.get_logger().warning("learning_points_update_failed", tenant_id=tenant_id, error=str(e))
 
 
 @router.post("/{assignment_id}/review", status_code=201)

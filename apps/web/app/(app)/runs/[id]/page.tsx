@@ -297,7 +297,7 @@ export default function RunDetailPage() {
           >
             Sensitivity
           </Link>
-          {run?.status === "completed" && (
+          {run?.status === "succeeded" && (
             <VAButton
               type="button"
               variant="secondary"

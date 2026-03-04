@@ -81,13 +81,16 @@ app.middleware("http")(auth_middleware)
 
 # CORSMiddleware MUST wrap auth so that error responses (401/403) include CORS
 # headers. Otherwise browsers block auth errors as CORS failures ("Failed to fetch").
-app.add_middleware(
-    CORSMiddleware,
+_cors_kwargs: dict[str, Any] = dict(
     allow_origins=settings.cors_allowed_origins_list(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Request-ID"],
 )
+_origin_regex = settings.cors_origin_regex()
+if _origin_regex:
+    _cors_kwargs["allow_origin_regex"] = _origin_regex
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 app.middleware("http")(logging_middleware)
 

@@ -32,8 +32,9 @@ def _task_tenant_set(task_id: str, tenant_id: str) -> None:
         r = _get_redis()
         key = f"{JOB_TENANT_KEY_PREFIX}{task_id}"
         r.setex(key, JOB_TENANT_TTL_SEC, tenant_id)
-    except Exception:
-        pass
+    except Exception as e:
+        import structlog
+        structlog.get_logger().warning("redis_task_tenant_set_failed", task_id=task_id, error=str(e))
 
 
 def _task_tenant_get(task_id: str) -> str | None:
@@ -43,7 +44,9 @@ def _task_tenant_get(task_id: str) -> str | None:
         key = f"{JOB_TENANT_KEY_PREFIX}{task_id}"
         raw = r.get(key)
         return raw.decode("utf-8") if raw else None
-    except Exception:
+    except Exception as e:
+        import structlog
+        structlog.get_logger().warning("redis_task_tenant_get_failed", task_id=task_id, error=str(e))
         return None
 
 

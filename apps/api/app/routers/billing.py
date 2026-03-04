@@ -116,7 +116,9 @@ async def stripe_webhook(
     try:
         import stripe
         event = stripe.Webhook.construct_event(payload, sig, settings.stripe_webhook_secret)
-    except Exception:
+    except Exception as e:
+        import structlog
+        structlog.get_logger().warning("stripe_webhook_validation_failed", error=str(e))
         return JSONResponse(status_code=400, content={"error": "Invalid webhook signature"})
     sid = None
     if event.type == "subscription.updated":

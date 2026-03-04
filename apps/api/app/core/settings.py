@@ -84,6 +84,12 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         alias="CORS_ALLOWED_ORIGINS",
     )
+    cors_allow_origin_regex: str = Field(
+        default="",
+        alias="CORS_ALLOW_ORIGIN_REGEX",
+    )
+    """Regex pattern for additional allowed CORS origins (e.g. Vercel preview deployments).
+    In production, automatically includes Vercel preview URL pattern if not explicitly set."""
 
     rate_limit: str = Field(default="100/minute", alias="RATE_LIMIT")
     cron_secret: str | None = Field(default=None, alias="CRON_SECRET")
@@ -193,6 +199,19 @@ class Settings(BaseSettings):
             if prod_origin not in origins:
                 origins.append(prod_origin)
         return origins
+
+    def cors_origin_regex(self) -> str | None:
+        """Return regex for dynamically-matched CORS origins (e.g. Vercel previews).
+
+        In production, if no explicit regex is configured, defaults to matching
+        Vercel preview deployment URLs for the virtual-analyst project.
+        """
+        if self.cors_allow_origin_regex:
+            return self.cors_allow_origin_regex
+        # In production / staging, allow Vercel preview deployments automatically
+        if self.environment not in ("development", "test"):
+            return r"https://virtual-analyst[a-z0-9-]*\.vercel\.app"
+        return None
 
 
 @lru_cache

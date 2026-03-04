@@ -93,7 +93,7 @@ export default function DashboardPage() {
                         {r.run_id}
                       </Link>
                       <span className={`rounded-full px-2 py-0.5 text-xs ${
-                        r.status === "completed" ? "bg-green-900/40 text-green-300" :
+                        r.status === "succeeded" ? "bg-green-900/40 text-green-300" :
                         r.status === "failed" ? "bg-red-900/40 text-red-300" :
                         "bg-yellow-900/40 text-yellow-300"
                       }`}>

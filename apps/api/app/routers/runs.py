@@ -68,8 +68,9 @@ def _get_mc_progress(tenant_id: str, run_id: str) -> dict[str, Any] | None:
         raw = r.get(key)
         if raw:
             return json.loads(raw)
-    except Exception:
-        pass
+    except Exception as e:
+        import structlog
+        structlog.get_logger().warning("redis_mc_progress_failed", tenant_id=tenant_id, run_id=run_id, error=str(e))
     return None
 
 

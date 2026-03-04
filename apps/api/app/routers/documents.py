@@ -210,5 +210,6 @@ async def delete_document(
 
     try:
         store.delete(x_tenant_id, DOCUMENT_ARTIFACT_TYPE, document_id)
-    except Exception:
-        pass
+    except Exception as e:
+        import structlog
+        structlog.get_logger().warning("document_artifact_delete_failed", tenant_id=x_tenant_id, document_id=document_id, error=str(e))

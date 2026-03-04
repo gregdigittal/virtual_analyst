@@ -227,7 +227,12 @@ async def auth_middleware(request: Request, call_next):
                 logger.info("auth_user_provisioned", user_id=user_id, tenant_id=tenant_id, role="owner")
     except Exception as e:
         import traceback
-        logger.warning("auth_role_lookup_failed", user_id=user_id, tenant_id=tenant_id, error=str(e), traceback=traceback.format_exc())
-        request.state.role = "investor"
+        logger.error("auth_role_lookup_failed", user_id=user_id, tenant_id=tenant_id, error=str(e), traceback=traceback.format_exc())
+        # Return 503 instead of silently falling back to "investor" role.
+        # A DB outage should not grant any access to financial data.
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Service temporarily unavailable — unable to verify user role"},
+        )
 
     return await call_next(request)
