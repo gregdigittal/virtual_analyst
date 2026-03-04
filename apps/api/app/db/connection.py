@@ -18,7 +18,7 @@ async def tenant_conn(tenant_id: str):
         conn = await _pool.acquire()
     else:
         settings = get_settings()
-        conn = await asyncpg.connect(settings.database_url)
+        conn = await asyncpg.connect(settings.database_url, statement_cache_size=0)
     try:
         await conn.execute("SELECT set_config('app.tenant_id', $1, false)", tenant_id)
         yield conn
@@ -44,6 +44,7 @@ async def init_pool() -> None:
         min_size=settings.pool_min_size,
         max_size=settings.pool_max_size,
         command_timeout=60,
+        statement_cache_size=0,
     )
 
 
@@ -65,7 +66,7 @@ async def get_conn() -> asyncpg.Connection:
     if _pool is not None:
         return await _pool.acquire()
     settings = get_settings()
-    return await asyncpg.connect(settings.database_url)
+    return await asyncpg.connect(settings.database_url, statement_cache_size=0)
 
 
 async def ensure_tenant(conn: asyncpg.Connection, tenant_id: str, name: str | None = None) -> None:

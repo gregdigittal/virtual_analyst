@@ -67,13 +67,18 @@ class ArtifactStore:
             bucket = self._client.storage.from_("artifacts")
             try:
                 resp = bucket.download(path)
+                return json.loads(resp.decode("utf-8"))
             except Exception as e:
-                if "404" in str(e) or "not found" in str(e).lower() or "Object not found" in str(e):
+                err_str = str(e).lower()
+                # If storage failed, try in-memory fallback (populated when save() failed)
+                if path in self._memory:
+                    _log.info("artifact_loaded_from_memory_fallback: %s", path)
+                    return json.loads(self._memory[path].decode("utf-8"))
+                if "404" in str(e) or "not found" in err_str or "object not found" in err_str:
                     raise StorageError(
                         f"Artifact not found: {path}", code="ERR_STOR_NOT_FOUND"
                     ) from e
                 raise StorageError(str(e), code="ERR_STOR_OPERATION_FAILED") from e
-            return json.loads(resp.decode("utf-8"))
         if path not in self._memory:
             raise StorageError(f"Artifact not found: {path}", code="ERR_STOR_NOT_FOUND")
         return json.loads(self._memory[path].decode("utf-8"))
