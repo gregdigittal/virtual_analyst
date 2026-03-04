@@ -21,9 +21,10 @@ def _clean_env_url(value: str) -> str:
     return cleaned
 
 
-# Map Supabase project ref → region (used by _migrate_db_url)
-_SUPABASE_REGIONS: dict[str, str] = {
-    "hfbjypuoojstjquoyqid": "eu-west-1",
+# Map Supabase project ref → pooler host (used by _migrate_db_url).
+# Get the exact host from Dashboard → Settings → Database → Connection String.
+_SUPABASE_POOLER_HOSTS: dict[str, str] = {
+    "hfbjypuoojstjquoyqid": "aws-1-eu-west-1.pooler.supabase.com",
 }
 
 
@@ -31,11 +32,11 @@ def _migrate_db_url(url: str) -> str:
     """Rewrite deprecated Supabase direct-connection URLs to Supavisor pooler.
 
     Supabase deprecated direct ``db.<ref>.supabase.co:5432`` connections.
-    The replacement is ``postgres.<ref>@aws-0-<region>.pooler.supabase.com:6543``.
+    The replacement is ``postgres.<ref>@<pooler_host>:6543``.
 
     Only rewrites URLs that match the deprecated pattern AND whose project ref
-    is in ``_SUPABASE_REGIONS``.  Unknown projects are left unchanged so the
-    operator notices the failure and can fix it manually.
+    is in ``_SUPABASE_POOLER_HOSTS``.  Unknown projects are left unchanged so
+    the operator notices the failure and can fix it manually.
     """
     m = re.match(
         r"^(?P<scheme>postgres(?:ql)?://)(?P<user>[^:]+):(?P<pass>[^@]+)@db\.(?P<ref>[a-z]+)\.supabase\.co:5432/(?P<db>.+)$",
@@ -44,12 +45,12 @@ def _migrate_db_url(url: str) -> str:
     if not m:
         return url
     ref = m.group("ref")
-    region = _SUPABASE_REGIONS.get(ref)
-    if not region:
+    pooler_host = _SUPABASE_POOLER_HOSTS.get(ref)
+    if not pooler_host:
         return url  # unknown project — don't guess
     return (
         f"{m.group('scheme')}{m.group('user')}.{ref}:{m.group('pass')}"
-        f"@aws-0-{region}.pooler.supabase.com:6543/{m.group('db')}"
+        f"@{pooler_host}:6543/{m.group('db')}"
     )
 
 
