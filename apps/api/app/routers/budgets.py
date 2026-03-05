@@ -6,6 +6,7 @@ import calendar
 import json
 import uuid
 from collections import OrderedDict
+from datetime import date
 from typing import Any
 
 import asyncpg
@@ -296,11 +297,11 @@ async def create_budget_from_template_impl(
                 period_year = year + year_offset
                 _, last_day = calendar.monthrange(period_year, month)
                 period_id = _period_id()
-                start = f"{period_year}-{month:02d}-01"
-                end = f"{period_year}-{month:02d}-{last_day:02d}"
+                start = date(period_year, month, 1)
+                end = date(period_year, month, last_day)
                 await conn.execute(
                     """INSERT INTO budget_periods (tenant_id, budget_id, period_id, period_ordinal, period_start, period_end, label)
-                       VALUES ($1, $2, $3, $4, $5::date, $6::date, $7)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)
                        ON CONFLICT (tenant_id, budget_id, period_ordinal) DO NOTHING""",
                     tenant_id,
                     budget_id,
@@ -909,14 +910,14 @@ async def add_budget_periods(
                 period_id = _period_id()
                 await conn.execute(
                     """INSERT INTO budget_periods (tenant_id, budget_id, period_id, period_ordinal, period_start, period_end, label)
-                       VALUES ($1, $2, $3, $4, $5::date, $6::date, $7)
-                       ON CONFLICT (tenant_id, budget_id, period_ordinal) DO UPDATE SET period_start = $5::date, period_end = $6::date, label = $7""",
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)
+                       ON CONFLICT (tenant_id, budget_id, period_ordinal) DO UPDATE SET period_start = $5, period_end = $6, label = $7""",
                     x_tenant_id,
                     budget_id,
                     period_id,
                     item.period_ordinal,
-                    item.period_start,
-                    item.period_end,
+                    date.fromisoformat(item.period_start),
+                    date.fromisoformat(item.period_end),
                     item.label,
                 )
                 added.append({
