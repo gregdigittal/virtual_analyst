@@ -255,7 +255,7 @@ async def create_budget_from_template_impl(
     except LLMError as e:
         raise HTTPException(
             503 if e.code == "ERR_LLM_ALL_PROVIDERS_FAILED" else 429,
-            detail=e.message,
+            detail=f"{e.message}: {e.details}" if e.details else e.message,
         ) from e
     content = response.content or {}
     line_items_payload = content.get("line_items") or []
@@ -568,7 +568,7 @@ async def natural_language_budget_query(
         except LLMError as e:
             raise HTTPException(
                 429 if e.code == "ERR_LLM_QUOTA_EXCEEDED" else 503,
-                detail=e.message,
+                detail=f"{e.message}: {e.details}" if e.details else e.message,
             ) from e
         return {
             "answer": content.get("answer", "No answer generated."),
@@ -591,7 +591,7 @@ async def natural_language_budget_query(
     except LLMError as e:
         raise HTTPException(
             503 if e.code == "ERR_LLM_ALL_PROVIDERS_FAILED" else 429,
-            detail=e.message,
+            detail=f"{e.message}: {e.details}" if e.details else e.message,
         ) from e
     content = response.content or {}
     return {
@@ -1510,7 +1510,7 @@ async def reforecast_budget(
                 except LLMError as e:
                     raise HTTPException(
                         429 if e.code == "ERR_LLM_QUOTA_EXCEEDED" else 503,
-                        detail=e.message,
+                        detail=f"{e.message}: {e.details}" if e.details else e.message,
                     ) from e
             else:
                 prompt = (

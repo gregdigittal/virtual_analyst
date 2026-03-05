@@ -152,11 +152,15 @@ class LLMRouter:
                     context={"limit": settings.llm_tokens_monthly_limit, "tenant_id": tenant_id},
                 )
         last_error: Exception | None = None
+        skipped_no_key: list[str] = []
+        skipped_circuit_open: list[str] = []
         for provider_key, model, rule_max_tokens, rule_temp in candidates:
             if self._circuit.is_open(provider_key):
+                skipped_circuit_open.append(provider_key)
                 continue
             provider = self._get_provider(provider_key, model)
             if provider is None:
+                skipped_no_key.append(provider_key)
                 continue
             use_max = max_tokens if max_tokens is not None else rule_max_tokens
             use_temp = temperature if temperature is not None else rule_temp
@@ -196,8 +200,22 @@ class LLMRouter:
                 last_error = e
                 self._circuit.record_failure(provider_key)
                 continue
+        # Build a helpful error message indicating WHY providers failed
+        detail_parts: list[str] = []
+        if skipped_no_key:
+            detail_parts.append(
+                f"Providers skipped (no API key configured): {', '.join(sorted(set(skipped_no_key)))}"
+            )
+        if skipped_circuit_open:
+            detail_parts.append(
+                f"Providers skipped (circuit breaker open): {', '.join(sorted(set(skipped_circuit_open)))}"
+            )
+        if last_error:
+            detail_parts.append(f"Last provider error: {last_error}")
+        if not detail_parts:
+            detail_parts.append("No candidate providers available")
         raise LLMError(
             "All providers failed",
             code="ERR_LLM_ALL_PROVIDERS_FAILED",
-            details=str(last_error) if last_error else None,
+            details="; ".join(detail_parts),
         )

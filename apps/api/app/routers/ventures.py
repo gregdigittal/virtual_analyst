@@ -202,7 +202,7 @@ async def generate_draft(
     except LLMError as e:
         raise HTTPException(
             503 if e.code == "ERR_LLM_ALL_PROVIDERS_FAILED" else 429,
-            detail=e.message,
+            detail=f"{e.message}: {e.details}" if e.details else e.message,
         ) from e
     content = response.content or {}
     llm_assumptions = content.get("assumptions") or {}

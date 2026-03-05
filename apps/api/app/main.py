@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
@@ -112,6 +113,34 @@ async def finmodel_error_handler(request: Request, exc: FinModelError) -> JSONRe
         status_code=get_http_status(exc.code),
         content={
             "error": exc.to_dict(),
+            "meta": {
+                "request_id": getattr(request.state, "request_id", ""),
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all for unhandled exceptions.
+
+    Without this, unhandled errors produce a raw 500 response that bypasses
+    CORSMiddleware — the browser then reports a CORS error instead of the
+    real server error, making debugging very difficult.
+    """
+    logger.error(
+        "unhandled_exception",
+        error_type=type(exc).__name__,
+        error_message=str(exc),
+        path=request.url.path,
+        method=request.method,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error_type": type(exc).__name__,
             "meta": {
                 "request_id": getattr(request.state, "request_id", ""),
                 "timestamp": datetime.now(UTC).isoformat(),

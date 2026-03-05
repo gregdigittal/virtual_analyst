@@ -586,8 +586,8 @@ async def draft_chat(
                     )
                 except LLMError as e:
                     if e.code == "ERR_LLM_QUOTA_EXCEEDED":
-                        raise HTTPException(429, e.message) from e
-                    raise HTTPException(503, e.message) from e
+                        raise HTTPException(429, f"{e.message}: {e.details}" if e.details else e.message) from e
+                    raise HTTPException(503, f"{e.message}: {e.details}" if e.details else e.message) from e
             else:
                 system_text = _build_draft_assumptions_prompt(workspace)
                 chat_history = workspace.get("chat_history") or []
@@ -605,8 +605,8 @@ async def draft_chat(
                     )
                 except LLMError as e:
                     if e.code == "ERR_LLM_QUOTA_EXCEEDED":
-                        raise HTTPException(429, e.message) from e
-                    raise HTTPException(503, e.message) from e
+                        raise HTTPException(429, f"{e.message}: {e.details}" if e.details else e.message) from e
+                    raise HTTPException(503, f"{e.message}: {e.details}" if e.details else e.message) from e
                 content = response.content
             proposals_in = content.get("proposals") or []
             valid = []
