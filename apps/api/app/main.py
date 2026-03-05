@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
+import traceback
+
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -129,18 +131,23 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     CORSMiddleware — the browser then reports a CORS error instead of the
     real server error, making debugging very difficult.
     """
+    tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
     logger.error(
         "unhandled_exception",
         error_type=type(exc).__name__,
         error_message=str(exc),
         path=request.url.path,
         method=request.method,
+        traceback="".join(tb),
     )
+    # Include error_message in non-production for debugging
+    include_detail = settings.environment in ("development", "test")
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "Internal server error",
+            "detail": str(exc) if include_detail else "Internal server error",
             "error_type": type(exc).__name__,
+            "error_message": str(exc),
             "meta": {
                 "request_id": getattr(request.state, "request_id", ""),
                 "timestamp": datetime.now(UTC).isoformat(),
