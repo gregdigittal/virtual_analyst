@@ -140,22 +140,20 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         method=request.method,
         traceback="".join(tb),
     )
-    # Include error_message in non-production for debugging
+    # Include detail/traceback in non-production for debugging
     include_detail = settings.environment in ("development", "test")
-    tb_str = "".join(tb)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": str(exc) if include_detail else "Internal server error",
-            "error_type": type(exc).__name__,
-            "error_message": str(exc),
-            "traceback": tb_str,
-            "meta": {
-                "request_id": getattr(request.state, "request_id", ""),
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
+    body: dict[str, Any] = {
+        "detail": str(exc) if include_detail else "Internal server error",
+        "meta": {
+            "request_id": getattr(request.state, "request_id", ""),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
-    )
+    }
+    if include_detail:
+        body["error_type"] = type(exc).__name__
+        body["error_message"] = str(exc)
+        body["traceback"] = "".join(tb)
+    return JSONResponse(status_code=500, content=body)
 
 
 app.include_router(health.router, prefix="/api/v1")

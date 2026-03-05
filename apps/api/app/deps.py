@@ -66,7 +66,10 @@ def get_llm_router() -> LLMRouter:
     global _llm_router
     if _llm_router is None:
         _llm_router = LLMRouter()
-        _llm_router.set_billing_service(get_billing_service())
+        # TODO: Wire billing once billing module is fully implemented:
+        # _llm_router.set_billing_service(get_billing_service())
+        # Until then, LLM router falls back to simple token metering
+        # (check_limit / add_usage in services.llm.metering).
     return _llm_router
 
 
