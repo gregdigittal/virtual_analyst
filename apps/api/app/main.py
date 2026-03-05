@@ -148,13 +148,13 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
     body: dict[str, Any] = {
         "detail": str(exc) if include_detail else "Internal server error",
+        "error_type": type(exc).__name__,
         "meta": {
             "request_id": getattr(request.state, "request_id", ""),
             "timestamp": datetime.now(UTC).isoformat(),
         },
     }
     if include_detail:
-        body["error_type"] = type(exc).__name__
         body["error_message"] = str(exc)
         body["traceback"] = "".join(tb)
     return JSONResponse(status_code=500, content=body)
