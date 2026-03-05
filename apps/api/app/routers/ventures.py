@@ -205,7 +205,11 @@ async def generate_draft(
             detail=f"{e.message}: {e.details}" if e.details else e.message,
         ) from e
     content = response.content or {}
+    if not isinstance(content, dict):
+        content = {}
     llm_assumptions = content.get("assumptions") or {}
+    if not isinstance(llm_assumptions, dict):
+        llm_assumptions = {}
     draft_session_id = f"ds_{uuid.uuid4().hex[:12]}"
     base_workspace = _empty_workspace(draft_session_id, template_id, None, None)
     base_workspace["driver_blueprint"] = template.get("driver_blueprint", {"nodes": [], "edges": [], "formulas": []})

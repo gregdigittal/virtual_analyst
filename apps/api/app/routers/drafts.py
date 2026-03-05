@@ -608,9 +608,15 @@ async def draft_chat(
                         raise HTTPException(429, f"{e.message}: {e.details}" if e.details else e.message) from e
                     raise HTTPException(503, f"{e.message}: {e.details}" if e.details else e.message) from e
                 content = response.content
+            if not isinstance(content, dict):
+                content = {}
             proposals_in = content.get("proposals") or []
+            if not isinstance(proposals_in, list):
+                proposals_in = []
             valid = []
             for p in proposals_in:
+                if not isinstance(p, dict):
+                    continue
                 path = p.get("path") or ""
                 if not _path_under_assumptions(path):
                     continue

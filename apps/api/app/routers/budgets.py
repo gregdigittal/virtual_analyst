@@ -9,6 +9,7 @@ from collections import OrderedDict
 from typing import Any
 
 import asyncpg
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -26,6 +27,8 @@ from apps.api.app.services.agent.budget_agent import run_budget_nl_query_agent
 from apps.api.app.services.agent.reforecast_agent import run_reforecast_agent
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.errors import LLMError
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/budgets", tags=["budgets"], dependencies=[require_role(*ROLES_CAN_WRITE)])
 
@@ -258,7 +261,13 @@ async def create_budget_from_template_impl(
             detail=f"{e.message}: {e.details}" if e.details else e.message,
         ) from e
     content = response.content or {}
+    if not isinstance(content, dict):
+        logger.warning("llm_response_not_dict", content_type=type(content).__name__, raw_text=response.raw_text[:500])
+        content = {}
     line_items_payload = content.get("line_items") or []
+    if not isinstance(line_items_payload, list):
+        logger.warning("llm_line_items_not_list", payload_type=type(line_items_payload).__name__)
+        line_items_payload = []
     budget_id = _budget_id()
     version_id = _version_id()
     async with tenant_conn(tenant_id) as conn:
@@ -303,10 +312,16 @@ async def create_budget_from_template_impl(
                 )
             created_lines: list[dict[str, Any]] = []
             for li in line_items_payload:
+                if not isinstance(li, dict):
+                    logger.warning("llm_line_item_not_dict", item_type=type(li).__name__, item_value=str(li)[:200])
+                    continue
                 line_item_id = _line_item_id()
                 confidence = li.get("confidence")
                 if confidence is not None:
-                    confidence = max(0.0, min(1.0, float(confidence)))
+                    try:
+                        confidence = max(0.0, min(1.0, float(confidence)))
+                    except (TypeError, ValueError):
+                        confidence = None
                 await conn.execute(
                     """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, confidence_score, is_revenue)
                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
@@ -319,7 +334,12 @@ async def create_budget_from_template_impl(
                     confidence,
                     bool(li.get("is_revenue", False)),
                 )
-                for amt in li.get("amounts") or []:
+                amounts_list = li.get("amounts") or []
+                if not isinstance(amounts_list, list):
+                    amounts_list = []
+                for amt in amounts_list:
+                    if not isinstance(amt, dict):
+                        continue
                     await conn.execute(
                         """INSERT INTO budget_line_item_amounts (tenant_id, line_item_id, period_ordinal, amount)
                            VALUES ($1, $2, $3, $4)
@@ -594,6 +614,9 @@ async def natural_language_budget_query(
             detail=f"{e.message}: {e.details}" if e.details else e.message,
         ) from e
     content = response.content or {}
+    if not isinstance(content, dict):
+        logger.warning("llm_nl_query_not_dict", content_type=type(content).__name__)
+        content = {}
     return {
         "answer": content.get("answer", "No answer generated."),
         "citations": content.get("citations") or [],
@@ -1536,7 +1559,14 @@ async def reforecast_budget(
                         detail=e.message,
                     ) from e
                 content = response.content or {}
+            if not isinstance(content, dict):
+                logger.warning("llm_reforecast_not_dict", content_type=type(content).__name__)
+                content = {}
             revisions = content.get("revisions") or []
+            if not isinstance(revisions, list):
+                revisions = []
+            # Ensure each revision is a dict (guard against malformed LLM output)
+            revisions = [r for r in revisions if isinstance(r, dict)]
             for li in line_rows:
                 new_li_id = _line_item_id()
                 account_ref = li["account_ref"]
@@ -1565,7 +1595,8 @@ async def reforecast_budget(
                         amt,
                     )
                 # Remaining periods: use LLM revision or keep original from pre-fetched amounts_by_item
-                rev_amounts = {a["period_ordinal"]: a["amount"] for a in (rev.get("amounts") or [])} if rev else {}
+                _rev_amt_list = (rev.get("amounts") or []) if rev else []
+                rev_amounts = {a["period_ordinal"]: a["amount"] for a in _rev_amt_list if isinstance(a, dict) and "period_ordinal" in a}
                 orig_amounts = amounts_by_item.get(li["line_item_id"], [])
                 for r in orig_amounts:
                     if r["period_ordinal"] in periods_with_actuals:
