@@ -149,13 +149,13 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     body: dict[str, Any] = {
         "detail": str(exc) if include_detail else "Internal server error",
         "error_type": type(exc).__name__,
+        "error_message": str(exc),
         "meta": {
             "request_id": getattr(request.state, "request_id", ""),
             "timestamp": datetime.now(UTC).isoformat(),
         },
     }
     if include_detail:
-        body["error_message"] = str(exc)
         body["traceback"] = "".join(tb)
     return JSONResponse(status_code=500, content=body)
 
@@ -210,4 +210,4 @@ async def metrics_endpoint(request: Request):
 
 @app.get("/")
 async def root() -> dict:
-    return {"name": "Virtual Analyst API", "version": "0.1.0", "status": "ok"}
+    return {"name": "Virtual Analyst API", "version": "0.1.0", "status": "ok", "deploy": "20260305b"}
