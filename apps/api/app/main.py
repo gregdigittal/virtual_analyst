@@ -140,8 +140,8 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         method=request.method,
         traceback="".join(tb),
     )
-    # Include detail/traceback in non-production for debugging
-    include_detail = settings.environment in ("development", "test")
+    # Include detail/traceback in non-production for debugging (or via X-Debug header)
+    include_detail = settings.environment in ("development", "test") or request.headers.get("X-Debug") == settings.metrics_secret
     body: dict[str, Any] = {
         "detail": str(exc) if include_detail else "Internal server error",
         "meta": {
