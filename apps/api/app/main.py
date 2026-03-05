@@ -210,4 +210,4 @@ async def metrics_endpoint(request: Request):
 
 @app.get("/")
 async def root() -> dict:
-    return {"name": "Virtual Analyst API", "version": "0.1.0", "status": "ok", "deploy": "20260305b"}
+    return {"name": "Virtual Analyst API", "version": "0.1.0", "status": "ok"}
