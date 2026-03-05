@@ -142,12 +142,14 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
     # Include error_message in non-production for debugging
     include_detail = settings.environment in ("development", "test")
+    tb_str = "".join(tb)
     return JSONResponse(
         status_code=500,
         content={
             "detail": str(exc) if include_detail else "Internal server error",
             "error_type": type(exc).__name__,
             "error_message": str(exc),
+            "traceback": tb_str,
             "meta": {
                 "request_id": getattr(request.state, "request_id", ""),
                 "timestamp": datetime.now(UTC).isoformat(),
