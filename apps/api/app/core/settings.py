@@ -195,6 +195,7 @@ class Settings(BaseSettings):
         for prod_origin in (
             "https://www.virtual-analyst.ai",
             "https://virtual-analyst.ai",
+            "https://virtual-analyst-ten.vercel.app",
         ):
             if prod_origin not in origins:
                 origins.append(prod_origin)
