@@ -86,7 +86,7 @@ export const mockApi = {
     getKpis: vi.fn(async () => []),
   },
   budgets: {
-    list: vi.fn(emptyList),
+    list: vi.fn(async () => ({ budgets: [], total: 0 })),
     get: vi.fn(async () => ({
       budget_id: "bud-1",
       label: "FY2026",
@@ -123,6 +123,7 @@ export const mockApi = {
   },
   notifications: {
     list: vi.fn(async () => ({ items: [], total: 0, unread_count: 0 })),
+    markRead: vi.fn(async () => ({ ok: true })),
   },
   assignments: {
     list: vi.fn(async () => ({ assignments: [], total: 0 })),
@@ -158,7 +159,42 @@ export const mockApi = {
     diff: vi.fn(async () => ({})),
   },
   comments: {
-    list: vi.fn(async () => ({ comments: [] })),
+    list: vi.fn(async () => ({ items: [], comments: [], total: 0 })),
+    create: vi.fn(async () => ({ comment_id: "c-1" })),
+  },
+  marketplace: {
+    list: vi.fn(async () => ({ items: [], total: 0 })),
+    useTemplate: vi.fn(async () => ({ baseline_id: "b-new" })),
+  },
+  memos: {
+    list: vi.fn(async () => ({ items: [], total: 0 })),
+    create: vi.fn(async () => ({ memo_id: "memo-1" })),
+  },
+  documents: {
+    list: vi.fn(async () => ({ items: [], total: 0 })),
+    upload: vi.fn(async () => ({ document_id: "doc-1" })),
+  },
+  covenants: {
+    list: vi.fn(async () => ({ items: [], total: 0 })),
+    metricRefs: vi.fn(async () => ({ metric_refs: [] })),
+    create: vi.fn(async () => ({ covenant_id: "cov-1" })),
+    delete: vi.fn(async () => ({ ok: true })),
+  },
+  benchmark: {
+    getOptIn: vi.fn(async () => ({ opted_in: false })),
+    getSummary: vi.fn(async () => ({ metrics: [] })),
+    setOptIn: vi.fn(async () => ({ ok: true })),
+    deleteOptIn: vi.fn(async () => ({ ok: true })),
+  },
+  ventures: {
+    templates: vi.fn(async () => []),
+    create: vi.fn(async () => ({ venture_id: "v-1", question_plan: [] })),
+    submitAnswers: vi.fn(async () => ({ ok: true })),
+    generateDraft: vi.fn(async () => ({ draft_session_id: "draft-v1" })),
+  },
+  changesets: {
+    list: vi.fn(async () => ({ items: [], total: 0 })),
+    create: vi.fn(async () => ({ changeset_id: "cs-1" })),
   },
   excelIngestion: {
     upload: vi.fn(async () => ({
