@@ -4,6 +4,8 @@
 
 Virtual Analyst provides built-in collaboration tools so your team can discuss assumptions, track changes, and stay informed without leaving the platform. Threaded comments let you attach conversations directly to runs, scenarios, assumptions, and other entities. The activity feed consolidates audit events and comments into a single timeline, while the notification system delivers alerts for completed runs, covenant breaches, task assignments, review decisions, and @mentions.
 
+> **Instructions Button:** Every page in the application features a floating **Instructions** button in the bottom-right corner. Click it to open a help drawer showing step-by-step guidance for the current page, prerequisites, and links to related sections.
+
 ## Process Flow
 
 ```mermaid
@@ -225,6 +227,19 @@ flowchart TD
 | Mark notification read | Individual notification | Click **Mark read** button |
 | Navigate to entity | Notification detail | Click **View** link on the notification |
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Collaboration, Activity, and Notifications pages, clicking this button opens a help drawer that provides:
+
+- Guidance on posting comments, threading replies, and using @mentions.
+- An explanation of the supported entity types for comments (`run`, `draft_session`, `baseline`, `scenario`, `venture`, `assumption`, `memo_pack`).
+- Tips for filtering the activity feed and managing notifications effectively.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |
@@ -237,7 +252,7 @@ flowchart TD
 
 ## Supported Comment Entities
 
-You can attach comments to any of the following entity types. Each entity type corresponds to a core area of the platform.
+You can attach comments to any of the following entity types. Each entity type corresponds to a core area of the platform. Comments across the platform use these specific entity type identifiers internally when posting, filtering, and querying. When you see comments on a draft, the system uses the entity type `draft_session`; on a model run, it uses `run`; and so on. Understanding these identifiers is helpful when filtering the activity feed or troubleshooting comment visibility.
 
 | Entity Type | Description | Example Use Case |
 |-------------|-------------|------------------|

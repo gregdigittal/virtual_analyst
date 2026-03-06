@@ -247,6 +247,19 @@ flowchart TD
 | Preview HTML-based output | Click **Preview** on a PDF or iXBRL output row | Output tab, Generated Outputs list |
 | Re-run consolidation with new rates | Update FX rates, click **Run Consolidation** again | Consolidation tab |
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the AFS Consolidation and Output pages, clicking this button opens a help drawer that provides:
+
+- Step-by-step guidance for uploading entity trial balances, configuring FX rates, and running consolidation.
+- Instructions for generating output files in PDF, DOCX, and iXBRL formats.
+- An explanation of intercompany elimination entries and how to review them.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Problem | Likely Cause | Resolution |

@@ -6,6 +6,8 @@ The Dashboard is your home screen in Virtual Analyst. Every time you log in, thi
 
 The Dashboard is organized into three tiers: summary cards at the top for key counts, a two-column detail area in the middle for runs and tasks, and a full-width activity feed and collapsible metrics panel at the bottom.
 
+> **Instructions Button:** Every page in the application features a floating **Instructions** button in the bottom-right corner. Click it to open a help drawer showing step-by-step guidance for the current page, prerequisites, and links to related sections.
+
 ---
 
 ## What You See on First Login
@@ -211,6 +213,19 @@ flowchart TD
 | Check API latency | Expand the **API performance metrics** section at the bottom of the page. |
 | Identify slow endpoints | Expand API metrics and review the **Latency by endpoint** list, sorted slowest first. |
 | Refresh Dashboard data | Reload the page in your browser. All data is fetched fresh on each page load. |
+
+---
+
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Dashboard, clicking this button opens a help drawer that provides:
+
+- A summary of what the Dashboard displays and how to interpret the widgets.
+- Step-by-step guidance for common actions such as navigating to runs, checking pending tasks, and reading the activity feed.
+- A list of prerequisites (e.g., creating a baseline and running a model before Dashboard data appears).
+- Quick links to related sections of the manual and other parts of the application.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
 
 ---
 

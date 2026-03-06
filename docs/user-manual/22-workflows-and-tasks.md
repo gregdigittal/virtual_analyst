@@ -260,6 +260,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Workflows, Tasks, and Inbox pages, clicking this button opens a help drawer that provides:
+
+- Guidance on creating approval workflows with multi-stage review chains and assignee rules.
+- Step-by-step instructions for managing your inbox, claiming pool tasks, and submitting work for review.
+- Tips for using standalone assignments, corrections, and learning feedback within the review process.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

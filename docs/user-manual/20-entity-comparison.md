@@ -224,6 +224,19 @@ The run comparison path is simpler because you select runs directly by ID, bypas
 | Run a run comparison | Click **Compare runs** after selecting two different runs |
 | Read variance direction | Green text with "+" indicates Run B exceeds Run A; red text indicates Run B is lower |
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Compare page, clicking this button opens a help drawer that provides:
+
+- Guidance on selecting entities or runs for side-by-side comparison.
+- Step-by-step instructions for interpreting variance metrics, percentage changes, and directional indicators.
+- Tips for using comparisons to identify performance drivers and outliers across entities.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

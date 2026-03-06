@@ -187,17 +187,36 @@ export default function DraftWorkspacePage() {
     if (!tenantId || !chatMessage.trim()) return;
     setChatSending(true);
     setError(null);
-    try {
-      await api.drafts.chat(tenantId, id, chatMessage.trim());
-      setChatMessage("");
-      await loadDraft();
-      toast.success("Message sent");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      toast.error(e instanceof Error ? e.message : String(e));
-    } finally {
-      setChatSending(false);
+    const msg = chatMessage.trim();
+    // Retry once on transient network failures (Render cold-start / LLM timeout)
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await api.drafts.chat(tenantId, id, msg);
+        setChatMessage("");
+        await loadDraft();
+        toast.success("Message sent");
+        return;
+      } catch (e) {
+        lastErr = e;
+        const isNetwork = e instanceof ApiError && e.statusCode === 0;
+        if (isNetwork && attempt === 0) {
+          // Retry once after brief pause for cold-start / transient failures
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        break;
+      }
     }
+    const errMsg =
+      lastErr instanceof ApiError && lastErr.statusCode === 0
+        ? "Chat request timed out — the AI model may be loading. Please try again in a moment."
+        : lastErr instanceof Error
+          ? lastErr.message
+          : String(lastErr);
+    setError(errMsg);
+    toast.error(errMsg);
+    setChatSending(false);
   }
 
   async function acceptProposal(proposalId: string) {
@@ -638,7 +657,7 @@ export default function DraftWorkspacePage() {
               <CommentThread
                 tenantId={tenantId}
                 userId={userId}
-                entityType="draft"
+                entityType="draft_session"
                 entityId={id}
               />
             )}

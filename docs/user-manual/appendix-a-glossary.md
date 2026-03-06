@@ -184,3 +184,15 @@ Definitions of key terms used throughout the Virtual Analyst user manual.
 |------|-----------|-----------|
 | **WACC (Weighted Average Cost of Capital)** | The blended cost of a company's debt and equity financing, used as the discount rate in DCF valuations. WACC is configured as an assumption and directly affects the present value of projected cash flows. | [Ch. 16](16-valuation.md) |
 | **Workflow** | A structured process that routes items (baselines, drafts, reports) through a defined approval chain. Workflows enforce review requirements, capture sign-offs, and maintain an audit trail of all approval decisions. | [Ch. 22](22-workflows-and-tasks.md) |
+
+---
+
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. While the Glossary itself does not have a dedicated application page, relevant term definitions and contextual guidance are surfaced within the help drawers throughout the platform. Clicking the **Instructions** button on any page opens a help drawer that provides:
+
+- Step-by-step guidance specific to the page you are currently viewing.
+- Definitions and explanations of key concepts relevant to that page's functionality.
+- Prerequisites and links to related chapters in this manual.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.

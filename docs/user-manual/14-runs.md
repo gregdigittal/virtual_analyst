@@ -311,6 +311,19 @@ Steps 10-11 are the computationally intensive portion of a Monte Carlo run. The 
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Runs pages, clicking this button opens a help drawer that provides:
+
+- Guidance on executing model runs, configuring Monte Carlo iterations, and setting confidence intervals.
+- Step-by-step instructions for reviewing financial statements, KPIs, and simulation results on the run detail page.
+- Tips for exporting run results in PDF or Excel format.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 **Run fails to start**

@@ -201,6 +201,19 @@ flowchart TD
 | Navigate between pages | Use the pagination controls below the template grid |
 | Save a baseline as a template | Use the save-as-template action from an existing baseline (requires baseline ID, name, industry) |
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Marketplace page, clicking this button opens a help drawer that provides:
+
+- Guidance on browsing, searching, and filtering templates by industry and type.
+- Step-by-step instructions for previewing template details and applying a template to create a new baseline.
+- An explanation of how template assumptions are populated and how to customize them after creation.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

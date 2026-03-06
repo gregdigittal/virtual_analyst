@@ -245,6 +245,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the AFS Review and Tax pages, clicking this button opens a help drawer that provides:
+
+- Guidance on submitting sections for review, responding to reviewer feedback, and completing the approval workflow.
+- Step-by-step instructions for configuring tax computation parameters and generating AI-assisted tax notes.
+- Tips for managing the review cycle efficiently across multiple sections.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

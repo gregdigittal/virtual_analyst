@@ -245,6 +245,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Monte Carlo and Sensitivity Analysis pages, clicking this button opens a help drawer that provides:
+
+- Guidance on interpreting fan charts, percentile distributions, and confidence intervals from Monte Carlo simulations.
+- Step-by-step instructions for configuring tornado charts, heat maps, and sensitivity perturbation ranges.
+- Tips for setting up the correlation matrix and validating positive semi-definiteness.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

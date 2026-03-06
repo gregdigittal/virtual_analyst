@@ -252,6 +252,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Benchmarking page, clicking this button opens a help drawer that provides:
+
+- Guidance on opting in to benchmarking and selecting your industry segment and size category.
+- Step-by-step instructions for viewing peer summaries, percentile rankings, and competitor analysis.
+- An explanation of how anonymized benchmark aggregates are computed and updated.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

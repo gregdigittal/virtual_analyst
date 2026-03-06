@@ -288,6 +288,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Import Excel page, clicking this button opens a help drawer that provides:
+
+- Step-by-step guidance for each stage of the AI-assisted import wizard (upload, mapping review, confirmation).
+- Tips for preparing your Excel workbook before upload to ensure clean data mapping.
+- An explanation of how the AI detects revenue streams, cost items, and capital expenditures.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 **Upload fails -- file too large or unsupported format.**

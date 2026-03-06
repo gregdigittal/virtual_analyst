@@ -251,6 +251,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Budgets page, clicking this button opens a help drawer that provides:
+
+- Guidance on creating budgets, defining periods, and adding line items with department and category breakdowns.
+- Step-by-step instructions for entering actuals, viewing variance analysis, and creating reforecasts.
+- Tips for submitting budgets for approval and interpreting variance charts.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 **Period mismatch -- fiscal year does not align with periods**

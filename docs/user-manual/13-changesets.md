@@ -288,6 +288,19 @@ At any point before merging, a changeset can be abandoned, which sets its status
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Changesets page, clicking this button opens a help drawer that provides:
+
+- Guidance on creating changesets with targeted overrides and testing them with dry-runs.
+- Step-by-step instructions for reviewing dry-run results and merging changesets into baselines.
+- An explanation of changeset statuses (Draft, Tested, Merged, Abandoned) and their transitions.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 **Override path not found**

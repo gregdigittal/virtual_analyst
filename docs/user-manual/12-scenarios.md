@@ -209,6 +209,19 @@ The iterative loop between the refinement decision and the comparison execution 
 | Run a single scenario | Create a new run and select the scenario in the scenario selector before executing |
 | Compare scenarios | Open the Scenario Comparison view, select up to 10 scenarios, and click **Compare** |
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Scenarios page, clicking this button opens a help drawer that provides:
+
+- Guidance on creating, editing, and duplicating scenarios with alternative assumption sets.
+- Step-by-step instructions for defining overrides and comparing up to 10 scenarios side by side.
+- Tips for interpreting scenario comparison results and identifying key variance drivers.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

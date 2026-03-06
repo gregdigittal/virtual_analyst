@@ -296,6 +296,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Settings and Administration pages, clicking this button opens a help drawer that provides:
+
+- Guidance on managing billing plans, integrations, teams, SSO/SAML configuration, and audit logs.
+- Step-by-step instructions for GDPR compliance features including data export and user anonymization.
+- Tips for configuring currency settings, FX rates, and the conversion calculator.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

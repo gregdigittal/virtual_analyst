@@ -8,6 +8,8 @@ Every draft is linked to a workspace -- a JSON document that holds your current 
 
 **Prerequisites:** At least one baseline must exist before you can create a draft. See [Chapter 10: Baselines](10-baselines.md) for instructions on creating your first baseline.
 
+> **Instructions Button:** Every page in the application features a floating **Instructions** button in the bottom-right corner. Click it to open a help drawer showing step-by-step guidance for the current page, prerequisites, and links to related sections.
+
 ---
 
 ## Process Flow
@@ -140,6 +142,8 @@ Each active draft includes a built-in AI chat assistant that understands your cu
 
 > **Tip:** The AI chat maintains a rolling history of your last ten messages, so you can have a back-and-forth conversation to refine assumptions iteratively. Chat is only available while the draft status is active.
 
+> **Connection resilience:** The AI Chat panel includes automatic retry logic for transient connection failures. If the backend AI model is still loading (cold start), the chat will automatically retry the request once. Should the retry also fail, you will see a clear message: "Chat request timed out -- the AI model may be loading. Please try again in a moment." rather than a generic connection error. Simply wait a few seconds and resend your message.
+
 ### 5. Creating Proposals for Team Review
 
 When working collaboratively, you can create proposals that other team members can review before changes are applied:
@@ -150,6 +154,8 @@ When working collaboratively, you can create proposals that other team members c
 4. Accepted proposals are immediately applied to the workspace assumptions. Rejected proposals are removed from the pending list.
 
 Proposals enforce safety boundaries: values outside reasonable financial bounds are filtered, and paths are restricted to valid assumption categories (revenue streams, cost structure, working capital, CapEx, and funding).
+
+> **Technical note:** Comments and discussion threads on drafts use the entity type `draft_session` internally. This is the identifier used when posting comments, filtering the activity feed, or querying comment history for a draft. See [Chapter 25: Collaboration](25-collaboration.md) for the full list of supported entity types.
 
 ### 6. Running Integrity Checks
 
@@ -274,12 +280,26 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Drafts pages, clicking this button opens a help drawer that provides:
+
+- Step-by-step guidance for creating, editing, and committing drafts.
+- An explanation of the draft lifecycle (active, ready to commit, committed, abandoned).
+- Tips for using the AI Chat panel, including how to review and accept proposals.
+- Prerequisites such as having an existing baseline before creating a draft.
+- Quick links to related chapters on baselines, scenarios, and runs.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |
 |---------|-------|------------|
 | Draft validation fails with errors | The driver blueprint contains circular dependencies, or required fields are missing. | Open the integrity report, identify the failing check (e.g., `IC_GRAPH_ACYCLIC`), and resolve the cycle or missing data. Re-run checks. |
-| AI chat not responding | The LLM service may be temporarily unavailable, or your tenant has exceeded its quota. | Wait a moment and retry your message. If you receive a quota error (HTTP 429), contact your administrator to review usage limits. |
+| AI chat not responding | The LLM service may be temporarily unavailable, or your tenant has exceeded its quota. | The chat panel automatically retries once on transient failures. If the retry also fails, you will see a message: "Chat request timed out -- the AI model may be loading. Please try again in a moment." Wait a few seconds and resend your message. If you receive a quota error (HTTP 429), contact your administrator to review usage limits. |
 | Commit is blocked with "must be ready_to_commit" | The draft status is still active. You must transition it before committing. | Click **Mark Ready** to change the status to ready to commit, then retry the commit action. |
 | Commit conflicts or produces unexpected baseline | Another draft was committed first, making a different baseline active. | Refresh the Baselines page to see the current active baseline. Create a new draft from the latest version if needed. |
 | Proposal rejected or filtered out | The proposal path targeted an invalid assumption category, or the value was outside reasonable bounds. | Review the AI response commentary for details. Rephrase your request to the AI with more specific guidance, or set the value manually. |

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { VASidebar } from "@/components/VASidebar";
+import { InstructionsButton } from "@/components/InstructionsDrawer";
 
 export default function AuthenticatedLayout({
   children,
@@ -27,6 +28,7 @@ export default function AuthenticatedLayout({
           </button>
         </div>
         {children}
+        <InstructionsButton />
       </div>
     </div>
   );

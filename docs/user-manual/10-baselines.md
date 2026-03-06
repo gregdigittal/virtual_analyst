@@ -306,6 +306,19 @@ or discard all open drafts before archiving.
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Baselines page, clicking this button opens a help drawer that provides:
+
+- Guidance on searching, filtering, and drilling into baselines.
+- Step-by-step instructions for creating drafts, running models, and comparing baseline versions.
+- An explanation of the model stepper and baseline lifecycle (active, archived, locked).
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 **Baseline is locked / cannot edit**

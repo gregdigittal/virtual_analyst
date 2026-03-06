@@ -277,6 +277,19 @@ flowchart TD
 
 ---
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the AFS pages, clicking this button opens a help drawer that provides:
+
+- Step-by-step guidance for creating engagements, uploading trial balances, and configuring the reporting framework (IFRS or GAAP).
+- Instructions for using the AI disclosure drafter and editing generated sections.
+- An overview of the AFS workflow from engagement setup through to output generation.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |

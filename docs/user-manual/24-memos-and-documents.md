@@ -232,6 +232,19 @@ flowchart TD
 | Delete a comment | API | Send a `DELETE` request to `/api/v1/comments/{comment_id}` |
 | List all memos for a run | API | Send a `GET` request to `/api/v1/memos?run_id={run_id}` |
 
+## Page Help
+
+Every page in Virtual Analyst includes a floating **Instructions** button positioned in the bottom-right corner of the screen. On the Memos and Documents pages, clicking this button opens a help drawer that provides:
+
+- Guidance on generating investment memos from model runs, selecting memo types, and downloading outputs.
+- Step-by-step instructions for uploading documents, attaching them to entities, and managing the document repository.
+- Tips for using the comment system on the Documents page to annotate files and collaborate with your team.
+- Prerequisites and links to related chapters.
+
+The help drawer can be dismissed by clicking outside it or pressing the close button. It is available on every page, so you can access context-sensitive guidance wherever you are in the platform.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |
