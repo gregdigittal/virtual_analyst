@@ -1,171 +1,41 @@
-# Virtual Analyst v1 — Cursor Context
-
-## Project Overview
-Multi-tenant financial modeling SaaS platform. Deterministic engine with Monte Carlo simulation, LLM-assisted analysis, Excel live links, and memo pack generation.
+# Virtual Analyst — Investment Analytics Platform
 
 ## Tech Stack
-- **Backend**: FastAPI + asyncpg (raw SQL, no ORM) + Pydantic v2 + Celery + Redis
-- **Frontend**: Next.js 14 App Router + TypeScript strict + Supabase Auth + Tailwind CSS
-- **Database**: PostgreSQL with Row-Level Security (RLS) via `app.tenant_id` GUC
-- **Infra**: Vercel (web), Render (API), Docker, Prometheus + OpenTelemetry
-- **LLM**: Anthropic Claude + OpenAI (dual provider with circuit breaker)
-- **Payments**: Stripe (subscriptions + usage metering)
+- Backend: Python 3.11+, FastAPI (async), PostgreSQL (Supabase), Redis (async)
+- Frontend: TypeScript (51+ pages)
+- Shared Engine: shared/fm_shared/ (valuation, monte_carlo, statements, sensitivity)
+- API: apps/api/app/ (routers, middleware, services)
+- LLM: Task-label-based routing with configurable model/temperature per label
+- DTF: tools/dtf/ (developer-only calibration and validation CLI)
 
-## Repository Layout
-```
-apps/
-  api/app/
-    core/settings.py          # Pydantic Settings (env-based config)
-    db/
-      connection.py            # asyncpg pool init/close
-      migrations/0001-0016.sql # Sequential migrations
-      audit.py                 # Audit log DB layer (19 event types)
-      billing.py               # Billing/subscription DB layer
-      covenants.py             # Covenant definitions + breach checking
-      excel.py                 # Excel connections CRUD + sync events
-      integrations.py          # OAuth connections + Fernet-encrypted tokens
-    deps.py                    # FastAPI dependency providers (billing singleton)
-    main.py                    # FastAPI app, all 19 routers registered
-    middleware/                 # logging, metrics, security (rate limiting)
-    routers/
-      audit.py                 # GET /audit (list + CSV/JSON export)
-      baselines.py             # Baseline CRUD
-      billing.py               # Plans, subscription, usage, Stripe webhook
-      changesets.py            # Changeset operations
-      compliance.py            # GDPR export (Art. 15) + anonymization (8 tables)
-      covenants.py             # Covenant CRUD + breach checking
-      drafts.py                # Draft session state machine
-      excel.py                 # Excel connections CRUD, pull, push
-      health.py                # Health check
-      import_csv.py            # CSV upload + column mapping + draft creation
-      integrations.py          # OAuth2 flow (Xero), HMAC-signed state
-      jobs.py                  # Celery job queue API
-      memos.py                 # Memo pack generate, list, get, download, delete
-      metrics_summary.py       # Prometheus metrics summary
-      notifications.py         # User notifications
-      runs.py                  # Run execution, MC simulation, covenant checking
-      scenarios.py             # Scenario CRUD + batch compare
-      ventures.py              # Venture wizard
-    services/
-      billing/service.py       # BillingService (Stripe lifecycle, quotas)
-      excel_export.py          # .xlsx builder (IS/BS/CF/KPI sheets, openpyxl)
-      integrations/            # OAuth adapter pattern (base.py + xero.py)
-      llm/                     # LLM provider, router, circuit breaker, metering
-      memo_service.py          # HTML memo generator (IC/credit/valuation)
-  excel-addin/                 # Office.js Excel add-in (manifest.xml, taskpane)
-  web/                         # Next.js 14 frontend
-    app/
-      baselines/, dashboard/, drafts/, login/, notifications/, runs/, scenarios/
-    components/nav.tsx
-    lib/api.ts                 # API client helpers
-    middleware.ts              # Supabase auth middleware
-  worker/tasks.py              # Celery worker (MC simulation, DLQ pattern)
-shared/fm_shared/
-  analysis/                    # Monte Carlo, distributions, DCF valuation
-  model/                       # Engine, evaluator, graph, KPIs, schemas, statements
-  storage/                     # ArtifactStore (file-based artifact persistence)
-  errors.py                    # FinModelError hierarchy with error codes
-  logging.py, metrics.py       # Structured logging + Prometheus
-tests/
-  unit/                        # 15 test files
-  integration/                 # RLS isolation, baseline-run lifecycle
-  golden/                      # Manufacturing golden tests
-  load/                        # Engine performance tests
-  e2e/                         # Hosted health check
-finmodel spec pack v7/docs/specs/
-  VIRTUAL_ANALYST_BACKLOG.md   # Full backlog (Phases 1-7)
-  TEAM_COLLABORATION_SPEC.md   # Team collab spec
-```
+## Active Workstreams
+1. Platform Remediation: 23 items (REM-01 to REM-23), 6 sprints
+2. PIM Module: Sentiment-augmented portfolio intelligence, 7 phases, 9 DB tables
+3. DTF Framework: Parameter calibration + ongoing prediction validation
 
-## Conventions & Patterns
+## Key Modules
+- AFS (Annual Financial Statements): apps/api/app/routers/afs.py (2500+ lines — being refactored)
+- Budgets: apps/api/app/routers/budgets.py (1400+ lines — being split)
+- Valuation: shared/fm_shared/analysis/valuation.py (DCF)
+- Monte Carlo: shared/fm_shared/analysis/monte_carlo.py
+- Statements: shared/fm_shared/model/statements.py
+- Auth: apps/api/app/middleware/auth.py
 
-### Multi-Tenancy
-- Every table has `tenant_id text not null references tenants(id) on delete cascade`
-- Composite primary keys: `(tenant_id, <entity_id>)`
-- RLS policies use `current_setting('app.tenant_id', true)`
-- `tenant_conn(x_tenant_id)` async context manager sets GUC and returns connection
-- All API endpoints require `X-Tenant-ID` header
+## Sub-agents available in .claude/agents/
+- platform-remediator: Fix REM-XX backlog items
+- security-auditor: Read-only security review
+- financial-engine: Shared financial model engine work
+- pim-architect: PIM module architecture and design
+- pim-builder: PIM module implementation
+- dtf-engineer: Developer Testing Framework
+- frontend-builder: TypeScript frontend pages
+- financial-reviewer: Read-only financial/statistical validation
 
-### Database
-- Raw asyncpg queries (no ORM); parameterized with `$1, $2, ...`
-- Migrations numbered `0001` through `0016` (sequential)
-- JSONB columns use `_json` suffix (e.g., `target_json`, `bindings_json`)
-- JSON serialized via `json.dumps()` before INSERT, cast with `$N::jsonb`
-- Multi-step mutations wrapped in `async with conn.transaction()`
-- Append-only tables (audit_log, excel_sync_events) have SELECT+INSERT RLS only
-
-### API Design
-- All routers registered under `/api/v1` prefix in `main.py`
-- Pydantic `BaseModel` for request bodies
-- FastAPI `Header()` for tenant/user context
-- `Query(alias="format")` pattern to avoid Python keyword conflicts
-- Error responses: `HTTPException(status_code, detail_string)`
-- `FinModelError` hierarchy with custom exception handler
-
-### Services
-- `ArtifactStore` for file-based persistence (save/load by tenant/type/id)
-- `BillingService` as shared singleton via `deps.py`
-- LLM router with dual-path billing and usage recording
-- Integration framework with abstract base + concrete adapters (Xero)
-- OAuth tokens encrypted at rest via Fernet
-
-### Frontend (Next.js)
-- App Router with `app/` directory structure
-- TypeScript strict mode (Vercel build enforces type checking)
-- Supabase auth with middleware-based session handling
-- API calls via `lib/api.ts` helper functions
-
-### Testing
-- `pytest-asyncio` with `asyncio_mode = "auto"`
-- Coverage: `--cov=apps --cov=shared`
-- Golden tests compare against known-good manufacturing outputs
-- Unit tests mock DB connections and external services
-
-## Implementation Phases (Completed)
-
-### Phase 1 (VA-P1): Core Platform
-Baselines, changesets, runs, engine, KPIs, statements, DB migrations 0001-0008, RLS, health, metrics, notifications, connection pool, indexes.
-
-### Phase 2 (VA-P2): Draft Workspace & Jobs
-Celery job queue, draft session CRUD with state machine, async MC simulation, LLM governance/guardrails, venture wizard, notifications UI, DLQ pattern.
-
-### Phase 3 (VA-P3): Analysis & Scenarios
-Distribution engine, Monte Carlo runner with seeded RNG, DCF valuation (annualized trailing 12-month FCF), multiples valuation, sensitivity analysis, scenario CRUD with batch compare (`ANY($2::text[])`).
-
-### Phase 4 (VA-P4): Enterprise Features
-OAuth2 integrations (Xero adapter, HMAC-signed state, Fernet encryption), Stripe billing (subscriptions, usage metering, webhooks), audit log (19 event types, CSV/JSON export, checksums), covenant monitoring (multi-period breach detection), GDPR compliance (export + anonymization), CSV import with column mapping.
-
-### Phase 5 (VA-P5): Excel & Memos
-Excel live links (connections CRUD, pull/push with binding resolution), Excel export (.xlsx with IS/BS/CF/KPI sheets), memo packs (IC memo, credit memo, valuation note with XSS-safe HTML generation), Office.js add-in scaffold.
-
-## Remaining Phases (Not Started)
-- **Phase 6 (VA-P6)**: Workflow & Approvals
-- **Phase 7 (VA-P7)**: Budgeting & Board Packs (VA-P7-01 through VA-P7-12)
-
-## Recent Git History
-```
-3b5b8af fix: type integrityDialog.checks to resolve TS build error on Vercel
-d719e5a VA-P3/P4/P5: Scenarios, integrations, billing, audit, compliance, covenants, Excel live links, memo packs
-368f696 VA-P2-09: backlog note; VA-P3-01: Distribution engine + MC runner
-1b478f3 VA-P2-08b: LLM guardrails & confidence visibility; VA-P2-09: Notifications
-2e89efd VA-P2-08: Draft workspace UI + fixes
-be4d2c7 VA-P2-04/05/06: Fix races + VA-P2-07 venture wizard
-400b12f Bug fix & consistency pass; engine import order
-07085bc VA-P2-02: Draft session CRUD, state machine, audit, unit tests
-e763e7a VA-P2-01: Celery job queue, jobs API, tests; eager mode fix, DLQ finally, TASK_REGISTRY type
-```
-
-## Code Quality Reviews Completed
-Three rounds of code review have been performed with all issues resolved:
-- **Round 1**: 21 issues found, 17 fixes applied (Phases 1-2)
-- **Round 2**: 13 issues found, 13 fixes applied (Phase 4)
-- **Round 3**: 12 issues found, 12 fixes applied (Phase 5)
-
-Key fixes included: missing `Depends` import (critical), stored XSS in memo HTML, readonly mode bypass on push, GDPR gaps for Phase 5 tables, transaction wrapping, Pydantic validation models, and various consistency improvements.
-
-## Current State
-- Branch `main` is up to date with `origin/main` at commit `3b5b8af`
-- Working tree is clean
-- Vercel deploy should succeed (TypeScript type error was fixed in `3b5b8af`)
-- All Phases 1-5 are implemented and code-reviewed
-- Next work: Phase 6 (Workflow & Approvals) or Phase 7 (Budgeting & Board Packs)
+## Critical Rules
+- Sprint 1 remediation MUST complete before any PIM code
+- All async handlers: no synchronous blocking calls
+- All SQL: parameterised queries or ORM, never f-strings
+- All financial calcs: reference CFA/IAS/ISA standard in docstrings
+- PIM endpoints: check_pim_access(tenant_id) as first operation
+- DTF: never expose on public API
+- Statistical tests: deterministic, then LLM for narrative only

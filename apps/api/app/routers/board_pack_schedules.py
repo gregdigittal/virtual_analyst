@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
+from croniter import croniter
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
+from apps.api.app.db.connection import get_pool
 from apps.api.app.deps import get_artifact_store, get_llm_router, require_role, ROLES_CAN_WRITE
 from apps.api.app.services.email import EmailError, send_board_pack_email
 from apps.api.app.routers.board_packs import (
@@ -21,6 +24,15 @@ from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.storage import ArtifactStore
 
 router = APIRouter(prefix="/board-packs/schedules", tags=["board-packs"], dependencies=[require_role(*ROLES_CAN_WRITE)])
+
+
+def compute_next_run(cron_expr: str, base: datetime | None = None) -> datetime | None:
+    """Parse cron expression and return the next run time (UTC). Returns None if invalid."""
+    try:
+        base = base or datetime.now(timezone.utc)
+        return croniter(cron_expr, base).get_next(datetime).replace(tzinfo=timezone.utc)
+    except (ValueError, KeyError):
+        return None
 
 
 class CreateScheduleBody(BaseModel):
@@ -56,10 +68,11 @@ async def create_schedule(
         raise HTTPException(400, "X-Tenant-ID required")
     schedule_id = f"sch_{uuid.uuid4().hex[:12]}"
     section_order = body.section_order or DEFAULT_SECTION_ORDER
+    next_run = compute_next_run(body.cron_expr)
     async with tenant_conn(x_tenant_id) as conn:
         await conn.execute(
-            """INSERT INTO pack_schedules (tenant_id, schedule_id, label, run_id, budget_id, section_order, cron_expr, distribution_emails, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)""",
+            """INSERT INTO pack_schedules (tenant_id, schedule_id, label, run_id, budget_id, section_order, cron_expr, next_run_at, distribution_emails, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)""",
             x_tenant_id,
             schedule_id,
             body.label,
@@ -67,6 +80,7 @@ async def create_schedule(
             body.budget_id,
             json.dumps(section_order),
             body.cron_expr,
+            next_run,
             body.distribution_emails,
             x_user_id or None,
         )
@@ -75,6 +89,7 @@ async def create_schedule(
         "label": body.label,
         "run_id": body.run_id,
         "cron_expr": body.cron_expr,
+        "next_run_at": next_run.isoformat() if next_run else None,
         "distribution_emails": body.distribution_emails,
     }
 
@@ -320,6 +335,10 @@ async def patch_schedule(
         updates.append(f"cron_expr = ${pos}")
         args.append(body.cron_expr)
         pos += 1
+        next_run = compute_next_run(body.cron_expr)
+        updates.append(f"next_run_at = ${pos}")
+        args.append(next_run)
+        pos += 1
     if body.distribution_emails is not None:
         updates.append(f"distribution_emails = ${pos}")
         args.append(body.distribution_emails)
@@ -357,3 +376,147 @@ async def delete_schedule(
         )
     if result == "DELETE 0":
         raise HTTPException(404, "Schedule not found")
+
+
+# --- Cron endpoint (no role auth — secured via X-Cron-Secret) ---
+
+cron_router = APIRouter(prefix="/board-packs/schedules", tags=["board-packs"])
+
+
+@cron_router.post("/cron/execute", status_code=200)
+async def cron_execute_schedules(
+    x_cron_secret: str = Header("", alias="X-Cron-Secret"),
+    store: ArtifactStore = Depends(get_artifact_store),
+    llm: LLMRouter = Depends(get_llm_router),
+) -> dict[str, Any]:
+    """Execute due board pack schedules. Called by external cron (every 15-60 min).
+
+    For each tenant, finds enabled schedules where next_run_at <= now(),
+    generates the pack, distributes via email, records history, and advances next_run_at.
+    Requires X-Cron-Secret when CRON_SECRET env var is set.
+    """
+    import asyncpg
+    import structlog
+
+    from apps.api.app.core.settings import get_settings
+
+    logger = structlog.get_logger()
+    settings = get_settings()
+    if settings.cron_secret and x_cron_secret != settings.cron_secret:
+        raise HTTPException(403, "Invalid cron secret")
+
+    now_ts = datetime.now(timezone.utc)
+    executed = 0
+    errors = 0
+
+    # Get all tenants
+    pool = get_pool()
+    if pool:
+        async with pool.acquire() as conn:
+            tenant_rows = await conn.fetch("SELECT id FROM tenants")
+    else:
+        conn = await asyncpg.connect(settings.database_url)
+        try:
+            tenant_rows = await conn.fetch("SELECT id FROM tenants")
+        finally:
+            await conn.close()
+
+    for trow in tenant_rows:
+        tenant_id = trow["id"]
+        try:
+            async with tenant_conn(tenant_id) as tconn:
+                due_schedules = await tconn.fetch(
+                    """SELECT schedule_id, label, run_id, budget_id, section_order,
+                              cron_expr, distribution_emails, created_by
+                       FROM pack_schedules
+                       WHERE tenant_id = $1 AND enabled = true AND next_run_at IS NOT NULL AND next_run_at <= $2""",
+                    tenant_id,
+                    now_ts,
+                )
+            for sched in due_schedules:
+                sched_id = sched["schedule_id"]
+                try:
+                    so = sched["section_order"]
+                    if so is not None and not isinstance(so, list):
+                        so = json.loads(so) if isinstance(so, str) else list(so)
+                    so = so or DEFAULT_SECTION_ORDER
+
+                    # Generate board pack
+                    create_resp = await create_board_pack_impl(
+                        tenant_id,
+                        sched["created_by"],
+                        sched["label"],
+                        sched["run_id"],
+                        sched["budget_id"],
+                        so,
+                        None,
+                    )
+                    pack_id = create_resp["pack_id"]
+
+                    history_id = f"hist_{uuid.uuid4().hex[:12]}"
+                    try:
+                        await generate_board_pack_impl(tenant_id, pack_id, store, llm)
+                    except Exception as gen_err:
+                        logger.warning("cron_pack_generate_failed", tenant=tenant_id, schedule=sched_id, error=str(gen_err))
+                        async with tenant_conn(tenant_id) as tconn:
+                            await tconn.execute(
+                                """INSERT INTO pack_generation_history (tenant_id, history_id, schedule_id, pack_id, label, run_id, status, error_message)
+                                   VALUES ($1, $2, $3, $4, $5, $6, 'failed', $7)""",
+                                tenant_id, history_id, sched_id, pack_id, sched["label"], sched["run_id"], str(gen_err)[:500],
+                            )
+                        errors += 1
+                        continue
+
+                    # Record success history
+                    async with tenant_conn(tenant_id) as tconn:
+                        await tconn.execute(
+                            """INSERT INTO pack_generation_history (tenant_id, history_id, schedule_id, pack_id, label, run_id, status)
+                               VALUES ($1, $2, $3, $4, $5, $6, 'ready')""",
+                            tenant_id, history_id, sched_id, pack_id, sched["label"], sched["run_id"],
+                        )
+
+                    # Distribute via email if recipients configured
+                    dist_emails = list(sched["distribution_emails"] or [])
+                    if dist_emails:
+                        try:
+                            # Fetch narrative for email
+                            async with tenant_conn(tenant_id) as tconn:
+                                bp_row = await tconn.fetchrow(
+                                    "SELECT narrative_json FROM board_packs WHERE tenant_id = $1 AND pack_id = $2",
+                                    tenant_id, pack_id,
+                                )
+                            narrative_json = None
+                            if bp_row and bp_row["narrative_json"]:
+                                nj = bp_row["narrative_json"]
+                                narrative_json = json.loads(nj) if isinstance(nj, str) else nj
+
+                            email_result = await send_board_pack_email(dist_emails, sched["label"] or "Board Pack", narrative_json)
+                            if email_result.get("sent", False):
+                                async with tenant_conn(tenant_id) as tconn:
+                                    await tconn.execute(
+                                        """UPDATE pack_generation_history SET distributed_at = now(), status = 'distributed'
+                                           WHERE tenant_id = $1 AND history_id = $2""",
+                                        tenant_id, history_id,
+                                    )
+                        except EmailError as email_err:
+                            logger.warning("cron_pack_email_failed", tenant=tenant_id, schedule=sched_id, error=str(email_err))
+
+                    # Advance next_run_at
+                    next_run = compute_next_run(sched["cron_expr"], now_ts)
+                    async with tenant_conn(tenant_id) as tconn:
+                        await tconn.execute(
+                            "UPDATE pack_schedules SET next_run_at = $1 WHERE tenant_id = $2 AND schedule_id = $3",
+                            next_run, tenant_id, sched_id,
+                        )
+
+                    executed += 1
+                    logger.info("cron_pack_executed", tenant=tenant_id, schedule=sched_id, pack_id=pack_id)
+
+                except Exception as e:
+                    logger.error("cron_pack_schedule_error", tenant=tenant_id, schedule=sched_id, error=str(e))
+                    errors += 1
+
+        except Exception as e:
+            logger.error("cron_pack_tenant_error", tenant=tenant_id, error=str(e))
+
+    return {"executed": executed, "errors": errors, "checked_tenants": len(tenant_rows)}

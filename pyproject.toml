@@ -44,6 +44,7 @@ dependencies = [
     "defusedxml>=0.7.1",
     "sendgrid>=6.11.0",
     "sentry-sdk[fastapi]>=2.0.0",
+    "croniter>=2.0.0",
 ]
 
 [project.optional-dependencies]

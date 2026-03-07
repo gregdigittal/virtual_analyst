@@ -10,13 +10,18 @@ from apps.api.app.main import app
 client = TestClient(app)
 
 
-def _mock_tenant_conn(_tenant_id: str):
-    conn = MagicMock()
-    conn.execute = AsyncMock()
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=conn)
-    cm.__aexit__ = AsyncMock(return_value=None)
-    return cm
+def _make_mock_pool(*, fail: bool = False):
+    """Return a mock asyncpg pool with acquire/release."""
+    mock_conn = MagicMock()
+    if fail:
+        mock_conn.execute = AsyncMock(side_effect=OSError("Connection refused"))
+    else:
+        mock_conn.execute = AsyncMock(return_value="SELECT 1")
+
+    mock_pool = MagicMock()
+    mock_pool.acquire = AsyncMock(return_value=mock_conn)
+    mock_pool.release = AsyncMock()
+    return mock_pool
 
 
 def test_liveness() -> None:
@@ -30,7 +35,7 @@ def test_readiness_all_ok() -> None:
     mock_redis.ping = AsyncMock()
     mock_redis.close = AsyncMock()
     with (
-        patch("apps.api.app.routers.health.tenant_conn", side_effect=_mock_tenant_conn),
+        patch("apps.api.app.routers.health.get_pool", return_value=_make_mock_pool()),
         patch("apps.api.app.routers.health.Redis") as mock_redis_cls,
     ):
         mock_redis_cls.from_url.return_value = mock_redis
@@ -43,17 +48,11 @@ def test_readiness_all_ok() -> None:
 
 
 def test_readiness_degraded_db() -> None:
-    def _failing_conn(_tid: str):
-        cm = MagicMock()
-        cm.__aenter__ = AsyncMock(side_effect=OSError("Connection refused"))
-        cm.__aexit__ = AsyncMock(return_value=None)
-        return cm
-
     mock_redis = MagicMock()
     mock_redis.ping = AsyncMock()
     mock_redis.close = AsyncMock()
     with (
-        patch("apps.api.app.routers.health.tenant_conn", side_effect=_failing_conn),
+        patch("apps.api.app.routers.health.get_pool", return_value=_make_mock_pool(fail=True)),
         patch("apps.api.app.routers.health.Redis") as mock_redis_cls,
     ):
         mock_redis_cls.from_url.return_value = mock_redis
