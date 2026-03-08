@@ -35,7 +35,7 @@
 
 | Area | Metric |
 |------|--------|
-| Backend tests | 84 test files (311+ tests), 0 failed, 18 skipped (integration gated) |
+| Backend tests | 85 test files (547+ tests), 0 failed, 19 skipped (integration gated) |
 | Frontend unit tests | **159 passed** across 32 test files |
 | Frontend pages | **58 pages** in `(app)` route group |
 | E2E tests (Playwright) | **68 spec files** — 32 pass, 2 skip, 3 fail (UI detail page links) |
@@ -54,17 +54,28 @@
 | AFS-P2 | AI Disclosure Drafter + Prior AFS Analysis | ✅ Complete |
 | AFS-P3 | Review Workflow + Tax Computation | ✅ Complete |
 | AFS-P4 | Multi-entity Consolidation + iXBRL Output | ✅ Complete |
-| AFS-P5 | Analytics & Industry Benchmarking | **Next** |
-| AFS-P6 | Custom Frameworks + Roll-forward | Planned |
+| AFS-P5 | Analytics & Industry Benchmarking | ✅ Complete |
+| AFS-P6 | Custom Frameworks + Roll-forward | **Next** |
 
-- **Router**: `apps/api/app/routers/afs.py` (~44 endpoints)
-- **Services**: `apps/api/app/services/afs/` (disclosure_drafter, tax_note_drafter, output_generator)
+- **Router**: `apps/api/app/routers/afs.py` (~52 endpoints)
+- **Services**: `apps/api/app/services/afs/` (disclosure_drafter, tax_note_drafter, output_generator, analytics_ai, ratio_calculator)
 - **Migrations**: 0052 (core), 0053 (sections), 0054 (reviews+tax), 0055 (consolidation+outputs)
 - **Frontend**: `apps/web/app/(app)/afs/` (dashboard, setup, sections, tax, review, consolidation, output)
 
 ---
 
 ## Recent Changes (since last CONTEXT update)
+
+### AFS Phase 5 — Analytics & Industry Benchmarking (2026-03-07)
+- 5 new backend analytics endpoints in `afs.py` (compute, get analytics, get ratios, get anomalies, get going concern)
+- `_analytics_id()` UUID generator + `ComputeAnalyticsBody` Pydantic model
+- Parallel AI analysis via `asyncio.gather` (anomaly detection, commentary, going concern) with graceful failure handling
+- Industry benchmark percentile positioning (below_p25 through above_p75)
+- 18 new tests in `test_afs_analytics_api.py` — all passing
+- Router now at 52 endpoints (was 44)
+- H-03 board pack cron scheduler: 16 tests passing
+- H-02 frontend page smoke tests: 159 tests across 32 files
+- Full backend suite: 547 passed, 0 failed, 19 skipped
 
 ### a5bd4bb — Instructions Button + Drafts Fixes (2026-03-06)
 - `InstructionsDrawer.tsx` + `instructions-config.ts` — floating help button on all authenticated pages, route-aware manual content for 50+ routes
@@ -143,10 +154,10 @@ See `BACKLOG.md` for full details.
 | Tier | Status | Key Items |
 |------|--------|-----------|
 | Tier 1 Ship Blockers | ✅ S-01 done, **S-02 done** (this file) | — |
-| Tier 2 High Priority | **3 open** | Frontend page smoke tests (H-02), board pack email (H-03), board pack update (H-04) |
+| Tier 2 High Priority | ✅ H-02, H-03, H-04 done | — |
 | Tier 3 Medium | **5 open** | Compare scoping, budget flag, nav auth, prompt cleanup, build plan file |
-| Tier 4 AFS Module | **P5-P6 remaining** | Analytics & benchmarking, custom frameworks & roll-forward |
-| Tier 5 Nice to Have | **8 open** | Integration tests, cold-start, E2E, rate-limit, OpenAPI, perf, monitoring, CI |
+| Tier 4 AFS Module | **P6 remaining** | Custom frameworks & roll-forward |
+| Tier 5 Nice to Have | **7 open** | Integration tests, cold-start, E2E, rate-limit, perf, monitoring, CI |
 | Review Findings | **41 open** | 7 sprints: security, DCF, tax, stats, consolidation, forecasting, code quality |
 
 ---
