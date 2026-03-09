@@ -1,9 +1,9 @@
 # Virtual Analyst — Updated Backlog
 
-> Updated: 2026-03-08
+> Updated: 2026-03-09
 > Branch: main
 > Latest commit: cf9bda7 (AFS Phase 5 — Analytics & Industry Benchmarking)
-> Source: VA Tech Stack Review PIM document (2026-03-08)
+> Source: PIM Requirements BuildPlan v2.0 (2026-03-09) — supersedes VA_Tech_Stack_Review_PIM v1.0
 
 ---
 
@@ -93,80 +93,81 @@ AI-powered Annual Financial Statement generation with multi-framework compliance
 
 ---
 
-## Tier 6 — Tech Stack Remediation (PIM Gates)
+## Tier 6 — PIM Pre-Condition Gates (must-close before PIM dev)
 
-> Source: `docs/reviews/VA_Tech_Stack_Review_PIM.docx` (2026-03-08)
-> These 8 items are **mandatory prerequisites** before PIM development can begin.
-> Incremental cost: ~$220–260/month (Supabase Large + Sentry + BetterUptime)
+> Source: PIM Requirements BuildPlan v2.0 (2026-03-09)
+> Full build plan: `docs/plans/2026-03-09-pim-v2-build-plan.md`
+> 7 gates — 4 v1.0 infrastructure gates dropped (Celery, Structlog, Sentry backend, CI already implemented)
 
-| # | Item | Description | CR Ref | Effort |
+| # | Gate | Description | CR Ref | Effort |
 |---|------|-------------|--------|--------|
-| **G-01** | Fix JWKS async race condition | Cache JWKS response with TTL; current implementation re-fetches on every request under concurrent load | CR-S4 | S |
-| **G-02** | Replace sync Redis with `redis.asyncio` | `redis.Redis` blocks the async event loop; migrate all call sites to `redis.asyncio.Redis` | CR-S5 | S |
-| **G-03** | Replace `unknown` TypeScript types | `StatementsData` and related interfaces use `unknown`; add proper typed interfaces for all financial data structures | CR-Q8 | M |
-| **G-04** | Upgrade Supabase to Large compute | PIM requires higher connection limits, more CPU/RAM for time-series queries and concurrent Celery workers. Upgrade via Supabase dashboard | — | Config |
-| **G-05** | Add Celery + Redis broker + Flower | Async job queue for: sentiment ingestion, backtest execution, DTF-A calibration, scheduled sentiment refresh. Redis already deployed (reuse as broker). Add Flower for task monitoring | — | M |
-| **G-06** | Add Structlog structured JSON logging | Replace ad-hoc `print`/`logging` with structured JSON logs. Enable correlation IDs, tenant context, and log aggregation readiness | — | S |
-| **G-07** | Add Sentry error tracking | Integrate `sentry-sdk[fastapi]` for backend + `@sentry/nextjs` for frontend. Configure source maps, environment tags, user context | — | S |
-| **G-08** | Add GitHub Actions CI pipeline | Automated: `ruff check`, `pytest`, `vitest`, `tsc --noEmit`, ESLint. Run on PR + push to main. Block merge on failure | — | M |
-
-**Cross-references to existing items:**
-- G-01 (CR-S4) → overlaps with Comprehensive Review Sprint 1 security items
-- G-02 (CR-S5) → overlaps with Comprehensive Review Sprint 7 item 34
-- G-03 (CR-Q8) → overlaps with Comprehensive Review Sprint 7 item 33
-- G-06 → partially done (structlog already imported in some modules)
-- G-07 → supersedes N-07 (monitoring & alerting)
-- G-08 → supersedes N-08 (CI pipeline enhancements)
+| **GATE-1** | Statistical anomaly detection | Replace LLM-only anomaly detection with IQR/Z-score statistical methods; LLM supplements only | CR-S2 | M |
+| **GATE-2** | JWKS async race condition | Cache JWKS response with `asyncio.Lock` + TTL; current implementation re-fetches every request | CR-S4 | S |
+| **GATE-3** | Async Redis migration | Replace sync `redis.Redis` with `redis.asyncio.Redis` across all call sites | CR-S5 | S |
+| **GATE-4** | DCF mid-year convention | Add mid-year discounting option to DCF valuation engine | CR-F1 | M |
+| **GATE-5** | DCF equity bridge | Add net-debt-to-equity bridge in DCF output | CR-F2 | S |
+| **GATE-6** | DCF exit multiples | Add EBITDA exit multiple terminal value method alongside perpetuity growth | CR-F3 | M |
+| **GATE-7** | MC parallelism | Replace single-threaded Monte Carlo loop with `ProcessPoolExecutor` | CR-T1 | S |
 
 ---
 
-## Tier 7 — PIM Tech Stack Enhancements (post-gate)
+## Tier 7 — PIM Remediation Backlog (Sprint 0)
 
-> Source: `docs/reviews/VA_Tech_Stack_Review_PIM.docx` (2026-03-08)
-> These are implemented as needed during PIM development sprints.
+> Source: PIM Requirements BuildPlan v2.0, Sprint 0 — 23 remediation items
+> Full details: `docs/plans/2026-03-09-pim-v2-build-plan.md` § Sprint Plan
 
-| # | Item | Description | Priority | Effort |
-|---|------|-------------|----------|--------|
-| **P-01** | Numba JIT for Monte Carlo + Markov hot loops | `@njit` decorator on inner simulation loops for 10–100× speedup. NumPy vectorized Markov transitions via matrix power P^n | High | M |
-| **P-02** | `pg_partman` time-series partitioning | Partition `pim_price_history` and `pim_sentiment_scores` by month using native PostgreSQL partitioning (TimescaleDB deprecated on Supabase PG17) | High | M |
-| **P-03** | `ProcessPoolExecutor` for MC/Markov parallelism | CPU-bound simulation parallelism using `ProcessPoolExecutor` with `asyncio.run_in_executor()`. Overlaps with Comprehensive Review Sprint 4 item 16 (CR-T1) | High | S |
-| **P-04** | QuantEcon library | Markov chain utilities (steady-state computation, `MarkovChain` class, ergodicity checks). Avoids reimplementing standard stochastic methods | Medium | S |
-| **P-05** | D3.js for PIM visualizations | Supplement Recharts with D3.js for: Markov state diagrams, sentiment heatmaps, backtest comparison charts, PE distribution overlays | Medium | M |
-| **P-06** | Materialized views for backtest aggregates | Pre-computed views for IC/ICIR/SPC metrics, portfolio returns, strategy comparisons. Refresh on schedule or after backtest completion | Medium | S |
-| **P-07** | Supabase read replica | Offload heavy analytical queries (backtests, universe screening) to read replica. Keep writes on primary | Low | Config |
-| **P-08** | Migrate to new Supabase API key format | Transition from legacy `anon`/`service_role` JWTs to `sb_publishable_*` / `sb_secret_*` keys. Supabase plans to deprecate legacy format | Low | S |
-| **P-09** | Evaluate DuckDB for DTF-A calibration | Embedded analytical engine for developer-only calibration pipeline. Process EDGAR/FRED/Yahoo bulk data without hitting PostgreSQL | Low | S (eval) |
-| **P-10** | Evaluate Polars for backtest data processing | Upgrade path from pandas if backtest DataFrames exceed memory at 500+ company universes. Lazy evaluation + multi-threaded execution | Low | S (eval) |
+Sprint 0 (2 weeks) closes all 7 gates + fixes 16 additional issues from the consolidated code review.
 
-**Cross-references to existing items:**
-- P-03 → overlaps with Comprehensive Review Sprint 4 item 16 (ProcessPoolExecutor for MC)
-- P-05 → D3.js is additive to existing Recharts setup, not a replacement
+| # | Item | CR Ref | Effort |
+|---|------|--------|--------|
+| **REM-01** | Statistical anomaly detection (IQR/Z-score) | CR-S2 (GATE-1) | M |
+| **REM-02** | JWKS async race condition | CR-S4 (GATE-2) | S |
+| **REM-03** | Async Redis migration | CR-S5 (GATE-3) | S |
+| **REM-04** | DCF mid-year convention | CR-F1 (GATE-4) | M |
+| **REM-05** | DCF equity bridge | CR-F2 (GATE-5) | S |
+| **REM-06** | DCF exit multiples | CR-F3 (GATE-6) | M |
+| **REM-07** | MC parallelism (ProcessPoolExecutor) | CR-T1 (GATE-7) | S |
+| **REM-08** | Tax loss carryforward / NOL | CR-F4 | M |
+| **REM-09** | Multi-period FX rates | CR-F5 | M |
+| **REM-10** | Auth middleware DB-error fallback | CR-F6 | S |
+| **REM-11** | Split `budgets.py` (1,618 lines) | CR-Q2 | M |
+| **REM-12** | Split `afs.py` (2,657 lines) | CR-Q3 | L |
+| **REM-13** | Fix RunStatus enum (`completed` → `succeeded`) | CR-Q4 | S |
+| **REM-14** | Consolidation minority interest | CR-Q5 | M |
+| **REM-15** | Auth middleware role fallback | CR-Q6 | S |
+| **REM-16** | Replace bare `except:` (8 files) | CR-Q7 | S |
+| **REM-17** | Replace `unknown` TypeScript types | CR-Q8 | M |
+| **REM-18** | Parameter denylist hardening | CR-Q9 | XS |
+| **REM-19** | Sentry frontend integration | CR-N2 | S |
+| **REM-20** | Additional page-level smoke tests | CR-N1 | M |
+| **REM-21** | Budget `is_revenue` flag | CR-N3 | S |
+| **REM-22** | OpenAPI → TypeScript codegen | CR-N4 | M |
+| **REM-23** | API rate-limit tests | CR-N5 | S |
 
 ---
 
 ## Tier 8 — PIM Module (Portfolio Intelligence Module)
 
 > Design spec: `docs/plans/Portfolio_Intelligence_Module_Design_Spec.docx`
-> Build plan: `docs/plans/2026-03-08-pim-tech-stack-build-plan.md`
-> Prerequisites: All Tier 6 gate items must be complete before PIM development begins.
+> Build plan v2.0: `docs/plans/2026-03-09-pim-v2-build-plan.md`
+> Prerequisites: All Tier 6 gates must be closed (Sprint 0) before PIM sprints begin.
 
-AI-powered portfolio analytics with 81-state Markov chain model, multi-source sentiment analysis, backtesting framework, and PE benchmarking.
+AI-powered portfolio analytics with 81-state Markov chain model, CIS scoring, multi-source sentiment analysis, backtesting framework, and PE benchmarking. 71 backlog items across 7 sprints.
 
-| # | Phase | Sub-systems | Description | Effort |
-|---|-------|-------------|-------------|--------|
-| **PIM-1** | Sentiment Ingestion | Sentiment Engine, Data Sources | Multi-source sentiment ingestion (news APIs, earnings transcripts, social), NLP scoring via LLM, Celery-scheduled refresh, tenant-scoped storage | XL |
-| **PIM-2** | Economic Context | Macro Indicators, FRED Integration | Economic regime classification (expansion/contraction/transition), FRED API integration, indicator dashboard, regime-aware model conditioning | L |
-| **PIM-3** | Fundamental Aggregation | Company Financials, Universe Manager | EDGAR/Yahoo fundamental data ingestion, financial ratio computation, sector/peer grouping, universe CRUD, quality scoring | XL |
-| **PIM-4** | Portfolio Scoring | Composite Score, Markov States | 81-state Markov chain (3 sentiment × 3 fundamental × 3 economic × 3 momentum), state transition matrix estimation, portfolio-level composite scoring | XL |
-| **PIM-5** | Markov Chain Engine | Transition Matrix, Steady State | Numba-accelerated Markov simulation, `QuantEcon.MarkovChain` integration, steady-state distribution, state persistence, matrix calibration via DTF | L |
-| **PIM-6** | Backtesting Framework | Strategy Backtester, IC/ICIR | Walk-forward backtesting, information coefficient calculation, strategy comparison, materialized view aggregates, backtest studio UI | XL |
-| **PIM-7** | PE Benchmarking | PE Assessments, Peer Analysis | Private equity benchmark database, fund return comparison, J-curve analysis, vintage year analytics, DPI/TVPI/IRR computation | L |
+| Sprint | Duration | Focus | Key Deliverables |
+|--------|----------|-------|-----------------|
+| **Sprint 0** | 2 weeks | Remediation | 7 gate closures + 16 code review fixes (REM-01 – REM-23) |
+| **Sprint 1** | 3 weeks | Sentiment Ingestion (FR-1) | Polygon.io + NewsAPI integration, LLM sentiment scoring, Celery workers, 3 new tables |
+| **Sprint 2** | 3 weeks | Economic Context (FR-2) | FRED API integration, regime classification, economic dashboard, indicator storage |
+| **Sprint 3** | 3 weeks | CIS & Markov Engine (FR-3, FR-4) | Composite Investment Score, 81-state Markov chain, QuantEcon integration, Numba JIT |
+| **Sprint 4** | 4 weeks | Portfolio Construction (FR-5) | Greedy portfolio optimizer, constraint engine, rebalancing, transaction cost model |
+| **Sprint 5** | 3 weeks | Backtesting (FR-6) | Walk-forward backtester, IC/ICIR/SPC metrics, backtest studio UI, materialized views |
+| **Sprint 6** | 4 weeks | PE Benchmarking + DTF (FR-7) | PE assessment database, J-curve analysis, DPI/TVPI/IRR, DTF-B ongoing validation |
 
-**New infrastructure requirements:**
-- Celery workers (from G-05) for async ingestion + backtest execution
-- `pg_partman` partitioned tables (from P-02) for time-series data
-- Numba JIT (from P-01) for simulation hot loops
-- D3.js (from P-05) for Markov diagrams and sentiment heatmaps
+**New database tables:** 9 PIM + 4 DTF = 13 total
+**New LLM task labels:** 6 (sentiment extraction, summary, factor attribution, PE memo, portfolio narrative, backtest commentary)
+**Procurement:** Polygon.io ($29/mo), AlphaSense (sentiment), MSCI Barra (transaction costs), Claude Sonnet (PE memo)
+**Infrastructure:** Numba JIT, pg_partman partitioning, ProcessPoolExecutor, QuantEcon, D3.js visualizations, materialized views
 
 ---
 

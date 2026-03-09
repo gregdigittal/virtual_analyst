@@ -1,6 +1,6 @@
 # Project Context — Virtual Analyst
 
-> Last updated: 2026-03-08
+> Last updated: 2026-03-09
 > Commit: cf9bda7 — feat(afs): add Phase 5 analytics endpoints + tests
 > Branch: main (clean — 67 untracked files, mostly E2E specs + plan docs)
 > Total commits: 244
@@ -67,25 +67,44 @@
 ## PIM Module Status (Portfolio Intelligence Module)
 
 > Design spec: `docs/plans/Portfolio_Intelligence_Module_Design_Spec.docx`
-> Build plan: `docs/plans/2026-03-08-pim-tech-stack-build-plan.md`
+> Build plan v2.0: `docs/plans/2026-03-09-pim-v2-build-plan.md` (supersedes v1.0)
+> Requirements spec: `docs/specs/PIM_Requirements_BuildPlan_v2.docx`
 > Tech stack review: `docs/reviews/VA_Tech_Stack_Review_PIM.docx`
 
-**Status:** Pre-development — 8 gate items (Tier 6) must be completed first.
+**Status:** Pre-development — 7 gates (GATE-1–GATE-7) must be closed in Sprint 0 before PIM sprints begin.
+29 consolidated code review issues tracked. 71 backlog items across 7 sprints (Sprint 0–6).
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Gate (G-01–G-08) | JWKS fix, async Redis, TS types, Supabase Large, Celery, Structlog, Sentry, CI | **Next** |
-| PIM-1 | Sentiment Ingestion | Pending gates |
-| PIM-2 | Economic Context (FRED integration) | Pending |
-| PIM-3 | Fundamental Aggregation (EDGAR/Yahoo) | Pending |
-| PIM-4 | Portfolio Scoring (81-state Markov) | Pending |
-| PIM-5 | Markov Chain Engine (Numba + QuantEcon) | Pending |
-| PIM-6 | Backtesting Framework (IC/ICIR) | Pending |
-| PIM-7 | PE Benchmarking (DPI/TVPI/IRR) | Pending |
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| Sprint 0 (2w) | Remediation — 7 gates + 16 fixes (REM-01–REM-23) | **Next** |
+| Sprint 1 (3w) | Sentiment Ingestion (FR-1) — Polygon.io, NewsAPI, LLM scoring | Pending S0 |
+| Sprint 2 (3w) | Economic Context (FR-2) — FRED integration, regime classification | Pending |
+| Sprint 3 (3w) | CIS & Markov Engine (FR-3, FR-4) — 81-state chain, QuantEcon, Numba | Pending |
+| Sprint 4 (4w) | Portfolio Construction (FR-5) — greedy optimizer, constraints, rebalancing | Pending |
+| Sprint 5 (3w) | Backtesting (FR-6) — walk-forward, IC/ICIR/SPC, backtest studio | Pending |
+| Sprint 6 (4w) | PE Benchmarking + DTF (FR-7) — DPI/TVPI/IRR, DTF-B validation | Pending |
+
+**Key changes from v1.0:**
+- 4 infrastructure gates dropped (Celery, Structlog, Sentry backend, CI — already implemented)
+- 7 statistical standards added (SR-1–SR-7, ISA 520 compliance)
+- CIS (Composite Investment Score) formula specified: FQ 35% + FM 20% + IS 25% + SM 10% + SP 10%
+- DTF split: DTF-A (manual calibration) vs DTF-B (automated weekly validation)
+- New procurement: Polygon.io ($29/mo), AlphaSense, MSCI Barra, Claude Sonnet
 
 ---
 
 ## Recent Changes (since last CONTEXT update)
+
+### PIM v2.0 Build Plan (2026-03-09)
+- Created comprehensive build plan at `docs/plans/2026-03-09-pim-v2-build-plan.md`
+- Supersedes v1.0 (`docs/plans/2026-03-08-pim-tech-stack-build-plan.md`)
+- 29 consolidated code review issues verified against codebase (5 corrections found)
+- 7 PIM gates (down from 8 in v1.0 — 4 infrastructure gates already implemented)
+- 71 master backlog items across 7 sprints (Sprint 0–6, ~22 weeks total)
+- 7 statistical standards (SR-1–SR-7) for ISA 520 compliance
+- 9 new PIM tables + 4 DTF tables + 6 LLM task labels
+- DTF specification: DTF-A (manual calibration) + DTF-B (automated weekly validation)
+- Updated BACKLOG.md Tiers 6-8 to match v2.0 sprint structure
 
 ### AFS Phase 5 — Analytics & Industry Benchmarking (2026-03-07)
 - 5 new backend analytics endpoints in `afs.py` (compute, get analytics, get ratios, get anomalies, get going concern)
@@ -179,9 +198,10 @@ See `BACKLOG.md` for full details.
 | Tier 3 Medium | **5 open** | Compare scoping, budget flag, nav auth, prompt cleanup, build plan file |
 | Tier 4 AFS Module | **P6 remaining** | Custom frameworks & roll-forward |
 | Tier 5 Nice to Have | **7 open** | Integration tests, cold-start, E2E, rate-limit, perf, monitoring, CI |
-| Tier 6 PIM Gates | **8 open** | JWKS fix, async Redis, TS types, Supabase Large, Celery, Structlog, Sentry, CI |
-| Tier 7 PIM Enhancements | **10 open** | Numba, pg_partman, ProcessPool, QuantEcon, D3.js, materialized views, etc. |
-| Tier 8 PIM Module | **7 phases** | Sentiment, Economic, Fundamentals, Scoring, Markov, Backtesting, PE Benchmarks |
+| Tier 6 PIM Gates | **7 open** | Statistical anomaly, JWKS race, async Redis, DCF mid-year/equity/exit, MC parallelism |
+| Tier 7 PIM Remediation | **23 items** | Sprint 0: 7 gates + 16 code review fixes (REM-01–REM-23) |
+| Tier 8 PIM Module | **7 sprints, 71 items** | Sentiment, Economic, CIS/Markov, Portfolio, Backtesting, PE/DTF |
+| Review Findings | **29 tracked** | Consolidated in PIM v2.0 build plan (CR-S1–CR-N9) |
 | Review Findings | **41 open** | 7 sprints: security, DCF, tax, stats, consolidation, forecasting, code quality |
 
 ---
