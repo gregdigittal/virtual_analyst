@@ -1,7 +1,7 @@
 # Project Context — Virtual Analyst
 
-> Last updated: 2026-03-06
-> Commit: a5bd4bb — feat: add Instructions button + fix drafts bugs + update manual
+> Last updated: 2026-03-08
+> Commit: cf9bda7 — feat(afs): add Phase 5 analytics endpoints + tests
 > Branch: main (clean — 67 untracked files, mostly E2E specs + plan docs)
 > Total commits: 244
 
@@ -61,6 +61,27 @@
 - **Services**: `apps/api/app/services/afs/` (disclosure_drafter, tax_note_drafter, output_generator, analytics_ai, ratio_calculator)
 - **Migrations**: 0052 (core), 0053 (sections), 0054 (reviews+tax), 0055 (consolidation+outputs)
 - **Frontend**: `apps/web/app/(app)/afs/` (dashboard, setup, sections, tax, review, consolidation, output)
+
+---
+
+## PIM Module Status (Portfolio Intelligence Module)
+
+> Design spec: `docs/plans/Portfolio_Intelligence_Module_Design_Spec.docx`
+> Build plan: `docs/plans/2026-03-08-pim-tech-stack-build-plan.md`
+> Tech stack review: `docs/reviews/VA_Tech_Stack_Review_PIM.docx`
+
+**Status:** Pre-development — 8 gate items (Tier 6) must be completed first.
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Gate (G-01–G-08) | JWKS fix, async Redis, TS types, Supabase Large, Celery, Structlog, Sentry, CI | **Next** |
+| PIM-1 | Sentiment Ingestion | Pending gates |
+| PIM-2 | Economic Context (FRED integration) | Pending |
+| PIM-3 | Fundamental Aggregation (EDGAR/Yahoo) | Pending |
+| PIM-4 | Portfolio Scoring (81-state Markov) | Pending |
+| PIM-5 | Markov Chain Engine (Numba + QuantEcon) | Pending |
+| PIM-6 | Backtesting Framework (IC/ICIR) | Pending |
+| PIM-7 | PE Benchmarking (DPI/TVPI/IRR) | Pending |
 
 ---
 
@@ -153,11 +174,14 @@ See `BACKLOG.md` for full details.
 
 | Tier | Status | Key Items |
 |------|--------|-----------|
-| Tier 1 Ship Blockers | ✅ S-01 done, **S-02 done** (this file) | — |
+| Tier 1 Ship Blockers | ✅ Done | — |
 | Tier 2 High Priority | ✅ H-02, H-03, H-04 done | — |
 | Tier 3 Medium | **5 open** | Compare scoping, budget flag, nav auth, prompt cleanup, build plan file |
 | Tier 4 AFS Module | **P6 remaining** | Custom frameworks & roll-forward |
 | Tier 5 Nice to Have | **7 open** | Integration tests, cold-start, E2E, rate-limit, perf, monitoring, CI |
+| Tier 6 PIM Gates | **8 open** | JWKS fix, async Redis, TS types, Supabase Large, Celery, Structlog, Sentry, CI |
+| Tier 7 PIM Enhancements | **10 open** | Numba, pg_partman, ProcessPool, QuantEcon, D3.js, materialized views, etc. |
+| Tier 8 PIM Module | **7 phases** | Sentiment, Economic, Fundamentals, Scoring, Markov, Backtesting, PE Benchmarks |
 | Review Findings | **41 open** | 7 sprints: security, DCF, tax, stats, consolidation, forecasting, code quality |
 
 ---
@@ -193,7 +217,10 @@ See `BACKLOG.md` for full details.
 ### Documentation
 - User manual: `docs/user-manual/` (26 chapters + glossary, all with "Page Help" subsections)
 - Comprehensive review: `docs/reviews/2026-03-04-comprehensive-platform-review.md`
+- Tech stack review (PIM): `docs/reviews/VA_Tech_Stack_Review_PIM.docx`
 - AFS design doc: `docs/plans/2026-02-24-afs-module-design.md`
+- PIM design spec: `docs/plans/Portfolio_Intelligence_Module_Design_Spec.docx`
+- PIM build plan: `docs/plans/2026-03-08-pim-tech-stack-build-plan.md`
 
 ---
 
