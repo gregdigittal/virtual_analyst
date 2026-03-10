@@ -1,6 +1,6 @@
 "use client";
 
-import { api, API_URL, getAccessToken, type StatementsData, type KpiItem } from "@/lib/api";
+import { api, API_URL, getAccessToken, type StatementRow, type StatementsData, type KpiItem } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton, VACard, VASpinner } from "@/components/ui";
 import { EntityTimeline } from "@/components/EntityTimeline";
@@ -127,13 +127,13 @@ function statementsToRows(
 }
 
 function buildStatementRows(
-  list: Record<string, unknown>[] | undefined,
+  list: StatementRow[] | undefined,
   periodCount: number
 ): { label: string; values: number[] }[] {
   if (!list?.length) return [];
   const byKey: Record<string, number[]> = {};
   for (let t = 0; t < list.length && t < periodCount; t++) {
-    const row = list[t] as Record<string, unknown>;
+    const row = list[t];
     for (const [k, v] of Object.entries(row)) {
       if (k === "period_index") continue;
       const num = typeof v === "number" ? v : Number(v);
@@ -231,13 +231,13 @@ export default function RunDetailPage() {
   const periodCount = periodLabels.length;
   const periods = periodLabels;
   const isList = Array.isArray(statements?.income_statement)
-    ? (statements!.income_statement as Record<string, unknown>[])
+    ? statements!.income_statement
     : [];
   const bsList = Array.isArray(statements?.balance_sheet)
-    ? (statements!.balance_sheet as Record<string, unknown>[])
+    ? statements!.balance_sheet
     : [];
   const cfList = Array.isArray(statements?.cash_flow)
-    ? (statements!.cash_flow as Record<string, unknown>[])
+    ? statements!.cash_flow
     : [];
   const isRows = buildStatementRows(isList, periodCount);
   const bsRows = buildStatementRows(bsList, periodCount);

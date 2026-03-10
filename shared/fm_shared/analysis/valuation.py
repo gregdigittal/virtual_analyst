@@ -13,6 +13,9 @@ class DCFResult:
     """DCF valuation result."""
 
     enterprise_value: float = 0.0
+    net_debt: float = 0.0
+    cash: float = 0.0
+    equity_value: float = 0.0
     pv_explicit: float = 0.0
     pv_terminal: float = 0.0
     terminal_value: float = 0.0
@@ -38,6 +41,9 @@ def dcf_valuation(
     terminal_growth_rate: float | None = None,
     terminal_multiple: float | None = None,
     projection_years: int = 5,
+    ebitda_series: list[float] | None = None,
+    net_debt: float = 0.0,
+    cash: float = 0.0,
 ) -> DCFResult:
     """
     DCF: PV of explicit FCFs + PV of terminal value.
@@ -51,7 +57,7 @@ def dcf_valuation(
     pv_explicit = 0.0
     breakdown: list[dict[str, Any]] = []
     for t, cf in enumerate(fcf):
-        pv = cf / ((1.0 + wacc) ** ((t + 1) / 12.0))
+        pv = cf / ((1.0 + wacc) ** ((t + 0.5) / 12.0))
         pv_explicit += pv
         breakdown.append({"period": t, "fcf": round(cf, 2), "pv": round(pv, 2)})
     # Annualize: sum the last 12 months (or all periods if fewer than 12)
@@ -62,11 +68,21 @@ def dcf_valuation(
         g = terminal_growth_rate
         terminal_value = fcf_annual * (1.0 + g) / (wacc - g)
     elif terminal_multiple is not None and terminal_multiple > 0:
-        terminal_value = fcf_annual * terminal_multiple
+        # Use EBITDA exit multiple when ebitda_series provided, else fall back to FCF
+        if ebitda_series:
+            trailing_ebitda = ebitda_series[-12:] if len(ebitda_series) >= 12 else ebitda_series
+            ebitda_annual = sum(trailing_ebitda) * (12 / len(trailing_ebitda)) if trailing_ebitda else 0.0
+            terminal_value = ebitda_annual * terminal_multiple
+        else:
+            terminal_value = fcf_annual * terminal_multiple
     pv_terminal = terminal_value / ((1.0 + wacc) ** (n / 12.0)) if terminal_value else 0.0
     enterprise_value = pv_explicit + pv_terminal
+    equity_value = enterprise_value - net_debt + cash
     return DCFResult(
         enterprise_value=round(enterprise_value, 2),
+        net_debt=round(net_debt, 2),
+        cash=round(cash, 2),
+        equity_value=round(equity_value, 2),
         pv_explicit=round(pv_explicit, 2),
         pv_terminal=round(pv_terminal, 2),
         terminal_value=round(terminal_value, 2),

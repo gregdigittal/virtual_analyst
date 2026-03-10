@@ -21,6 +21,7 @@ class Metadata(BaseModel):
     resolution: Literal["monthly", "annual"] = "monthly"
     fiscal_year_end_month: int = Field(12, ge=1, le=12)
     tax_rate: float | None = Field(None, ge=0, le=1)
+    nol_carry_forward: bool = Field(True, description="Enable NOL / tax loss carry-forward (REM-08)")
     initial_cash: float | None = Field(None, ge=0)
     initial_equity: float | None = Field(None, ge=0)
 

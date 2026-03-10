@@ -75,7 +75,7 @@ export default function ComparePage() {
         if (!cancelled) setLoadingEntities(false);
       }
       try {
-        const runsRes = await api.runs.list(ctx.tenantId, { status: "completed", limit: 50 });
+        const runsRes = await api.runs.list(ctx.tenantId, { status: "succeeded", limit: 50 });
         if (!cancelled) setAvailableRuns(runsRes.items ?? []);
       } catch { /* optional */ }
     })();
@@ -123,7 +123,7 @@ export default function ComparePage() {
 
           let latestRun: RunSummary | undefined;
           if (entityBaselines.length > 0) {
-            const runsRes = await api.runs.list(tenantId, { status: "completed", limit: 50 });
+            const runsRes = await api.runs.list(tenantId, { status: "succeeded", limit: 50 });
             latestRun = (runsRes.items ?? []).find((r) =>
               entityBaselines.includes(r.baseline_id)
             );
@@ -137,7 +137,7 @@ export default function ComparePage() {
               loading: false,
               error: entityBaselines.length === 0
                 ? "No baselines linked to entity"
-                : "No completed runs for this entity",
+                : "No succeeded runs for this entity",
             });
             return;
           }

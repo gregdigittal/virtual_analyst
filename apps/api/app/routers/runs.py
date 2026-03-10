@@ -49,23 +49,24 @@ class CreateRunBody(BaseModel):
 
 MC_PROGRESS_KEY = "run:mc_progress"
 
-_redis_pool: Any = None
+# REM-03: Use redis.asyncio to avoid blocking the event loop (CR-S5)
+_async_redis_pool: Any = None
 
 
-def _get_redis():
-    global _redis_pool
-    if _redis_pool is None:
-        import redis
-        _redis_pool = redis.ConnectionPool.from_url(REDIS_URL)
-    import redis
-    return redis.Redis(connection_pool=_redis_pool)
+def _get_async_redis():
+    global _async_redis_pool
+    if _async_redis_pool is None:
+        import redis.asyncio as aioredis
+        _async_redis_pool = aioredis.ConnectionPool.from_url(REDIS_URL)
+    import redis.asyncio as aioredis
+    return aioredis.Redis(connection_pool=_async_redis_pool)
 
 
-def _get_mc_progress(tenant_id: str, run_id: str) -> dict[str, Any] | None:
+async def _get_mc_progress(tenant_id: str, run_id: str) -> dict[str, Any] | None:
     try:
-        r = _get_redis()
+        r = _get_async_redis()
         key = f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}"
-        raw = r.get(key)
+        raw = await r.get(key)
         if raw:
             return json.loads(raw)
     except Exception as e:
@@ -207,6 +208,7 @@ async def create_run(
         valuation_config = body.valuation_config
         if valuation_config and isinstance(valuation_config, dict):
             fcf_series = [k.get("fcf", 0) for k in kpis]
+            ebitda_series = [s.get("ebitda", 0) for s in statements.income_statement] if statements.income_statement else None
             dcf_cfg = valuation_config.get("dcf") or {}
             wacc = float(dcf_cfg.get("wacc", 0.10))
             g = dcf_cfg.get("terminal_growth_rate")
@@ -214,7 +216,15 @@ async def create_run(
             mult = dcf_cfg.get("terminal_multiple")
             mult = float(mult) if mult is not None else None
             proj_years = int(dcf_cfg.get("projection_years", 5))
-            dcf_result = dcf_valuation(fcf_series, wacc, terminal_growth_rate=g, terminal_multiple=mult, projection_years=proj_years)
+            v_net_debt = float(dcf_cfg.get("net_debt", 0.0))
+            v_cash = float(dcf_cfg.get("cash", 0.0))
+            dcf_result = dcf_valuation(
+                fcf_series, wacc,
+                terminal_growth_rate=g, terminal_multiple=mult,
+                projection_years=proj_years,
+                ebitda_series=ebitda_series,
+                net_debt=v_net_debt, cash=v_cash,
+            )
             last_is = statements.income_statement[-1] if statements.income_statement else {}
             metrics = {
                 "revenue": last_is.get("revenue", 0),
@@ -226,6 +236,9 @@ async def create_run(
             valuation_payload = {
                 "dcf": {
                     "enterprise_value": dcf_result.enterprise_value,
+                    "net_debt": dcf_result.net_debt,
+                    "cash": dcf_result.cash,
+                    "equity_value": dcf_result.equity_value,
                     "pv_explicit": dcf_result.pv_explicit,
                     "pv_terminal": dcf_result.pv_terminal,
                     "terminal_value": dcf_result.terminal_value,
@@ -398,7 +411,7 @@ async def get_run(
             out["num_simulations"] = row.get("num_simulations")
             out["seed"] = row.get("seed")
         if row["status"] in ("queued", "running"):
-            progress = _get_mc_progress(x_tenant_id, run_id)
+            progress = await _get_mc_progress(x_tenant_id, run_id)
             if progress:
                 out["mc_progress"] = progress
         return out

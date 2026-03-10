@@ -107,6 +107,7 @@ async def test_get_usage() -> None:
 
 
 def test_stripe_webhook_valid_signature() -> None:
+    pytest.importorskip("stripe")
     settings = Settings(STRIPE_WEBHOOK_SECRET="whsec_test", ENVIRONMENT="test")
     event = MagicMock()
     event.type = "subscription.updated"
@@ -137,6 +138,7 @@ def test_stripe_webhook_valid_signature() -> None:
 
 
 def test_stripe_webhook_invalid_signature_returns_400() -> None:
+    pytest.importorskip("stripe")
     settings = Settings(STRIPE_WEBHOOK_SECRET="whsec_test", ENVIRONMENT="test")
     with patch("apps.api.app.core.settings.get_settings", return_value=settings):
         with patch("stripe.Webhook.construct_event", side_effect=Exception("bad sig")):

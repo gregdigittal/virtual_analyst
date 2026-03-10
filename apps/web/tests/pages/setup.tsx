@@ -75,7 +75,7 @@ export const mockApi = {
     get: vi.fn(async () => ({
       run_id: "run-1",
       baseline_id: "b-1",
-      status: "completed",
+      status: "succeeded",
       created_at: "2026-01-01T00:00:00Z",
       statements: null,
       kpis: [],

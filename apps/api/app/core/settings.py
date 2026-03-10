@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
 
+    polygon_api_key: str | None = Field(default=None, alias="POLYGON_API_KEY")
+    """Polygon.io API key for PIM sentiment news ingestion."""
+
     llm_tokens_monthly_limit: int = Field(default=1_000_000, ge=0, alias="LLM_TOKENS_MONTHLY_LIMIT")
     circuit_breaker_failure_threshold: int = Field(default=5, ge=1, alias="CIRCUIT_BREAKER_FAILURE_THRESHOLD")
     circuit_breaker_recovery_seconds: int = Field(default=60, ge=1, alias="CIRCUIT_BREAKER_RECOVERY_SECONDS")

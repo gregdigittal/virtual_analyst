@@ -287,3 +287,79 @@ def add(self, x: int, y: int) -> int:
 def fail_then_dlq(self, message: str) -> str:
     """Example task: always raises; after 3 retries goes to DLQ."""
     raise ValueError(message)
+
+
+# ---------------------------------------------------------------------------
+# PIM-1.6: Sentiment refresh task
+# ---------------------------------------------------------------------------
+
+async def _refresh_sentiment_async(tenant_id: str) -> dict[str, Any]:
+    """Refresh sentiment signals for all companies in a tenant's universe."""
+    from apps.api.app.core.settings import get_settings
+    from apps.api.app.services.llm.router import LLMRouter
+    from apps.api.app.services.pim.sentiment_ingestor import SentimentIngestor
+
+    settings = get_settings()
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=5, statement_cache_size=0)
+    try:
+        llm_router = LLMRouter()
+        ingestor = SentimentIngestor(
+            polygon_api_key=settings.polygon_api_key,
+            llm_router=llm_router,
+            db_pool=pool,
+        )
+        results = await ingestor.refresh_all(tenant_id)
+        return {"tenant_id": tenant_id, "results": results}
+    finally:
+        await pool.close()
+
+
+async def _refresh_sentiment_all_tenants_async() -> dict[str, Any]:
+    """Refresh sentiment for all tenants that have active PIM universes."""
+    from apps.api.app.core.settings import get_settings
+
+    settings = get_settings()
+    conn = await asyncpg.connect(settings.database_url, statement_cache_size=0)
+    try:
+        tenant_rows = await conn.fetch(
+            "SELECT DISTINCT tenant_id FROM pim_universes WHERE is_active = true"
+        )
+    finally:
+        await conn.close()
+
+    all_results: dict[str, Any] = {}
+    for row in tenant_rows:
+        tid = row["tenant_id"]
+        try:
+            result = await _refresh_sentiment_async(tid)
+            all_results[tid] = result.get("results", {})
+        except Exception:
+            logger.warning("sentiment_refresh_tenant_failed", tenant_id=tid, exc_info=True)
+            all_results[tid] = {"error": "failed"}
+    return all_results
+
+
+@celery_app.task(
+    bind=True,
+    base=DLQTask,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=2,
+)
+def refresh_sentiment(self, tenant_id: str | None = None) -> dict[str, Any]:
+    """PIM-1.6: Refresh sentiment signals from Polygon.io + LLM extraction.
+
+    If tenant_id is provided, refreshes only that tenant.
+    If None, refreshes all tenants with active PIM universes.
+    """
+    try:
+        if tenant_id:
+            result = asyncio.run(_refresh_sentiment_async(tenant_id))
+        else:
+            result = asyncio.run(_refresh_sentiment_all_tenants_async())
+        return result
+    except Exception as e:
+        logger.exception("refresh_sentiment_failed", tenant_id=tenant_id, error=str(e))
+        raise

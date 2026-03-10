@@ -57,6 +57,7 @@ class LLMResponse:
     model: str
     provider: str
     cost_estimate_usd: float
+    metadata: dict[str, Any] | None = None
 
 
 def _ensure_additional_properties_false(schema: dict[str, Any]) -> dict[str, Any]:

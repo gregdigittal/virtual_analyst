@@ -30,6 +30,12 @@ class IntercompanyElimination:
     interest_rate: float = 0.05  # for link_type=='loan': rate from amount_or_rate or default
 
 
+# FX rate type: scalar (single rate for all periods) or per-period list
+# REM-09 / CR-F5: Support per-period FX rate tables for IAS 21 compliance
+FxRate = float | list[float]
+FxRateTable = dict[tuple[str, str], FxRate]
+
+
 @dataclasses.dataclass
 class ConsolidatedResult:
     org_id: str
@@ -40,7 +46,7 @@ class ConsolidatedResult:
     consolidated_kpis: dict[str, Any]
     entity_results: list[EntityResult]
     eliminations: list[IntercompanyElimination]
-    fx_rates_used: dict[tuple[str, str], float]  # (from_ccy, to_ccy) -> rate
+    fx_rates_used: dict[tuple[str, str], FxRate]  # (from_ccy, to_ccy) -> rate or [rates]
     minority_interest: dict[str, Any]  # NCI per period
     integrity: dict[str, Any]
 
@@ -93,11 +99,12 @@ def _rate_key(from_ccy: str, to_ccy: str) -> tuple[str, str]:
 
 
 def _get_rate(
-    fx_rates: dict[tuple[str, str], float],
+    fx_rates: FxRateTable,
     from_ccy: str,
     to_ccy: str,
     integrity: dict[str, Any] | None = None,
-) -> float:
+) -> FxRate:
+    """Return rate(s) for a currency pair. May be scalar or per-period list."""
     if from_ccy == to_ccy:
         return 1.0
     key = _rate_key(from_ccy, to_ccy)
@@ -105,18 +112,35 @@ def _get_rate(
         return fx_rates[key]
     inv = _rate_key(to_ccy, from_ccy)
     if inv in fx_rates:
-        return 1.0 / fx_rates[inv]
+        raw = fx_rates[inv]
+        if isinstance(raw, list):
+            return [1.0 / r if r != 0.0 else 1.0 for r in raw]
+        return 1.0 / raw if raw != 0.0 else 1.0
     if integrity is not None and "warnings" in integrity:
         integrity["warnings"].append(f"Missing FX rate for {from_ccy}/{to_ccy}, using 1.0")
     return 1.0  # fallback no translation
+
+
+def _resolve_rate_for_period(rate: FxRate, t: int) -> float:
+    """Get the rate for a specific period index. Scalar rates apply to all periods."""
+    if isinstance(rate, list):
+        return rate[t] if t < len(rate) else (rate[-1] if rate else 1.0)
+    return rate
+
+
+def _apply_rate_to_series(vals: list[float], rate: FxRate) -> list[float]:
+    """Multiply a value series by a rate (scalar or per-period list)."""
+    if isinstance(rate, list):
+        return [v * (rate[t] if t < len(rate) else (rate[-1] if rate else 1.0)) for t, v in enumerate(vals)]
+    return [v * rate for v in vals]
 
 
 def translate_statements(
     statements: dict[str, Any],
     from_currency: str,
     to_currency: str,
-    fx_avg_rates: dict[tuple[str, str], float],
-    fx_closing_rates: dict[tuple[str, str], float] | None,
+    fx_avg_rates: FxRateTable,
+    fx_closing_rates: FxRateTable | None,
     horizon: int,
     integrity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -133,13 +157,13 @@ def translate_statements(
     for key in ("income_statement", "cash_flow"):
         if key in statements:
             data = _get_period_values(statements[key], horizon)
-            scaled = {label: [v * avg_rate for v in vals] for label, vals in data.items()}
+            scaled = {label: _apply_rate_to_series(vals, avg_rate) for label, vals in data.items()}
             out[key] = _dict_to_period_series(scaled, horizon)
         else:
             out[key] = statements.get(key, [])
     if "balance_sheet" in statements:
         bs_data = _get_period_values(statements["balance_sheet"], horizon)
-        bs_scaled = {label: [v * closing_rate for v in vals] for label, vals in bs_data.items()}
+        bs_scaled = {label: _apply_rate_to_series(vals, closing_rate) for label, vals in bs_data.items()}
         out["balance_sheet"] = _dict_to_period_series(bs_scaled, horizon)
     else:
         out["balance_sheet"] = statements.get("balance_sheet", [])
@@ -164,12 +188,12 @@ def consolidate(
     entity_results: list[EntityResult],
     eliminations: list[IntercompanyElimination],
     reporting_currency: str,
-    fx_avg_rates: dict[tuple[str, str], float],
+    fx_avg_rates: FxRateTable,
     minority_interest_treatment: str,
     horizon: int,
     eliminate_intercompany: bool = True,
     org_id: str = "",
-    fx_closing_rates: dict[tuple[str, str], float] | None = None,
+    fx_closing_rates: FxRateTable | None = None,
 ) -> ConsolidatedResult:
     """
     Consolidate entity results: FX translate (avg for IS/CF, closing for BS), then sum by consolidation method,

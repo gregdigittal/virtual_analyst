@@ -170,6 +170,10 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                     )
                 equity_raises_per_period[fac.converts_to_equity_month] += conversion_amount
 
+    # NOL (Net Operating Loss) carry-forward tracking (REM-08 / CR-F4)
+    nol_enabled = getattr(config.metadata, "nol_carry_forward", True)
+    nol_balance = 0.0  # accumulated tax losses available for offset
+
     # Income statement per period
     is_list: list[dict[str, Any]] = []
     for t in range(horizon):
@@ -179,7 +183,15 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
         ebitda = gross - fixed_opex[t]
         ebit = ebitda - da_per_month[t]
         ebt = ebit - interest[t]
-        tax = max(0.0, ebt * tax_rate)
+        # NOL carry-forward: offset taxable income with accumulated losses
+        nol_used = 0.0
+        if nol_enabled and ebt > 0 and nol_balance > 0:
+            nol_used = min(nol_balance, ebt)
+            nol_balance -= nol_used
+        taxable_income = max(0.0, ebt - nol_used)
+        tax = taxable_income * tax_rate
+        if nol_enabled and ebt < 0:
+            nol_balance += abs(ebt)
         ni = ebt - tax
         dividend = 0.0
         if config.assumptions.funding and config.assumptions.funding.dividends:
@@ -200,8 +212,11 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 "ebit": ebit,
                 "interest_expense": interest[t],
                 "ebt": ebt,
+                "nol_offset": nol_used,
+                "taxable_income": taxable_income,
                 "tax": tax,
                 "net_income": ni,
+                "nol_balance": nol_balance,
                 "dividends": dividend,
             }
         )
@@ -358,19 +373,26 @@ def generate_statements(config: ModelConfig, time_series: dict[str, list[float]]
                 cumul_waterfall_debt[t] += waterfall.waterfall_debt_per_period[t]
                 cumul_waterfall_interest[t] += waterfall.waterfall_interest[t]
 
+            # Recompute tax with NOL carry-forward (REM-08)
+            wf_nol_balance = 0.0
             for t in range(horizon):
                 is_list[t]["interest_expense"] = (
                     original_interest[t] + cumul_waterfall_interest[t]
                 )
-                is_list[t]["ebt"] = (
-                    is_list[t]["ebit"] - is_list[t]["interest_expense"]
-                )
-                is_list[t]["tax"] = max(
-                    0.0, is_list[t]["ebt"] * tax_rate
-                )
-                is_list[t]["net_income"] = (
-                    is_list[t]["ebt"] - is_list[t]["tax"]
-                )
+                ebt_t = is_list[t]["ebit"] - is_list[t]["interest_expense"]
+                is_list[t]["ebt"] = ebt_t
+                wf_nol_used = 0.0
+                if nol_enabled and ebt_t > 0 and wf_nol_balance > 0:
+                    wf_nol_used = min(wf_nol_balance, ebt_t)
+                    wf_nol_balance -= wf_nol_used
+                wf_taxable = max(0.0, ebt_t - wf_nol_used)
+                is_list[t]["nol_offset"] = wf_nol_used
+                is_list[t]["taxable_income"] = wf_taxable
+                is_list[t]["tax"] = wf_taxable * tax_rate
+                if nol_enabled and ebt_t < 0:
+                    wf_nol_balance += abs(ebt_t)
+                is_list[t]["nol_balance"] = wf_nol_balance
+                is_list[t]["net_income"] = ebt_t - is_list[t]["tax"]
                 if (
                     dividend_policy
                     and dividend_policy.policy == "payout_ratio"

@@ -86,29 +86,35 @@ async def test_run_budget_nl_query_agent_handles_tool_error() -> None:
 @pytest.mark.asyncio
 async def test_natural_language_budget_query_fallback_when_agent_disabled() -> None:
     """When agent is disabled, nl-query uses legacy llm.complete_with_routing path."""
-    from apps.api.app.routers import budgets as router_module
+    from apps.api.app.routers.budgets import analytics as analytics_module
 
     conn = MagicMock()
     conn.fetch = AsyncMock(side_effect=[
+        # 1) budget list
         [{"budget_id": "bud_1", "label": "FY24", "status": "active", "current_version_id": "v1"}],
-        [{"period_ordinal": 1, "total": 5000.0}],
-        [{"department_ref": "Sales", "total": 5000.0}],
+        # 2) Q1: total budget per budget_id (batched)
+        [{"budget_id": "bud_1", "total": 100000.0}],
+        # 3) Q2: total actuals per budget_id (batched)
+        [{"budget_id": "bud_1", "total": 5000.0}],
+        # 4) Q3: department ranking per budget_id (batched)
+        [{"budget_id": "bud_1", "department_ref": "Sales", "total": 5000.0}],
     ])
-    conn.fetchval = AsyncMock(return_value=100000.0)
 
     @asynccontextmanager
     async def mock_tenant_conn(_tid: str):
         yield conn
 
-    with patch.object(router_module, "get_agent_service", return_value=None):
-        with patch.object(router_module, "tenant_conn", side_effect=mock_tenant_conn):
+    with patch.object(analytics_module, "get_agent_service", return_value=None):
+        with patch.object(analytics_module, "tenant_conn", side_effect=mock_tenant_conn):
             llm = MagicMock()
             llm.complete_with_routing = AsyncMock(
                 return_value=MagicMock(content={"answer": "Legacy answer.", "citations": []})
             )
 
-            response = await router_module.natural_language_budget_query(
-                router_module.NLQueryBody(question="What is the total?"),
+            from apps.api.app.routers.budgets._common import NLQueryBody
+
+            response = await analytics_module.natural_language_budget_query(
+                NLQueryBody(question="What is the total?"),
                 x_tenant_id="t1",
                 llm=llm,
             )

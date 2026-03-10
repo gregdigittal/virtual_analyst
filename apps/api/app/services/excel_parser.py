@@ -168,7 +168,7 @@ def parse_workbook(file_bytes: bytes, filename: str = "upload.xlsx", max_sheets:
             referenced_sheets: list[str] = []
             try:
                 merged_cell_count = len(ws_f.merged_cells.ranges) if hasattr(ws_f.merged_cells, "ranges") else 0
-            except Exception:
+            except (AttributeError, TypeError):
                 merged_cell_count = 0  # read_only mode does not populate merged_cells.ranges
 
             for row in ws_f.iter_rows(min_row=1, max_row=max_row, min_col=1, max_col=max_col):

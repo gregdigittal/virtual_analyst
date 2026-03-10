@@ -103,20 +103,41 @@ async def detect_anomalies(
     ratios: dict,
     benchmarks: dict | None = None,
 ) -> LLMResponse:
-    """Detect unusual ratio values that may require additional disclosure."""
+    """Detect unusual ratio values that may require additional disclosure.
+
+    REM-01 / CR-S2 / ISA 520: Statistical pre-screening (Z-score + IQR) identifies
+    anomalies first, then LLM generates narrative explanations and disclosure impact
+    for the statistically flagged items. This hybrid approach satisfies ISA 520
+    requirements (expectation, threshold, investigation).
+    """
+    from apps.api.app.services.afs.anomaly_stats import (
+        anomalies_to_dict,
+        detect_anomalies_statistical,
+    )
+
+    # Phase 1: Statistical pre-screening
+    stat_anomalies = detect_anomalies_statistical(ratios, benchmarks)
+    stat_section = ""
+    if stat_anomalies:
+        stat_lines = ["## Statistically Flagged Anomalies\n"]
+        for a in stat_anomalies:
+            stat_lines.append(f"- [{a.severity.upper()}] {a.description}")
+        stat_section = "\n".join(stat_lines) + "\n\n"
+
+    # Phase 2: LLM narrative generation informed by statistical findings
     system = (
         "You are a financial analyst reviewing computed ratios for an entity's annual financial statements. "
-        "Identify any unusual or concerning values. Compare against industry benchmarks where provided. "
-        "Focus on ratios that deviate significantly from normal ranges or industry norms. "
+        "Statistical anomaly detection has already been performed — focus your analysis on the "
+        "statistically flagged items below, and add any additional anomalies you identify. "
         "For each anomaly, explain the potential disclosure impact under IFRS/GAAP."
     )
-    user = f"Entity: {entity_name}\n\n{_format_ratios_for_prompt(ratios, benchmarks)}"
+    user = f"Entity: {entity_name}\n\n{stat_section}{_format_ratios_for_prompt(ratios, benchmarks)}"
 
     messages: list[Message] = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
-    return await llm_router.complete_with_routing(
+    llm_response = await llm_router.complete_with_routing(
         tenant_id=tenant_id,
         messages=messages,
         response_schema=ANOMALY_SCHEMA,
@@ -124,6 +145,11 @@ async def detect_anomalies(
         max_tokens=4096,
         temperature=0.2,
     )
+    # Attach statistical anomalies to metadata for audit trail
+    if llm_response.metadata is None:
+        llm_response.metadata = {}
+    llm_response.metadata["statistical_anomalies"] = anomalies_to_dict(stat_anomalies)
+    return llm_response
 
 
 async def generate_commentary(

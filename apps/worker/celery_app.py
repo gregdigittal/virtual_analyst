@@ -35,6 +35,12 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
     task_default_retry_delivery_mode="transient",
+    beat_schedule={
+        "refresh-sentiment-every-6h": {
+            "task": "apps.worker.tasks.refresh_sentiment",
+            "schedule": 21600.0,  # 6 hours
+        },
+    },
 )
 
 def push_to_dlq(

@@ -153,17 +153,23 @@ export interface RunDetail extends RunSummary {
   mc_progress?: number | null;
 }
 
+/** A single period row from the three-statement engine. */
+export interface StatementRow {
+  period_index: number;
+  [key: string]: string | number;
+}
+
 export interface StatementsData {
-  income_statement?: Record<string, unknown>[] | unknown;
-  balance_sheet?: Record<string, unknown>[] | unknown;
-  cash_flow?: Record<string, unknown>[] | unknown;
+  income_statement?: StatementRow[];
+  balance_sheet?: StatementRow[];
+  cash_flow?: StatementRow[];
   periods?: string[];
   revenue_by_segment?: Record<string, number[]>;
 }
 
 export interface KpiItem {
   period?: number;
-  [key: string]: unknown;
+  [key: string]: string | number | undefined;
 }
 
 export interface DraftSummary {
@@ -1562,6 +1568,61 @@ export const api = {
     rollforward: (tenantId: string, engagementId: string) =>
       request<{ sections_copied: number; comparatives_copied: boolean }>(`/api/v1/afs/engagements/${encodeURIComponent(engagementId)}/rollforward`, { tenantId, method: "POST" }),
   },
+
+  // --- PIM (Portfolio Intelligence Module) ---
+  pim: {
+    universe: {
+      list: (tenantId: string, opts?: { limit?: number; offset?: number; sector?: string; active_only?: boolean }) =>
+        request<PimUniverseListResponse>(
+          `/api/v1/pim/universe?${new URLSearchParams({
+            ...(opts?.limit != null && { limit: String(opts.limit) }),
+            ...(opts?.offset != null && { offset: String(opts.offset) }),
+            ...(opts?.sector && { sector: opts.sector }),
+            ...(opts?.active_only != null && { active_only: String(opts.active_only) }),
+          }).toString()}`,
+          { tenantId }
+        ),
+      add: (tenantId: string, body: { ticker: string; company_name: string; sector?: string; sub_sector?: string; country_iso?: string; exchange?: string; currency?: string; tags?: string[]; notes?: string }) =>
+        request<PimUniverseCompany>("/api/v1/pim/universe", { tenantId, method: "POST", body }),
+      get: (tenantId: string, companyId: string) =>
+        request<PimUniverseCompany>(`/api/v1/pim/universe/${encodeURIComponent(companyId)}`, { tenantId }),
+      remove: (tenantId: string, companyId: string) =>
+        request<{ deleted: boolean }>(`/api/v1/pim/universe/${encodeURIComponent(companyId)}`, { tenantId, method: "DELETE" }),
+    },
+    sentiment: {
+      scores: (tenantId: string, opts?: { company_id?: string; limit?: number; offset?: number }) =>
+        request<PimSentimentScoresResponse>(
+          `/api/v1/pim/sentiment/scores?${new URLSearchParams({
+            ...(opts?.company_id && { company_id: opts.company_id }),
+            ...(opts?.limit != null && { limit: String(opts.limit) }),
+            ...(opts?.offset != null && { offset: String(opts.offset) }),
+          }).toString()}`,
+          { tenantId }
+        ),
+      aggregates: (tenantId: string, opts?: { company_id?: string; period_type?: string; months_back?: number; limit?: number; offset?: number }) =>
+        request<PimSentimentAggregatesResponse>(
+          `/api/v1/pim/sentiment/aggregates?${new URLSearchParams({
+            ...(opts?.company_id && { company_id: opts.company_id }),
+            ...(opts?.period_type && { period_type: opts.period_type }),
+            ...(opts?.months_back != null && { months_back: String(opts.months_back) }),
+            ...(opts?.limit != null && { limit: String(opts.limit) }),
+            ...(opts?.offset != null && { offset: String(opts.offset) }),
+          }).toString()}`,
+          { tenantId }
+        ),
+      dashboard: (tenantId: string) =>
+        request<PimSentimentDashboardResponse>("/api/v1/pim/sentiment/dashboard", { tenantId }),
+      companyDetail: (tenantId: string, companyId: string, opts?: { period_type?: string; months_back?: number; signals_limit?: number }) =>
+        request<PimSentimentCompanyDetail>(
+          `/api/v1/pim/sentiment/company/${encodeURIComponent(companyId)}?${new URLSearchParams({
+            ...(opts?.period_type && { period_type: opts.period_type }),
+            ...(opts?.months_back != null && { months_back: String(opts.months_back) }),
+            ...(opts?.signals_limit != null && { signals_limit: String(opts.signals_limit) }),
+          }).toString()}`,
+          { tenantId }
+        ),
+    },
+  },
 };
 
 export interface ScenarioItem {
@@ -2233,4 +2294,113 @@ export interface AFSAnalytics {
   status: string;
   error_message: string | null;
   computed_by: string | null;
+}
+
+// --- PIM Types ---
+
+export interface PimUniverseCompany {
+  company_id: string;
+  ticker: string;
+  company_name: string;
+  sector: string | null;
+  sub_sector: string | null;
+  country_iso: string | null;
+  market_cap_usd: number | null;
+  currency: string | null;
+  exchange: string | null;
+  is_active: boolean;
+  tags: string[];
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PimUniverseListResponse {
+  items: PimUniverseCompany[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PimSentimentSignal {
+  signal_id: string;
+  company_id: string;
+  source_type: string;
+  source_ref: string | null;
+  headline: string | null;
+  published_at: string | null;
+  sentiment_score: number;
+  confidence: number;
+  llm_model: string | null;
+  created_at: string | null;
+}
+
+export interface PimSentimentAggregate {
+  company_id: string;
+  period_type: string;
+  period_start: string | null;
+  period_end: string | null;
+  avg_sentiment: number;
+  median_sentiment: number | null;
+  min_sentiment: number | null;
+  max_sentiment: number | null;
+  std_sentiment: number | null;
+  signal_count: number;
+  avg_confidence: number | null;
+  source_breakdown: Record<string, number>;
+  trend_direction: string | null;
+  updated_at: string | null;
+}
+
+export interface PimSentimentScoresResponse {
+  items: PimSentimentSignal[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PimSentimentAggregatesResponse {
+  items: PimSentimentAggregate[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PimSentimentDashboardItem {
+  company_id: string;
+  ticker: string;
+  company_name: string;
+  sector: string | null;
+  total_signals: number;
+  latest_avg_sentiment: number | null;
+  latest_signal_count: number;
+  latest_avg_confidence: number | null;
+  source_breakdown: Record<string, number>;
+  trend_direction: string | null;
+  latest_period_start: string | null;
+  latest_period_end: string | null;
+  latest_signal: {
+    sentiment_score: number;
+    confidence: number;
+    headline: string | null;
+    published_at: string | null;
+    source_type: string;
+  } | null;
+}
+
+export interface PimSentimentDashboardResponse {
+  items: PimSentimentDashboardItem[];
+  total: number;
+}
+
+export interface PimSentimentCompanyDetail {
+  company: {
+    company_id: string;
+    ticker: string;
+    company_name: string;
+    sector: string | null;
+    sub_sector: string | null;
+  };
+  aggregates: PimSentimentAggregate[];
+  recent_signals: PimSentimentSignal[];
 }

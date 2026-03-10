@@ -78,7 +78,7 @@ async def test_reforecast_budget_fallback_when_agent_disabled() -> None:
     """When agent is disabled, reforecast uses legacy llm.complete_with_routing path."""
     from contextlib import asynccontextmanager
 
-    from apps.api.app.routers import budgets as router_module
+    from apps.api.app.routers.budgets import analytics as analytics_module
 
     conn = MagicMock()
     conn.fetch = AsyncMock(side_effect=[
@@ -101,16 +101,16 @@ async def test_reforecast_budget_fallback_when_agent_disabled() -> None:
 
     mock_get_budget = AsyncMock(return_value={"budget_id": "b1", "current_version_id": "v1"})
 
-    with patch.object(router_module, "get_agent_service", return_value=None):
-        with patch.object(router_module, "tenant_conn", side_effect=mock_tenant_conn):
-            with patch.object(router_module, "get_budget", mock_get_budget):
-                with patch.object(router_module, "ensure_budget_version", new_callable=AsyncMock):
+    with patch.object(analytics_module, "get_agent_service", return_value=None):
+        with patch.object(analytics_module, "tenant_conn", side_effect=mock_tenant_conn):
+            with patch.object(analytics_module, "get_budget", mock_get_budget):
+                with patch.object(analytics_module, "ensure_budget_version", new_callable=AsyncMock):
                     llm = MagicMock()
                     llm.complete_with_routing = AsyncMock(
                         return_value=MagicMock(content={"revisions": [{"account_ref": "acct1", "amounts": []}]})
                     )
 
-                    response = await router_module.reforecast_budget(
+                    response = await analytics_module.reforecast_budget(
                         "bud_1",
                         x_tenant_id="t1",
                         x_user_id="u1",

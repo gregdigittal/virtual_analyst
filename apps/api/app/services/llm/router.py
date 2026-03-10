@@ -49,6 +49,9 @@ DEFAULT_POLICY = {
         {"task_label": "afs_going_concern", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.1},
         {"task_label": "afs_framework_inference", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 8192, "temperature": 0.3},
         {"task_label": "afs_framework_inference", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 8192, "temperature": 0.3},
+        # PIM sentiment extraction (FR-1.6: temp=0.1 for deterministic scoring)
+        {"task_label": "pim_sentiment_extraction", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 2048, "temperature": 0.1},
+        {"task_label": "pim_sentiment_extraction", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 2048, "temperature": 0.1},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }

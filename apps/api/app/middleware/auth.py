@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 import httpx
@@ -20,31 +21,47 @@ logger = structlog.get_logger()
 
 # ──────────────────────────────────────────────────────────────────────
 # JWKS cache for ES256 verification (Supabase migrated JWT signing keys)
+# REM-02: asyncio.Lock prevents concurrent JWKS fetches racing on globals
 # ──────────────────────────────────────────────────────────────────────
 _jwks_cache: dict | None = None
 _jwks_cache_time: float = 0.0
 _JWKS_CACHE_TTL = 3600  # refresh JWKS every hour
+_jwks_lock: asyncio.Lock | None = None
 
 
-def _get_jwks(supabase_url: str) -> dict:
-    """Fetch and cache JWKS from Supabase for ES256 token verification."""
+def _get_jwks_lock() -> asyncio.Lock:
+    """Lazy-init lock to avoid creating it outside an event loop."""
+    global _jwks_lock
+    if _jwks_lock is None:
+        _jwks_lock = asyncio.Lock()
+    return _jwks_lock
+
+
+async def _get_jwks(supabase_url: str) -> dict:
+    """Fetch and cache JWKS from Supabase for ES256 token verification.
+
+    Uses asyncio.Lock to prevent concurrent requests from racing on global cache,
+    and httpx.AsyncClient to avoid blocking the event loop (REM-02 / CR-S4).
+    """
     global _jwks_cache, _jwks_cache_time
-    now = time.monotonic()
-    if _jwks_cache and (now - _jwks_cache_time) < _JWKS_CACHE_TTL:
-        return _jwks_cache
-    jwks_url = f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
-    try:
-        resp = httpx.get(jwks_url, timeout=10.0)
-        resp.raise_for_status()
-        _jwks_cache = resp.json()
-        _jwks_cache_time = now
-        logger.info("jwks_fetched", url=jwks_url, keys=len(_jwks_cache.get("keys", [])))
-        return _jwks_cache
-    except Exception as e:
-        logger.error("jwks_fetch_failed", url=jwks_url, error=str(e))
-        if _jwks_cache:
-            return _jwks_cache  # return stale cache on failure
-        raise
+    async with _get_jwks_lock():
+        now = time.monotonic()
+        if _jwks_cache and (now - _jwks_cache_time) < _JWKS_CACHE_TTL:
+            return _jwks_cache
+        jwks_url = f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(jwks_url, timeout=10.0)
+            resp.raise_for_status()
+            _jwks_cache = resp.json()
+            _jwks_cache_time = now
+            logger.info("jwks_fetched", url=jwks_url, keys=len(_jwks_cache.get("keys", [])))
+            return _jwks_cache
+        except Exception as e:
+            logger.error("jwks_fetch_failed", url=jwks_url, error=str(e))
+            if _jwks_cache:
+                return _jwks_cache  # return stale cache on failure
+            raise
 
 
 def _find_jwk_for_kid(jwks: dict, kid: str) -> dict | None:
@@ -129,13 +146,13 @@ async def auth_middleware(request: Request, call_next):
             kid = unverified_header.get("kid")
             if not kid:
                 raise ValueError("ES256 token missing kid in header")
-            jwks = _get_jwks(settings.supabase_url)
+            jwks = await _get_jwks(settings.supabase_url)
             jwk_data = _find_jwk_for_kid(jwks, kid)
             if not jwk_data:
                 # Force refresh cache in case keys rotated
                 global _jwks_cache_time
                 _jwks_cache_time = 0.0
-                jwks = _get_jwks(settings.supabase_url)
+                jwks = await _get_jwks(settings.supabase_url)
                 jwk_data = _find_jwk_for_kid(jwks, kid)
             if not jwk_data:
                 raise ValueError(f"No JWKS key found for kid={kid}")

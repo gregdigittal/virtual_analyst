@@ -195,7 +195,7 @@ See `BACKLOG.md` for full details.
 |------|--------|-----------|
 | Tier 1 Ship Blockers | ✅ Done | — |
 | Tier 2 High Priority | ✅ H-02, H-03, H-04 done | — |
-| Tier 3 Medium | **5 open** | Compare scoping, budget flag, nav auth, prompt cleanup, build plan file |
+| Tier 3 Medium | ✅ All resolved | Compare scoping, budget flag, nav auth, prompt cleanup — all verified complete |
 | Tier 4 AFS Module | **P6 remaining** | Custom frameworks & roll-forward |
 | Tier 5 Nice to Have | **7 open** | Integration tests, cold-start, E2E, rate-limit, perf, monitoring, CI |
 | Tier 6 PIM Gates | **7 open** | Statistical anomaly, JWKS race, async Redis, DCF mid-year/equity/exit, MC parallelism |

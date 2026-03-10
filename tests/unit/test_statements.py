@@ -286,6 +286,106 @@ def _config_with_segments() -> ModelConfig:
     return ModelConfig.model_validate(d)
 
 
+def test_nol_carry_forward() -> None:
+    """REM-08: NOL carry-forward offsets future taxable income with accumulated losses."""
+    # Create config with high fixed costs causing losses in early periods
+    config_dict = minimal_model_config_dict(
+        horizon_months=6, tax_rate=0.25, initial_equity=100_000.0
+    )
+    # Revenue = 1000/period. Fixed cost = 2000/period for first 3 months → loss of 1000/period
+    # Then fixed cost drops to 0 → profit of 1000/period, offset by NOL
+    config_dict["assumptions"]["cost_structure"] = {
+        "variable_costs": [],
+        "fixed_costs": [
+            {
+                "cost_id": "rent",
+                "label": "Rent",
+                "category": "sga",
+                "driver": {
+                    "ref": "drv:rent",
+                    "value_type": "step",
+                    "schedule": [
+                        {"month": 0, "value": 2000.0},
+                        {"month": 3, "value": 0.0},
+                    ],
+                },
+            }
+        ],
+    }
+    config = ModelConfig.model_validate(config_dict)
+    time_series = run_engine(config)
+    st = generate_statements(config, time_series)
+
+    # Periods 0-2: EBT = 1000 - 2000 = -1000, tax should be 0, NOL accumulates
+    for t in range(3):
+        assert st.income_statement[t]["ebt"] == pytest.approx(-1000.0, abs=1)
+        assert st.income_statement[t]["tax"] == 0.0
+        assert st.income_statement[t]["nol_offset"] == 0.0
+
+    # NOL balance after 3 loss periods = 3000
+    assert st.income_statement[2]["nol_balance"] == pytest.approx(3000.0, abs=1)
+
+    # Period 3: EBT = 1000, offset by NOL → taxable_income = 0, tax = 0
+    assert st.income_statement[3]["ebt"] == pytest.approx(1000.0, abs=1)
+    assert st.income_statement[3]["nol_offset"] == pytest.approx(1000.0, abs=1)
+    assert st.income_statement[3]["taxable_income"] == pytest.approx(0.0, abs=1)
+    assert st.income_statement[3]["tax"] == pytest.approx(0.0, abs=1)
+
+    # Period 4: EBT = 1000, NOL remaining = 2000 → still fully offset
+    assert st.income_statement[4]["nol_offset"] == pytest.approx(1000.0, abs=1)
+    assert st.income_statement[4]["tax"] == pytest.approx(0.0, abs=1)
+
+    # Period 5: EBT = 1000, NOL remaining = 1000 → fully offset
+    assert st.income_statement[5]["nol_offset"] == pytest.approx(1000.0, abs=1)
+    assert st.income_statement[5]["tax"] == pytest.approx(0.0, abs=1)
+    assert st.income_statement[5]["nol_balance"] == pytest.approx(0.0, abs=1)
+
+
+def test_nol_disabled() -> None:
+    """When nol_carry_forward is False, losses are not carried forward."""
+    config_dict = minimal_model_config_dict(
+        horizon_months=4, tax_rate=0.25, initial_equity=100_000.0
+    )
+    config_dict["metadata"]["nol_carry_forward"] = False
+    config_dict["assumptions"]["cost_structure"] = {
+        "variable_costs": [],
+        "fixed_costs": [
+            {
+                "cost_id": "rent",
+                "label": "Rent",
+                "category": "sga",
+                "driver": {
+                    "ref": "drv:rent",
+                    "value_type": "step",
+                    "schedule": [
+                        {"month": 0, "value": 2000.0},
+                        {"month": 2, "value": 0.0},
+                    ],
+                },
+            }
+        ],
+    }
+    config = ModelConfig.model_validate(config_dict)
+    time_series = run_engine(config)
+    st = generate_statements(config, time_series)
+
+    # Period 2: EBT = 1000, no NOL offset → full tax
+    assert st.income_statement[2]["ebt"] == pytest.approx(1000.0, abs=1)
+    assert st.income_statement[2]["nol_offset"] == 0.0
+    assert st.income_statement[2]["tax"] == pytest.approx(250.0, abs=1)
+
+
+def test_nol_keys_present() -> None:
+    """REM-08: IS rows include nol_offset, taxable_income, nol_balance."""
+    config = minimal_model_config(horizon_months=2, tax_rate=0.25)
+    time_series = run_engine(config)
+    st = generate_statements(config, time_series)
+    row = st.income_statement[0]
+    assert "nol_offset" in row
+    assert "taxable_income" in row
+    assert "nol_balance" in row
+
+
 def test_revenue_by_segment() -> None:
     """revenue_by_segment groups revenue by business_line."""
     config = _config_with_segments()

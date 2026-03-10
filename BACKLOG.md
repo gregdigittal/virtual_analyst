@@ -2,7 +2,7 @@
 
 > Updated: 2026-03-09
 > Branch: main
-> Latest commit: cf9bda7 (AFS Phase 5 — Analytics & Industry Benchmarking)
+> Latest commit: 7311f55 (PIM v2.0 build plan + backlog update)
 > Source: PIM Requirements BuildPlan v2.0 (2026-03-09) — supersedes VA_Tech_Stack_Review_PIM v1.0
 
 ---
@@ -12,7 +12,7 @@
 | Area | Metric |
 |------|--------|
 | Backend tests | 85 test files (**547+ tests**), 0 failed, 19 skipped (integration gated) |
-| Frontend unit tests | **159 passed** across 32 test files |
+| Frontend unit tests | **159 passed** across 59 test files |
 | Frontend pages | **58 pages** in `(app)` route group |
 | E2E tests (Playwright) | **68 spec files** — 32 pass, 2 skip, 3 fail (UI detail page links) |
 | TypeScript | 0 errors |
@@ -28,7 +28,7 @@
 | # | Item | Files | Effort |
 |---|------|-------|--------|
 | ~~**S-01**~~ | ~~Commit and deploy the 25 backend test fixes + auth middleware JWT fix~~ | Done (Round 24 + 25) | ~~S~~ |
-| **S-02** | **Update CONTEXT.md** to reflect Round 23 + test fixes, clear stale "In Progress" section | `CONTEXT.md` | S |
+| ~~**S-02**~~ | ~~Update CONTEXT.md to reflect Round 23 + test fixes, clear stale "In Progress" section~~ | Done (2026-03-09) | ~~S~~ |
 
 ---
 
@@ -37,9 +37,9 @@
 | # | Item | Description | Effort |
 |---|------|-------------|--------|
 | ~~**H-01**~~ | ~~Backend test coverage for 18 untested routers~~ | Done (Round 25 — all 18 routers now have tests, 311 total) | ~~L~~ |
-| **H-02** | Frontend page-level smoke tests | 0 of 51 pages have tests. Priority targets: `dashboard`, `baselines/[id]`, `runs/[id]`, `compare`, `workflows`, `budgets/[id]` — render without crash + auth redirect check | M |
-| **H-03** | Board pack email distribution | `board_pack_schedules.py:247` stubs email sending. Wire to SendGrid or SES for real distribution | M |
-| **H-04** | Board pack update endpoint | `board_packs.py:368` is a "Phase 10 stub" — implement real update (label, section order, branding) | S |
+| ~~**H-02**~~ | ~~Frontend page-level smoke tests~~ | Done — 59 test files covering all 57 page routes (159 tests passing) | ~~M~~ |
+| ~~**H-03**~~ | ~~Board pack email distribution~~ | Done — board pack cron scheduler + 16 tests passing | ~~M~~ |
+| ~~**H-04**~~ | ~~Board pack update endpoint~~ | Done — implemented real update (label, section order, branding) | ~~S~~ |
 
 ---
 
@@ -47,11 +47,11 @@
 
 | # | Item | Description | Effort |
 |---|------|-------------|--------|
-| **M-01** | Compare page entity scoping | `compare/page.tsx:119` — TODO: scope runs per entity once `baseline_id` is exposed on `OrgStructureItem` | S |
-| **M-02** | Budget `is_revenue` flag | `budgets.py:1388` — TODO: add explicit `is_revenue` flag to `budget_line_items` for accuracy | S |
-| **M-03** | Nav sign-out auth migration | `nav.tsx` still uses raw `createClient()` for sign-out — migrate to shared auth utility for consistency | S |
-| **M-04** | Cursor prompt cleanup | 47 `CURSOR_PROMPT_*.md` files in repo root. All applied — archive to `docs/prompts/` or remove | S |
-| **M-05** | Untracked `BUILD_PLAN_ENHANCEMENTS.md` | Either commit or add to `.gitignore` | S |
+| ~~**M-01**~~ | ~~Compare page entity scoping~~ | Resolved — `compare/page.tsx` now scopes runs per entity using `baseline_id` from `api.orgStructures.get()` | ~~S~~ |
+| ~~**M-02**~~ | ~~Budget `is_revenue` flag~~ | Resolved — migration `0049_budget_is_revenue.sql` adds column + backfills via pattern matching | ~~S~~ |
+| ~~**M-03**~~ | ~~Nav sign-out auth migration~~ | Resolved — `nav.tsx` uses shared `signOut()` from `@/lib/auth` | ~~S~~ |
+| ~~**M-04**~~ | ~~Cursor prompt cleanup~~ | Resolved — no `CURSOR_PROMPT_*.md` files remain at root; 53 files archived in `docs/prompts/` | ~~S~~ |
+| ~~**M-05**~~ | ~~Untracked `BUILD_PLAN_ENHANCEMENTS.md`~~ | N/A — file no longer exists; superseded by PIM v2.0 build plan | ~~S~~ |
 
 ---
 
@@ -180,12 +180,12 @@ AI-powered portfolio analytics with 81-state Markov chain model, CIS scoring, mu
 | Has tests | **35** | All routers covered (Round 25 added: activity, audit, benchmark, board_pack_schedules, comments, compliance, connectors, covenants, documents, feedback, health, import_csv, integrations, marketplace, metrics_summary, notifications, org_structures) |
 | No tests | **0** | — |
 
-### Frontend (51 pages)
+### Frontend (57 pages)
 
 | Status | Count |
 |--------|-------|
 | Component/utility tests | 5 files (VAInput, VASelect, VAPagination, format, logger) |
-| Page-level tests | **0** of 51 pages |
+| Page-level smoke tests | **59 test files** covering all 57 page routes (159 tests passing) |
 
 ---
 
