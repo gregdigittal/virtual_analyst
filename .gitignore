@@ -54,3 +54,6 @@ scripts/functional-tests/results/*.log
 credentials.json
 *.xlsx
 tsconfig.tsbuildinfo
+
+# AMC dashboard runtime state (not source)
+agent_state.json
