@@ -68,7 +68,7 @@ AI-powered Annual Financial Statement generation with multi-framework compliance
 | **AFS-P3** | Workflow + Tax | Review Workflow, Tax Computation | Multi-stage approval (draft → preparer → manager → partner), version control, redlining, audit trail, lock/unlock. Current + deferred tax computation, tax reconciliation, tax note generation | L |
 | **AFS-P4** | Consolidation + Filing | Multi-entity Consolidation, iXBRL/XBRL output | Aggregate trial balances, intercompany elimination, minority interests, currency translation. Machine-readable regulatory output (CIPC, SEC) | L |
 | **AFS-P5** | Analytics | AFS Analytics | Ratio analysis, YoY trends, industry benchmarking, anomaly detection, going concern indicators, management commentary suggestions | M |
-| **AFS-P6** | Custom Frameworks + Roll-forward | Custom/AI-inferred frameworks, Roll-forward | User-defined frameworks, AI-inferred frameworks from NL description, automatic prior-year roll-forward with update flags | M |
+| ~~**AFS-P6**~~ | ~~Custom Frameworks + Roll-forward~~ | ~~Custom/AI-inferred frameworks, Roll-forward~~ | Done (2026-03-15): framework detail page, needs_review flag + migration, TB mapping bug fix, 35 new tests | M |
 
 **New database tables:** 12 (afs_frameworks, afs_disclosure_items, afs_engagements, afs_trial_balances, afs_consolidation_rules, afs_sections, afs_section_history, afs_prior_afs, afs_tax_computations, afs_temporary_differences, afs_reviews, afs_review_comments)
 
@@ -101,13 +101,13 @@ AI-powered Annual Financial Statement generation with multi-framework compliance
 
 | # | Gate | Description | CR Ref | Effort |
 |---|------|-------------|--------|--------|
-| **GATE-1** | Statistical anomaly detection | Replace LLM-only anomaly detection with IQR/Z-score statistical methods; LLM supplements only | CR-S2 | M |
-| **GATE-2** | JWKS async race condition | Cache JWKS response with `asyncio.Lock` + TTL; current implementation re-fetches every request | CR-S4 | S |
-| **GATE-3** | Async Redis migration | Replace sync `redis.Redis` with `redis.asyncio.Redis` across all call sites | CR-S5 | S |
-| **GATE-4** | DCF mid-year convention | Add mid-year discounting option to DCF valuation engine | CR-F1 | M |
-| **GATE-5** | DCF equity bridge | Add net-debt-to-equity bridge in DCF output | CR-F2 | S |
-| **GATE-6** | DCF exit multiples | Add EBITDA exit multiple terminal value method alongside perpetuity growth | CR-F3 | M |
-| **GATE-7** | MC parallelism | Replace single-threaded Monte Carlo loop with `ProcessPoolExecutor` | CR-T1 | S |
+| ~~**GATE-1**~~ | ~~Statistical anomaly detection~~ | Done — `services/afs/anomaly_stats.py` IQR/Z-score + LLM supplement (2026-03-15) | CR-S2 | M |
+| ~~**GATE-2**~~ | ~~JWKS async race condition~~ | Done — `middleware/auth.py` asyncio.Lock + 1h TTL cache + httpx.AsyncClient (2026-03-15) | CR-S4 | S |
+| ~~**GATE-3**~~ | ~~Async Redis migration~~ | Done — `worker/celery_app.py` + `worker/tasks.py` migrated to redis.asyncio (2026-03-15) | CR-S5 | S |
+| ~~**GATE-4**~~ | ~~DCF mid-year convention~~ | Done — `valuation.py` `(t + 0.5) / 12.0` exponent is mid-year by default (2026-03-15) | CR-F1 | M |
+| ~~**GATE-5**~~ | ~~DCF equity bridge~~ | Done — `DCFResult` has `net_debt`, `cash`, `equity_value`; bridge in `dcf_valuation()` (2026-03-15) | CR-F2 | S |
+| ~~**GATE-6**~~ | ~~DCF exit multiples~~ | Done — `terminal_multiple` param + EBITDA exit multiple path in `dcf_valuation()` (2026-03-15) | CR-F3 | M |
+| ~~**GATE-7**~~ | ~~MC parallelism~~ | Done — `ProcessPoolExecutor` above `PARALLEL_THRESHOLD=50` in `monte_carlo.py` (2026-03-15) | CR-T1 | S |
 
 ---
 
@@ -120,29 +120,29 @@ Sprint 0 (2 weeks) closes all 7 gates + fixes 16 additional issues from the cons
 
 | # | Item | CR Ref | Effort |
 |---|------|--------|--------|
-| **REM-01** | Statistical anomaly detection (IQR/Z-score) | CR-S2 (GATE-1) | M |
-| **REM-02** | JWKS async race condition | CR-S4 (GATE-2) | S |
-| **REM-03** | Async Redis migration | CR-S5 (GATE-3) | S |
-| **REM-04** | DCF mid-year convention | CR-F1 (GATE-4) | M |
-| **REM-05** | DCF equity bridge | CR-F2 (GATE-5) | S |
-| **REM-06** | DCF exit multiples | CR-F3 (GATE-6) | M |
-| **REM-07** | MC parallelism (ProcessPoolExecutor) | CR-T1 (GATE-7) | S |
-| **REM-08** | Tax loss carryforward / NOL | CR-F4 | M |
-| **REM-09** | Multi-period FX rates | CR-F5 | M |
-| **REM-10** | Auth middleware DB-error fallback | CR-F6 | S |
-| **REM-11** | Split `budgets.py` (1,618 lines) | CR-Q2 | M |
-| **REM-12** | Split `afs.py` (2,657 lines) | CR-Q3 | L |
-| **REM-13** | Fix RunStatus enum (`completed` → `succeeded`) | CR-Q4 | S |
-| **REM-14** | Consolidation minority interest | CR-Q5 | M |
-| **REM-15** | Auth middleware role fallback | CR-Q6 | S |
-| **REM-16** | Replace bare `except:` (8 files) | CR-Q7 | S |
-| **REM-17** | Replace `unknown` TypeScript types | CR-Q8 | M |
-| **REM-18** | Parameter denylist hardening | CR-Q9 | XS |
-| **REM-19** | Sentry frontend integration | CR-N2 | S |
-| **REM-20** | Additional page-level smoke tests | CR-N1 | M |
-| **REM-21** | Budget `is_revenue` flag | CR-N3 | S |
-| **REM-22** | OpenAPI → TypeScript codegen | CR-N4 | M |
-| **REM-23** | API rate-limit tests | CR-N5 | S |
+| ~~**REM-01**~~ | ~~Statistical anomaly detection (IQR/Z-score)~~ | CR-S2 (GATE-1) — Done 2026-03-15 | M |
+| ~~**REM-02**~~ | ~~JWKS async race condition~~ | CR-S4 (GATE-2) — Done 2026-03-15 | S |
+| ~~**REM-03**~~ | ~~Async Redis migration~~ | CR-S5 (GATE-3) — Done 2026-03-15 | S |
+| ~~**REM-04**~~ | ~~DCF mid-year convention~~ | CR-F1 (GATE-4) — Done 2026-03-15 | M |
+| ~~**REM-05**~~ | ~~DCF equity bridge~~ | CR-F2 (GATE-5) — Done 2026-03-15 | S |
+| ~~**REM-06**~~ | ~~DCF exit multiples~~ | CR-F3 (GATE-6) — Done 2026-03-15 | M |
+| ~~**REM-07**~~ | ~~MC parallelism (ProcessPoolExecutor)~~ | CR-T1 (GATE-7) — Done 2026-03-15 | S |
+| ~~**REM-08**~~ | ~~Tax loss carryforward / NOL~~ | CR-F4 — Done (statements.py lines 173–219) | M |
+| ~~**REM-09**~~ | ~~Multi-period FX rates~~ | CR-F5 — Done (consolidation.py `FxRate = float \| list[float]`) | M |
+| ~~**REM-10**~~ | ~~Auth middleware DB-error fallback~~ | CR-F6 — Done (auth.py: 503 on DB error, no silent fallback) | S |
+| ~~**REM-11**~~ | ~~Split `budgets.py` (1,618 lines)~~ | CR-Q2 — Done (6-file package, budgets/) | M |
+| ~~**REM-12**~~ | ~~Split `afs.py` (2,657 lines)~~ | CR-Q3 — Done (10-file afs/ package, 2026-03-15) | L |
+| ~~**REM-13**~~ | ~~Fix RunStatus enum (`completed` → `succeeded`)~~ | CR-Q4 — Done (runs table CHECK constraint) | S |
+| ~~**REM-14**~~ | ~~Consolidation minority interest~~ | CR-Q5 — Done (consolidation.py NCI support) | M |
+| ~~**REM-15**~~ | ~~Auth middleware role fallback~~ | CR-Q6 — Done (same as REM-10: 503, no fallback) | S |
+| ~~**REM-16**~~ | ~~Replace bare `except:` (8 files)~~ | CR-Q7 — Done (zero bare `except:` found) | S |
+| ~~**REM-17**~~ | ~~Replace `unknown` TypeScript types (partial — pim + model_config)~~ | CR-Q8 — Done (ModelConfig/BaselineDetail/BaselineVersion interfaces in api.ts) | M |
+| ~~**REM-18**~~ | ~~Parameter denylist hardening~~ | CR-Q9 — Done (sensitivity.py: _MAX_PATH_DEPTH=5, _PATH_DENYLIST frozenset) | XS |
+| ~~**REM-19**~~ | ~~Sentry frontend integration~~ | CR-N2 — Done (sentry.*.config.ts + withSentryConfig) | S |
+| ~~**REM-20**~~ | ~~PIM page-level smoke tests~~ | CR-N1 — Done (pim-sentiment.test.tsx: 5 tests, setup.tsx pim mock added) | M |
+| ~~**REM-21**~~ | ~~Budget `is_revenue` flag~~ | CR-N3 — Done (periods.py + templates.py + analytics.py) | S |
+| ~~**REM-22**~~ | ~~OpenAPI → TypeScript codegen~~ | CR-N4 — Done (openapi-typescript@7.13 installed, generate:api script in package.json) | M |
+| ~~**REM-23**~~ | ~~API rate-limit tests~~ | CR-N5 — Done (test_rate_limiting.py, 4 tests) | S |
 
 ---
 

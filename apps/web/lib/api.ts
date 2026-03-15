@@ -123,6 +123,35 @@ export interface BaselineSummary {
   created_at: string | null;
 }
 
+export interface ModelConfigMetadata {
+  entity_name: string;
+  horizon_months: number;
+  tax_rate?: number;
+  currency?: string;
+  [key: string]: unknown;
+}
+
+export interface ModelConfig {
+  metadata: ModelConfigMetadata;
+  blueprints?: Record<string, unknown>[];
+  scenarios?: Record<string, unknown>[];
+  distributions?: Record<string, unknown>[];
+  nol_carry_forward?: boolean;
+  [key: string]: unknown;
+}
+
+export interface BaselineDetail extends BaselineSummary {
+  model_config: ModelConfig;
+  [key: string]: unknown;
+}
+
+export interface BaselineVersion {
+  model_config: ModelConfig;
+  baseline_version: string;
+  is_active: boolean;
+  created_at: string | null;
+}
+
 export interface BaselinesResponse {
   items: BaselineSummary[];
   limit: number;
@@ -321,7 +350,7 @@ export const api = {
         { tenantId }
       ),
     get: (tenantId: string, baselineId: string) =>
-      request<{ model_config: unknown } & Record<string, unknown>>(
+      request<BaselineDetail>(
         `/api/v1/baselines/${encodeURIComponent(baselineId)}`,
         { tenantId }
       ),
@@ -336,7 +365,7 @@ export const api = {
         { tenantId }
       ),
     getVersion: (tenantId: string, baselineId: string, version: string) =>
-      request<{ model_config: unknown; baseline_version: string; is_active: boolean; created_at: string | null }>(
+      request<BaselineVersion>(
         `/api/v1/baselines/${encodeURIComponent(baselineId)}/versions/${encodeURIComponent(version)}`,
         { tenantId }
       ),
@@ -1586,6 +1615,8 @@ export const api = {
         request<PimUniverseCompany>("/api/v1/pim/universe", { tenantId, method: "POST", body }),
       get: (tenantId: string, companyId: string) =>
         request<PimUniverseCompany>(`/api/v1/pim/universe/${encodeURIComponent(companyId)}`, { tenantId }),
+      update: (tenantId: string, companyId: string, body: { is_active?: boolean; sector?: string; sub_sector?: string; country_iso?: string; exchange?: string; currency?: string; tags?: string[]; notes?: string }) =>
+        request<PimUniverseCompany>(`/api/v1/pim/universe/${encodeURIComponent(companyId)}`, { tenantId, method: "PATCH", body }),
       remove: (tenantId: string, companyId: string) =>
         request<{ deleted: boolean }>(`/api/v1/pim/universe/${encodeURIComponent(companyId)}`, { tenantId, method: "DELETE" }),
     },
@@ -2133,6 +2164,7 @@ export interface AFSSection {
   status: string;
   version: number;
   rolled_forward_from: string | null;
+  needs_review: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;

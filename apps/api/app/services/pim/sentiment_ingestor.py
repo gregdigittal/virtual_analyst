@@ -154,6 +154,7 @@ class SentimentIngestor:
             messages=messages,
             response_schema=SENTIMENT_EXTRACTION_SCHEMA,
             task_label="pim_sentiment_extraction",
+            temperature=0.1,
         )
 
         content = resp.content

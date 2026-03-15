@@ -28,14 +28,14 @@ function sentimentLabel(score: number | null): string {
 }
 
 function trendIcon(dir: string | null): string {
-  if (dir === "up") return "↑";
-  if (dir === "down") return "↓";
+  if (dir === "improving") return "↑";
+  if (dir === "declining") return "↓";
   return "→";
 }
 
 function trendColor(dir: string | null): string {
-  if (dir === "up") return "text-emerald-400";
-  if (dir === "down") return "text-red-400";
+  if (dir === "improving") return "text-emerald-400";
+  if (dir === "declining") return "text-red-400";
   return "text-va-text2";
 }
 
@@ -235,7 +235,7 @@ export default function PimSentimentPage() {
                     <h2 className="text-lg font-medium text-va-text">
                       {detail.company.company_name}
                     </h2>
-                    <VABadge variant="outline">
+                    <VABadge>
                       {detail.company.ticker}
                     </VABadge>
                     {detail.company.sector && (

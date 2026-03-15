@@ -10,7 +10,8 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import require_role, ROLES_CAN_WRITE
+from apps.api.app.deps import ROLES_CAN_WRITE, require_role
+from apps.api.app.services.pim.access import check_pim_access
 
 logger = structlog.get_logger()
 
@@ -92,6 +93,7 @@ async def add_company(
     company_id = _company_id()
     import json
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         await conn.execute(
             """INSERT INTO pim_universes
                (tenant_id, company_id, ticker, company_name, sector, sub_sector,
@@ -131,6 +133,7 @@ async def bulk_add_companies(
     import json
     added: list[dict[str, Any]] = []
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         async with conn.transaction():
             for c in body.companies:
                 cid = _company_id()
@@ -191,6 +194,7 @@ async def list_companies(
     offset_ph = idx
     args.extend([limit, offset])
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         rows = await conn.fetch(
             f"""SELECT * FROM pim_universes
                 WHERE {" AND ".join(conditions)}
@@ -220,6 +224,7 @@ async def get_company(
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         row = await conn.fetchrow(
             "SELECT * FROM pim_universes WHERE tenant_id = $1 AND company_id = $2",
             x_tenant_id,
@@ -241,6 +246,7 @@ async def update_company(
         raise HTTPException(400, "X-Tenant-ID required")
     import json
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         row = await conn.fetchrow(
             "SELECT company_id FROM pim_universes WHERE tenant_id = $1 AND company_id = $2",
             x_tenant_id,
@@ -292,6 +298,7 @@ async def remove_company(
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         res = await conn.execute(
             "DELETE FROM pim_universes WHERE tenant_id = $1 AND company_id = $2",
             x_tenant_id,
@@ -309,6 +316,7 @@ async def list_sectors(
     if not x_tenant_id:
         raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         rows = await conn.fetch(
             """SELECT sector, count(*) AS count
                FROM pim_universes

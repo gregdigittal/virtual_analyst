@@ -6,7 +6,6 @@ Read-only endpoints that query pim_sentiment_signals and pim_sentiment_aggregate
 
 from __future__ import annotations
 
-import json
 from datetime import date, timedelta
 from typing import Any
 
@@ -14,7 +13,7 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import ROLES_CAN_WRITE, require_role
+from apps.api.app.services.pim.access import check_pim_access
 
 logger = structlog.get_logger()
 
@@ -76,6 +75,7 @@ async def list_latest_scores(
         raise HTTPException(400, "X-Tenant-ID required")
 
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         where = "WHERE tenant_id = $1"
         params: list[Any] = [x_tenant_id]
         if company_id:
@@ -129,6 +129,7 @@ async def list_aggregates(
     cutoff = date.today() - timedelta(days=months_back * 30)
 
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         where = "WHERE tenant_id = $1 AND period_type = $2 AND period_start >= $3"
         params: list[Any] = [x_tenant_id, period_type, cutoff]
         if company_id:
@@ -176,6 +177,7 @@ async def sentiment_dashboard(
         raise HTTPException(400, "X-Tenant-ID required")
 
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         # Get all active companies from universe
         companies = await conn.fetch(
             """SELECT company_id, ticker, company_name, sector
@@ -188,47 +190,56 @@ async def sentiment_dashboard(
         if not companies:
             return {"items": [], "total": 0}
 
-        # For each company, get latest weekly aggregate + latest signal
+        company_ids = [co["company_id"] for co in companies]
+
+        # Batch query 1: latest weekly aggregate per company (DISTINCT ON eliminates N+1)
+        agg_rows = await conn.fetch(
+            """SELECT DISTINCT ON (company_id)
+                      company_id, avg_sentiment, signal_count, avg_confidence,
+                      source_breakdown, trend_direction, period_start, period_end
+               FROM pim_sentiment_aggregates
+               WHERE tenant_id = $1 AND period_type = 'weekly' AND company_id = ANY($2::text[])
+               ORDER BY company_id, period_start DESC""",
+            x_tenant_id,
+            company_ids,
+        )
+        agg_by_company = {r["company_id"]: r for r in agg_rows}
+
+        # Batch query 2: latest signal per company (DISTINCT ON eliminates N+1)
+        sig_rows = await conn.fetch(
+            """SELECT DISTINCT ON (company_id)
+                      company_id, sentiment_score, confidence, headline, published_at, source_type
+               FROM pim_sentiment_signals
+               WHERE tenant_id = $1 AND company_id = ANY($2::text[])
+               ORDER BY company_id, published_at DESC NULLS LAST""",
+            x_tenant_id,
+            company_ids,
+        )
+        sig_by_company = {r["company_id"]: r for r in sig_rows}
+
+        # Batch query 3: total signal count per company
+        count_rows = await conn.fetch(
+            """SELECT company_id, count(*) AS cnt
+               FROM pim_sentiment_signals
+               WHERE tenant_id = $1 AND company_id = ANY($2::text[])
+               GROUP BY company_id""",
+            x_tenant_id,
+            company_ids,
+        )
+        count_by_company = {r["company_id"]: r["cnt"] for r in count_rows}
+
         items: list[dict[str, Any]] = []
         for co in companies:
             cid = co["company_id"]
-
-            # Latest weekly aggregate
-            agg_row = await conn.fetchrow(
-                """SELECT avg_sentiment, signal_count, avg_confidence,
-                          source_breakdown, trend_direction, period_start, period_end
-                   FROM pim_sentiment_aggregates
-                   WHERE tenant_id = $1 AND company_id = $2 AND period_type = 'weekly'
-                   ORDER BY period_start DESC LIMIT 1""",
-                x_tenant_id,
-                cid,
-            )
-
-            # Latest signal
-            sig_row = await conn.fetchrow(
-                """SELECT sentiment_score, confidence, headline, published_at, source_type
-                   FROM pim_sentiment_signals
-                   WHERE tenant_id = $1 AND company_id = $2
-                   ORDER BY published_at DESC LIMIT 1""",
-                x_tenant_id,
-                cid,
-            )
-
-            # Total signal count
-            total_row = await conn.fetchrow(
-                """SELECT count(*) AS cnt
-                   FROM pim_sentiment_signals
-                   WHERE tenant_id = $1 AND company_id = $2""",
-                x_tenant_id,
-                cid,
-            )
+            agg_row = agg_by_company.get(cid)
+            sig_row = sig_by_company.get(cid)
 
             entry: dict[str, Any] = {
                 "company_id": cid,
                 "ticker": co["ticker"],
                 "company_name": co["company_name"],
                 "sector": co["sector"],
-                "total_signals": total_row["cnt"] if total_row else 0,
+                "total_signals": count_by_company.get(cid, 0),
             }
 
             if agg_row:
@@ -284,6 +295,7 @@ async def company_sentiment_detail(
     cutoff = date.today() - timedelta(days=months_back * 30)
 
     async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)
         # Company info
         co = await conn.fetchrow(
             """SELECT company_id, ticker, company_name, sector, sub_sector
