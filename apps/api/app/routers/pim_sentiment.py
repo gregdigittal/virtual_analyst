@@ -10,10 +10,10 @@ from datetime import date, timedelta
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.services.pim.access import check_pim_access
+from apps.api.app.deps import require_pim_access
 
 logger = structlog.get_logger()
 
@@ -66,16 +66,13 @@ async def list_latest_scores(
     company_id: str | None = Query(None, description="Filter by company"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _pim: None = Depends(require_pim_access),  # noqa: B008
 ) -> dict[str, Any]:
     """List latest sentiment signals, optionally filtered by company.
 
     Returns most recent signals ordered by published_at descending.
     """
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
-
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         where = "WHERE tenant_id = $1"
         params: list[Any] = [x_tenant_id]
         if company_id:
@@ -116,20 +113,18 @@ async def list_aggregates(
     months_back: int = Query(6, ge=1, le=24, description="How many months of history"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    _pim: None = Depends(require_pim_access),  # noqa: B008
 ) -> dict[str, Any]:
     """List sentiment aggregates (weekly or monthly time-series).
 
     Used for trend sparklines on the dashboard.
     """
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     if period_type not in ("weekly", "monthly"):
         raise HTTPException(400, "period_type must be 'weekly' or 'monthly'")
 
     cutoff = date.today() - timedelta(days=months_back * 30)
 
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         where = "WHERE tenant_id = $1 AND period_type = $2 AND period_start >= $3"
         params: list[Any] = [x_tenant_id, period_type, cutoff]
         if company_id:
@@ -167,17 +162,14 @@ async def list_aggregates(
 @router.get("/dashboard")
 async def sentiment_dashboard(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    _pim: None = Depends(require_pim_access),  # noqa: B008
 ) -> dict[str, Any]:
     """Aggregated dashboard view: latest score per company + source breakdown.
 
     Returns one entry per active company with their latest weekly aggregate,
     overall source breakdown, and trend direction.
     """
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
-
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         # Get all active companies from universe
         companies = await conn.fetch(
             """SELECT company_id, ticker, company_name, sector
@@ -282,20 +274,18 @@ async def company_sentiment_detail(
     period_type: str = Query("weekly", description="'weekly' or 'monthly'"),
     months_back: int = Query(6, ge=1, le=24),
     signals_limit: int = Query(20, ge=1, le=100),
+    _pim: None = Depends(require_pim_access),  # noqa: B008
 ) -> dict[str, Any]:
     """Detailed sentiment view for a single company.
 
     Returns recent signals + aggregate time-series for charting.
     """
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     if period_type not in ("weekly", "monthly"):
         raise HTTPException(400, "period_type must be 'weekly' or 'monthly'")
 
     cutoff = date.today() - timedelta(days=months_back * 30)
 
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         # Company info
         co = await conn.fetchrow(
             """SELECT company_id, ticker, company_name, sector, sub_sector

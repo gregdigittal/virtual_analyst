@@ -19,9 +19,9 @@ async def metrics_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
         status_code = response.status_code
-    except Exception:
+    except Exception as e:
         status_code = 500
-        raise
+        raise e
     finally:
         duration = time.time() - start
         api_requests_active.dec()

@@ -139,7 +139,7 @@ def parse_workbook(file_bytes: bytes, filename: str = "upload.xlsx", max_sheets:
     try:
         try:
             wb_values = __import__("openpyxl").load_workbook(BytesIO(file_bytes), data_only=True, read_only=True)
-        except Exception:
+        except Exception:  # noqa: BLE001 — openpyxl raises varied exceptions on corrupt/protected files
             wb_values = None
 
         sheet_names = wb_formulas.sheetnames[:max_sheets]

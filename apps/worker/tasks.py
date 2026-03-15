@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from typing import Any
 
 import asyncpg
 import structlog
+
 from apps.worker.celery_app import REDIS_URL, celery_app, push_to_dlq
 from shared.fm_shared.analysis.monte_carlo import run_monte_carlo
-from shared.fm_shared.errors import EngineError, StorageError
+from shared.fm_shared.errors import StorageError
 from shared.fm_shared.model import (
     ModelConfig,
-    StatementImbalanceError,
     calculate_kpis,
     generate_statements,
     run_engine,
@@ -57,30 +56,26 @@ def _artifact_store() -> ArtifactStore:
     return ArtifactStore(supabase_client=client)
 
 
-def _set_mc_progress(tenant_id: str, run_id: str, current: int, total: int) -> None:
-    try:
-        import redis
+async def _set_mc_progress(tenant_id: str, run_id: str, current: int, total: int) -> None:
+    """Write MC simulation progress to Redis (REM-03 / CR-S5: redis.asyncio)."""
+    import redis.asyncio as aioredis
 
-        r = redis.from_url(REDIS_URL)
-        try:
-            key = f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}"
-            payload = json.dumps({"current": current, "total": total, "pct": round(current / max(total, 1) * 100, 1)})
-            r.setex(key, MC_PROGRESS_TTL, payload)
-        finally:
-            r.close()
+    try:
+        key = f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}"
+        payload = json.dumps({"current": current, "total": total, "pct": round(current / max(total, 1) * 100, 1)})
+        async with aioredis.from_url(REDIS_URL) as r:
+            await r.setex(key, MC_PROGRESS_TTL, payload)
     except Exception:
         pass
 
 
-def _clear_mc_progress(tenant_id: str, run_id: str) -> None:
-    try:
-        import redis
+async def _clear_mc_progress(tenant_id: str, run_id: str) -> None:
+    """Delete MC simulation progress key from Redis (REM-03 / CR-S5: redis.asyncio)."""
+    import redis.asyncio as aioredis
 
-        r = redis.from_url(REDIS_URL)
-        try:
-            r.delete(f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}")
-        finally:
-            r.close()
+    try:
+        async with aioredis.from_url(REDIS_URL) as r:
+            await r.delete(f"{MC_PROGRESS_KEY}:{tenant_id}:{run_id}")
     except Exception:
         pass
 
@@ -152,9 +147,11 @@ async def _run_mc_execute_async(
                 storage_path,
             )
 
-        # Monte Carlo with progress (long-running, outside transaction)
+        # Monte Carlo with progress (long-running, outside transaction).
+        # progress_cb is sync (run_monte_carlo interface); schedule the async write
+        # via ensure_future so it runs when the event loop next gets control.
         def progress_cb(current: int, total: int) -> None:
-            _set_mc_progress(tenant_id, run_id, current, total)
+            asyncio.ensure_future(_set_mc_progress(tenant_id, run_id, current, total))
 
         mc_result = run_monte_carlo(
             config,
@@ -163,7 +160,7 @@ async def _run_mc_execute_async(
             scenario_id=scenario_id,
             progress_callback=progress_cb,
         )
-        _clear_mc_progress(tenant_id, run_id)
+        await _clear_mc_progress(tenant_id, run_id)
 
         mc_payload = {
             "num_simulations": mc_result.num_simulations,
@@ -243,7 +240,7 @@ async def _run_mc_fail_async(tenant_id: str, run_id: str, error_message: str) ->
     from apps.api.app.core.settings import get_settings
 
     settings = get_settings()
-    _clear_mc_progress(tenant_id, run_id)
+    await _clear_mc_progress(tenant_id, run_id)
     conn = await asyncpg.connect(settings.database_url)
     try:
         await conn.execute("SET app.tenant_id = $1", tenant_id)
@@ -362,4 +359,179 @@ def refresh_sentiment(self, tenant_id: str | None = None) -> dict[str, Any]:
         return result
     except Exception as e:
         logger.exception("refresh_sentiment_failed", tenant_id=tenant_id, error=str(e))
+        raise
+
+
+# ---------------------------------------------------------------------------
+# PIM-2.4: Monthly FRED economic context refresh
+# ---------------------------------------------------------------------------
+
+
+async def _refresh_economic_context_async(tenant_id: str) -> dict[str, Any]:
+    """Pull FRED indicators, classify regime, and store snapshot for one tenant."""
+    import uuid
+
+    from apps.api.app.core.settings import get_settings
+    from apps.api.app.services.pim.fred import FREDError, fetch_indicators
+    from apps.api.app.services.pim.regime import classify_regime
+
+    settings = get_settings()
+    if not settings.fred_api_key:
+        logger.warning("fred_api_key_missing", msg="FRED_API_KEY not configured; skipping economic refresh")
+        return {"tenant_id": tenant_id, "status": "skipped", "reason": "no_api_key"}
+
+    indicators = await fetch_indicators(settings.fred_api_key)
+    regime_result = classify_regime(indicators)
+    snapshot_id = f"eco_{uuid.uuid4().hex[:16]}"
+
+    pool = await asyncpg.create_pool(settings.database_url, statement_cache_size=0, min_size=1, max_size=2)
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "SELECT set_config('app.tenant_id', $1, true)", tenant_id
+            )
+            await conn.execute(
+                """INSERT INTO pim_economic_snapshots
+                   (tenant_id, snapshot_id, fetched_at, gdp_growth_pct, cpi_yoy_pct,
+                    unemployment_rate, yield_spread_10y2y, ism_pmi, regime, regime_confidence,
+                    indicators_agreeing, indicators_total, indicators_raw)
+                   VALUES ($1, $2, $3::timestamptz, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)""",
+                tenant_id,
+                snapshot_id,
+                indicators["fetched_at"],
+                indicators.get("gdp_growth_pct"),
+                indicators.get("cpi_yoy_pct"),
+                indicators.get("unemployment_rate"),
+                indicators.get("yield_spread_10y2y"),
+                indicators.get("ism_pmi"),
+                regime_result.regime,
+                regime_result.regime_confidence,
+                regime_result.indicators_agreeing,
+                regime_result.indicators_total,
+                json.dumps(indicators.get("indicators_raw", {})),
+            )
+    finally:
+        await pool.close()
+
+    logger.info(
+        "economic_snapshot_stored",
+        tenant_id=tenant_id,
+        snapshot_id=snapshot_id,
+        regime=regime_result.regime,
+        confidence=regime_result.regime_confidence,
+    )
+    return {
+        "tenant_id": tenant_id,
+        "snapshot_id": snapshot_id,
+        "regime": regime_result.regime,
+        "confidence": regime_result.regime_confidence,
+    }
+
+
+async def _refresh_economic_all_tenants_async() -> dict[str, Any]:
+    """Refresh economic context for all PIM-enabled tenants."""
+    from apps.api.app.core.settings import get_settings
+
+    settings = get_settings()
+    conn = await asyncpg.connect(settings.database_url, statement_cache_size=0)
+    try:
+        tenant_rows = await conn.fetch(
+            """SELECT DISTINCT bs.tenant_id
+               FROM billing_subscriptions bs
+               JOIN billing_plans bp ON bp.plan_id = bs.plan_id
+               WHERE bs.status IN ('active', 'trialing')
+                 AND (bp.features_json->>'pim')::boolean = true"""
+        )
+    finally:
+        await conn.close()
+
+    all_results: dict[str, Any] = {}
+    for row in tenant_rows:
+        tid = row["tenant_id"]
+        try:
+            result = await _refresh_economic_context_async(tid)
+            all_results[tid] = result
+        except Exception:
+            logger.warning("economic_refresh_tenant_failed", tenant_id=tid, exc_info=True)
+            all_results[tid] = {"error": "failed"}
+    return all_results
+
+
+@celery_app.task(
+    bind=True,
+    base=DLQTask,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=2,
+)
+def refresh_economic_context(self, tenant_id: str | None = None) -> dict[str, Any]:
+    """PIM-2.4: Monthly FRED economic context refresh.
+
+    Pulls GDP, CPI, unemployment, yield spread, and PMI from FRED.
+    Classifies economic regime and stores snapshot in pim_economic_snapshots.
+
+    Scheduled monthly (see celery_app beat schedule).
+    If tenant_id is provided, refreshes only that tenant.
+    If None, refreshes all PIM-enabled tenants.
+    """
+    try:
+        if tenant_id:
+            result = asyncio.run(_refresh_economic_context_async(tenant_id))
+        else:
+            result = asyncio.run(_refresh_economic_all_tenants_async())
+        return result
+    except Exception as e:
+        logger.exception("refresh_economic_context_failed", tenant_id=tenant_id, error=str(e))
+        raise
+
+
+# ---------------------------------------------------------------------------
+# PIM-5.3: Backtest summary materialised view refresh (every 30 minutes)
+# ---------------------------------------------------------------------------
+
+
+async def _refresh_backtest_summary_mv_async() -> dict[str, Any]:
+    """Execute REFRESH MATERIALIZED VIEW CONCURRENTLY on pim_backtest_summary_mv.
+
+    CONCURRENTLY allows reads during refresh (requires the unique index on
+    (tenant_id, strategy_label) created in migration 0069).
+    """
+    from apps.api.app.core.settings import get_settings
+
+    settings = get_settings()
+    conn = await asyncpg.connect(
+        settings.database_url,
+        statement_cache_size=0,
+    )
+    try:
+        await conn.execute(
+            "REFRESH MATERIALIZED VIEW CONCURRENTLY pim_backtest_summary_mv"
+        )
+        logger.info("pim_backtest_summary_mv_refreshed")
+        return {"status": "ok", "view": "pim_backtest_summary_mv"}
+    finally:
+        await conn.close()
+
+
+@celery_app.task(
+    bind=True,
+    base=DLQTask,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=3,
+)
+def refresh_pim_backtest_summary_mv(self) -> dict[str, Any]:  # type: ignore[override]
+    """PIM-5.3: Refresh pim_backtest_summary_mv materialised view.
+
+    Scheduled every 30 minutes via celery beat (see celery_app.py).
+    Uses CONCURRENTLY to allow reads during refresh.
+    """
+    try:
+        return asyncio.run(_refresh_backtest_summary_mv_async())
+    except Exception as e:
+        logger.exception("refresh_backtest_summary_mv_failed", error=str(e))
         raise

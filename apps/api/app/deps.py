@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json as _json
 from typing import TYPE_CHECKING, Any
 
-from fastapi import Depends, Request
+import structlog
+from fastapi import Depends, Header, Request
 from fastapi.exceptions import HTTPException
 
 from apps.api.app.core.settings import get_settings
 from apps.api.app.services.llm.router import LLMRouter
 from shared.fm_shared.storage import ArtifactStore
+
+_logger = structlog.get_logger(__name__)
 
 if TYPE_CHECKING:
     from apps.api.app.services.agent.service import AgentService
@@ -49,7 +53,7 @@ _llm_router: LLMRouter | None = None
 _billing_service: Any = None
 
 
-def get_billing_service() -> "BillingService":
+def get_billing_service() -> BillingService:
     global _billing_service
     if _billing_service is None:
         from apps.api.app.services.billing import BillingService as _BillingService
@@ -66,6 +70,20 @@ def get_llm_router() -> LLMRouter:
     global _llm_router
     if _llm_router is None:
         _llm_router = LLMRouter()
+        # Apply startup policy override from LLM_POLICY_OVERRIDE_JSON env var (REM-19).
+        # This allows routing rules to be changed without modifying source code.
+        # For runtime changes without restart, use PUT /api/v1/admin/llm-policy.
+        _settings = get_settings()
+        if _settings.llm_policy_override_json:
+            try:
+                override_policy = _json.loads(_settings.llm_policy_override_json)
+                _llm_router.set_policy(override_policy)
+            except (ValueError, TypeError, KeyError) as e:
+                _logger.warning(
+                    "llm_policy_override_invalid",
+                    error=str(e),
+                    hint="LLM_POLICY_OVERRIDE_JSON must be valid JSON with 'rules' list",
+                )
         # TODO: Wire billing once billing module is fully implemented:
         # _llm_router.set_billing_service(get_billing_service())
         # Until then, LLM router falls back to simple token metering
@@ -96,8 +114,8 @@ def get_artifact_store() -> ArtifactStore:
                 settings.supabase_url,
                 settings.supabase_service_key or settings.supabase_anon_key,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("supabase_client_init_failed", error=str(e))
     _artifact_store = ArtifactStore(supabase_client=client)
     return _artifact_store
 
@@ -112,10 +130,10 @@ def reset_artifact_store() -> None:
 # - get_agent_service() → multi-step agent tasks (Excel ingestion, draft chat, budget NL query, reforecast)
 # Feature flags in Settings control which tasks use agents. Both paths share the same metering.
 
-_agent_service: "AgentService | None" = None
+_agent_service: AgentService | None = None
 
 
-def get_agent_service() -> "AgentService | None":
+def get_agent_service() -> AgentService | None:
     """Return AgentService if Agent SDK is enabled, else None."""
     global _agent_service
     settings = get_settings()
@@ -135,3 +153,21 @@ def get_agent_service() -> "AgentService | None":
 def reset_agent_service() -> None:
     global _agent_service
     _agent_service = None
+
+
+async def require_pim_access(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),  # noqa: B008
+) -> None:
+    """FastAPI dependency: raise 403 if the tenant does not have an active PIM subscription.
+
+    Also raises HTTP 400 if the X-Tenant-ID header is absent.
+    Use via Depends(require_pim_access) in PIM router endpoints to replace the
+    boilerplate check_pim_access call in each handler body.
+    """
+    if not x_tenant_id:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID required")
+    from apps.api.app.db import tenant_conn
+    from apps.api.app.services.pim.access import check_pim_access
+
+    async with tenant_conn(x_tenant_id) as conn:
+        await check_pim_access(x_tenant_id, conn)

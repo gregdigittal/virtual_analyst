@@ -91,7 +91,7 @@ export default function CustomFrameworkPage() {
         jurisdiction: manualJurisdiction.trim() || null,
       });
       toast.success(`Framework "${result.name}" created`);
-      router.push("/afs");
+      router.push(`/afs/frameworks/${result.framework_id}`);
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : "Failed to create framework",
@@ -267,9 +267,12 @@ export default function CustomFrameworkPage() {
                 </div>
               )}
 
-              <div className="mt-4 flex justify-end">
-                <VAButton variant="primary" onClick={() => router.push("/afs")}>
-                  Done — Back to AFS
+              <div className="mt-4 flex justify-end gap-2">
+                <VAButton variant="secondary" onClick={() => router.push("/afs")}>
+                  Back to AFS
+                </VAButton>
+                <VAButton variant="primary" onClick={() => preview && router.push(`/afs/frameworks/${preview.framework_id}`)}>
+                  View Framework
                 </VAButton>
               </div>
             </div>

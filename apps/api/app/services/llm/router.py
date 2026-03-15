@@ -7,9 +7,9 @@ from apps.api.app.services.billing import BillingService
 from apps.api.app.services.llm.circuit_breaker import CircuitBreaker
 from apps.api.app.services.llm.metering import add_usage, check_limit
 from apps.api.app.services.llm.provider import (
+    AnthropicProvider,
     LLMProvider,
     LLMResponse,
-    AnthropicProvider,
     OpenAIProvider,
 )
 from shared.fm_shared.errors import LLMError
@@ -52,6 +52,15 @@ DEFAULT_POLICY = {
         # PIM sentiment extraction (FR-1.6: temp=0.1 for deterministic scoring)
         {"task_label": "pim_sentiment_extraction", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 2048, "temperature": 0.1},
         {"task_label": "pim_sentiment_extraction", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 2048, "temperature": 0.1},
+        # PIM factor attribution (PIM-2.8: narrative explaining CIS factor drivers)
+        {"task_label": "pim_factor_attribution", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 512, "temperature": 0.2},
+        {"task_label": "pim_factor_attribution", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 512, "temperature": 0.2},
+        # PIM portfolio narrative (PIM-4.5: portfolio construction rationale, temp=0.2)
+        {"task_label": "pim_portfolio_narrative", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 1024, "temperature": 0.2},
+        {"task_label": "pim_portfolio_narrative", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 1024, "temperature": 0.2},
+        # PIM backtest commentary (PIM-5.2: interpret IC/ICIR/performance, temp=0.2)
+        {"task_label": "pim_backtest_commentary", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 1024, "temperature": 0.2},
+        {"task_label": "pim_backtest_commentary", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 1024, "temperature": 0.2},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }

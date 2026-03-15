@@ -236,6 +236,9 @@ export default function SectionEditorPage() {
                       {s.rolled_forward_from && (
                         <VABadge variant="violet">Carried Forward</VABadge>
                       )}
+                      {s.needs_review && (
+                        <VABadge variant="warning">Needs Review</VABadge>
+                      )}
                       <VABadge variant={s.status === "locked" ? "success" : s.status === "reviewed" ? "violet" : "default"}>
                         {s.status}
                       </VABadge>

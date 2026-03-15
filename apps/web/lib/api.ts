@@ -233,7 +233,7 @@ export interface DraftWorkspace {
 export interface PendingProposal {
   id: string;
   path: string;
-  value: unknown;
+  value: number | string | boolean | null;
   evidence?: string;
   confidence?: string;
   reasoning?: string;
@@ -254,10 +254,16 @@ export interface ChatResponse {
   commentary?: string | null;
 }
 
+export interface IntegrityCheck {
+  check: string;
+  status: "pass" | "fail" | "warning";
+  message?: string;
+}
+
 export interface CommitResult {
   baseline_id: string;
   baseline_version: string;
-  integrity?: { status: string; checks: unknown[] };
+  integrity?: { status: string; checks: IntegrityCheck[] };
 }
 
 export interface BudgetSummary {
@@ -1619,6 +1625,10 @@ export const api = {
         request<PimUniverseCompany>(`/api/v1/pim/universe/${encodeURIComponent(companyId)}`, { tenantId, method: "PATCH", body }),
       remove: (tenantId: string, companyId: string) =>
         request<{ deleted: boolean }>(`/api/v1/pim/universe/${encodeURIComponent(companyId)}`, { tenantId, method: "DELETE" }),
+      sectors: (tenantId: string) =>
+        request<{ sectors: string[] }>("/api/v1/pim/universe/sectors/list", { tenantId }),
+      bulkAdd: (tenantId: string, body: { companies: { ticker: string; company_name: string; sector?: string; country_iso?: string; exchange?: string }[] }) =>
+        request<{ added: number; skipped: number; errors: string[] }>("/api/v1/pim/universe/bulk", { tenantId, method: "POST", body }),
     },
     sentiment: {
       scores: (tenantId: string, opts?: { company_id?: string; limit?: number; offset?: number }) =>
@@ -1652,6 +1662,104 @@ export const api = {
           }).toString()}`,
           { tenantId }
         ),
+    },
+    economic: {
+      current: (tenantId: string) =>
+        request<PimEconomicSnapshot>("/api/v1/pim/economic/current", { tenantId }),
+      snapshots: (tenantId: string, opts?: { limit?: number; offset?: number }) =>
+        request<PimEconomicSnapshotsResponse>(
+          `/api/v1/pim/economic/snapshots?${new URLSearchParams({
+            ...(opts?.limit != null && { limit: String(opts.limit) }),
+            ...(opts?.offset != null && { offset: String(opts.offset) }),
+          }).toString()}`,
+          { tenantId }
+        ),
+    },
+    cis: {
+      compute: (tenantId: string, body: PimCISComputeBody) =>
+        request<PimCISComputeResponse>("/api/v1/pim/cis/compute", { tenantId, method: "POST", body }),
+      factorAttribution: (tenantId: string, body: PimFactorAttributionBody) =>
+        request<PimFactorAttributionResponse>("/api/v1/pim/cis/factor-attribution", { tenantId, method: "POST", body }),
+    },
+    portfolio: {
+      build: (tenantId: string, body: PimBuildPortfolioBody) =>
+        request<PimPortfolioRun>("/api/v1/pim/portfolio/build", { tenantId, method: "POST", body }),
+      runs: (tenantId: string, params?: { limit?: number; offset?: number }) =>
+        request<PimPortfolioRunsResponse>(
+          `/api/v1/pim/portfolio/runs?${new URLSearchParams({
+            ...(params?.limit !== undefined && { limit: String(params.limit) }),
+            ...(params?.offset !== undefined && { offset: String(params.offset) }),
+          })}`,
+          { tenantId },
+        ),
+      get: (tenantId: string, runId: string) =>
+        request<PimPortfolioRun>(`/api/v1/pim/portfolio/${encodeURIComponent(runId)}`, { tenantId }),
+      delete: (tenantId: string, runId: string) =>
+        request<{ deleted: boolean }>(`/api/v1/pim/portfolio/${encodeURIComponent(runId)}`, { tenantId, method: "DELETE" }),
+    },
+    backtest: {
+      run: (tenantId: string, body: PimRunBacktestBody) =>
+        request<PimBacktestResult>("/api/v1/pim/backtest/run", { tenantId, method: "POST", body }),
+      results: (tenantId: string, params?: { limit?: number; offset?: number }) =>
+        request<PimBacktestResultsResponse>(
+          `/api/v1/pim/backtest/results?${new URLSearchParams({
+            ...(params?.limit !== undefined && { limit: String(params.limit) }),
+            ...(params?.offset !== undefined && { offset: String(params.offset) }),
+          })}`,
+          { tenantId },
+        ),
+      get: (tenantId: string, backtestId: string) =>
+        request<PimBacktestResult>(`/api/v1/pim/backtest/${encodeURIComponent(backtestId)}`, { tenantId }),
+      commentary: (tenantId: string, backtestId: string) =>
+        request<PimBacktestCommentary>(`/api/v1/pim/backtest/${encodeURIComponent(backtestId)}/commentary`, { tenantId }),
+      addCost: (tenantId: string, backtestId: string, body: PimTransactionCostInput) =>
+        request<PimTransactionCost>(`/api/v1/pim/backtest/${encodeURIComponent(backtestId)}/costs`, { tenantId, method: "POST", body }),
+      listCosts: (tenantId: string, backtestId: string) =>
+        request<PimTransactionCostsResponse>(`/api/v1/pim/backtest/${encodeURIComponent(backtestId)}/costs`, { tenantId }),
+      summary: (tenantId: string) =>
+        request<PimBacktestSummaryResponse>("/api/v1/pim/backtest/summary", { tenantId }),
+    },
+    markov: {
+      states: (tenantId: string) =>
+        request<PimMarkovStateLabelsResponse>("/api/v1/pim/markov/states", { tenantId }),
+      steadyState: (tenantId: string) =>
+        request<PimMarkovSteadyStateResponse>("/api/v1/pim/markov/steady-state", { tenantId }),
+      topTransitions: (tenantId: string, topN?: number) =>
+        request<PimMarkovTopTransitionsResponse>(
+          `/api/v1/pim/markov/top-transitions${topN !== undefined ? `?top_n=${topN}` : ""}`,
+          { tenantId },
+        ),
+    },
+    pe: {
+      create: (tenantId: string, body: CreatePeAssessmentBody) =>
+        request<PeAssessment>("/api/v1/pim/pe/assessments", { tenantId, method: "POST", body }),
+      list: (tenantId: string, params?: { limit?: number; offset?: number; vintage_year?: number }) =>
+        request<PeAssessmentsResponse>(
+          `/api/v1/pim/pe/assessments?${new URLSearchParams({
+            ...(params?.limit !== undefined && { limit: String(params.limit) }),
+            ...(params?.offset !== undefined && { offset: String(params.offset) }),
+            ...(params?.vintage_year !== undefined && { vintage_year: String(params.vintage_year) }),
+          })}`,
+          { tenantId },
+        ),
+      get: (tenantId: string, assessmentId: string) =>
+        request<PeAssessment>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}`, { tenantId }),
+      update: (tenantId: string, assessmentId: string, body: UpdatePeAssessmentBody) =>
+        request<PeAssessment>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}`, { tenantId, method: "PUT", body }),
+      delete: (tenantId: string, assessmentId: string) =>
+        request<{ deleted: boolean }>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}`, { tenantId, method: "DELETE" }),
+      compute: (tenantId: string, assessmentId: string) =>
+        request<PeComputeResult>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}/compute`, { tenantId, method: "POST", body: {} }),
+    },
+  },
+  admin: {
+    llm: {
+      getPolicy: (tenantId: string) =>
+        request<LlmPolicyResponse>("/api/v1/admin/llm-policy", { tenantId }),
+      updatePolicy: (tenantId: string, body: UpdateLlmPolicyBody) =>
+        request<LlmPolicyResponse>("/api/v1/admin/llm-policy", { tenantId, method: "PUT", body }),
+      resetPolicy: (tenantId: string) =>
+        request<LlmPolicyResponse>("/api/v1/admin/llm-policy/reset", { tenantId, method: "POST", body: {} }),
     },
   },
 };
@@ -2435,4 +2543,479 @@ export interface PimSentimentCompanyDetail {
   };
   aggregates: PimSentimentAggregate[];
   recent_signals: PimSentimentSignal[];
+}
+
+// --- PIM Economic Context Types ---
+
+export interface PimEconomicSnapshot {
+  snapshot_id: string;
+  fetched_at: string;
+  gdp_growth_pct: number | null;
+  cpi_yoy_pct: number | null;
+  unemployment_rate: number | null;
+  yield_spread_10y2y: number | null;
+  ism_pmi: number | null;
+  regime: "expansion" | "contraction" | "transition";
+  regime_confidence: number;
+  indicators_agreeing: number;
+  indicators_total: number;
+  created_at: string | null;
+}
+
+export interface PimEconomicSnapshotsResponse {
+  snapshots: PimEconomicSnapshot[];
+  limit: number;
+  offset: number;
+}
+
+// --- PIM CIS Types ---
+
+export interface PimCISFactorInput {
+  company_id: string;
+  sector?: string | null;
+  dcf_upside_pct?: number | null;
+  roe?: number | null;
+  debt_to_equity?: number | null;
+  revenue_growth_qoq?: number | null;
+  ebitda_margin_change?: number | null;
+  avg_sentiment_score?: number | null;
+  trend_direction?: "improving" | "stable" | "declining" | null;
+}
+
+export interface PimCISComputeBody {
+  companies: PimCISFactorInput[];
+  weights?: Record<string, number> | null;
+}
+
+export interface PimCISScores {
+  fundamental_quality: number | null;
+  fundamental_momentum: number | null;
+  idiosyncratic_sentiment: number | null;
+  sentiment_momentum: number | null;
+  sector_positioning: number | null;
+}
+
+export interface PimCISResult {
+  company_id: string;
+  cis_score: number;
+  factors_available: number;
+  factors_total: number;
+  factor_scores: PimCISScores;
+  weights_used: Record<string, number>;
+  limitations: string;
+}
+
+export interface PimCISComputeResponse {
+  companies: PimCISResult[];
+  current_regime: "expansion" | "contraction" | "transition" | null;
+  count: number;
+}
+
+export interface PimFactorAttributionBody {
+  company_id: string;
+  cis_score: number;
+  fundamental_quality?: number | null;
+  fundamental_momentum?: number | null;
+  idiosyncratic_sentiment?: number | null;
+  sentiment_momentum?: number | null;
+  sector_positioning?: number | null;
+  current_regime?: "expansion" | "contraction" | "transition" | null;
+}
+
+export interface PimFactorAttributionResponse {
+  company_id: string;
+  cis_score: number;
+  narrative: string;
+  top_driver: string;
+  risk_note: string;
+  limitations: string;
+}
+
+// Markov chain types (PIM-3.x / PIM-5.4)
+export interface PimMarkovStateLabel {
+  state_index: number;
+  gdp_state: number;         // 0=contraction, 1=neutral, 2=expansion
+  sentiment_state: number;   // 0=negative, 1=neutral, 2=positive
+  quality_state: number;     // 0=weak, 1=average, 2=strong
+  momentum_state: number;    // 0=declining, 1=stable, 2=improving
+  label: string;             // e.g. "expansion/positive/strong/improving"
+}
+
+export interface PimMarkovStateLabelsResponse {
+  items: PimMarkovStateLabel[];
+  total: number;
+}
+
+export interface PimMarkovTopState {
+  state_index: number;
+  label: string;
+  probability: number;
+}
+
+export interface PimMarkovSteadyStateResponse {
+  top_states: PimMarkovTopState[];
+  is_ergodic: boolean;
+  quantecon_available: boolean;
+  n_observations: number;
+  matrix_id: string;
+  limitations: string;
+}
+
+export interface PimMarkovTransitionEdge {
+  from_state: number;
+  from_label: string;
+  to_state: number;
+  to_label: string;
+  probability: number;
+}
+
+export interface PimMarkovTopTransitionsResponse {
+  edges: PimMarkovTransitionEdge[];
+  top_state_indices: number[];
+  limitations: string;
+}
+
+export interface PimMarkovSteadyStateResult {
+  top_states: { state_index: number; label: string; probability: number }[];
+  is_ergodic: boolean;
+  quantecon_available: boolean;
+  limitations: string;
+}
+
+export interface PimMarkovCurrentState {
+  state_index: number;
+  label: string;
+  gdp_state: number;
+  sentiment_state: number;
+  quality_state: number;
+  momentum_state: number;
+}
+
+export interface PimFundamentalsSnapshot {
+  company_id: string;
+  ticker: string;
+  period_end: string;
+  period_type: string;
+  revenue: number | null;
+  gross_profit: number | null;
+  ebitda: number | null;
+  net_income: number | null;
+  eps_diluted: number | null;
+  total_assets: number | null;
+  total_liabilities: number | null;
+  total_equity: number | null;
+  cash_and_equivalents: number | null;
+  total_debt: number | null;
+  roe: number | null;
+  debt_to_equity: number | null;
+  gross_margin_pct: number | null;
+  net_margin_pct: number | null;
+  market_cap: number | null;
+  price: number | null;
+  pe_ratio: number | null;
+  ev_ebitda: number | null;
+  revenue_growth_qoq: number | null;
+  ebitda_margin_change: number | null;
+  source: string;
+  limitations: string;
+}
+
+// --- PIM Portfolio Types (PIM-4.x) ---
+
+export interface PimPositionConstraints {
+  top_n?: number;
+  max_weight_pct?: number;
+  max_sector_pct?: number;
+  min_cis_score?: number;
+  min_liquidity_usd?: number | null;
+}
+
+export interface PimPortfolioCandidate {
+  company_id: string;
+  cis_score: number;
+  ticker?: string | null;
+  name?: string | null;
+  sector?: string | null;
+  market_cap_usd?: number | null;
+  fundamental_quality?: number | null;
+  fundamental_momentum?: number | null;
+  idiosyncratic_sentiment?: number | null;
+  sentiment_momentum?: number | null;
+  sector_positioning?: number | null;
+}
+
+export interface PimPortfolioHolding {
+  rank: number;
+  company_id: string;
+  cis_score: number;
+  weight: number;
+  ticker: string | null;
+  name: string | null;
+  sector: string | null;
+  fundamental_quality: number | null;
+  fundamental_momentum: number | null;
+  idiosyncratic_sentiment: number | null;
+  sentiment_momentum: number | null;
+  sector_positioning: number | null;
+}
+
+export interface PimPortfolioRun {
+  run_id: string;
+  tenant_id: string;
+  run_at?: string;
+  holdings: PimPortfolioHolding[];
+  constraints: PimPositionConstraints;
+  regime_at_run: string | null;
+  n_candidates: number;
+  n_holdings: number;
+  avg_cis_score: number;
+  total_cis_score: number;
+  narrative: string | null;
+  narrative_top_picks: string | null;
+  narrative_risk_note: string | null;
+  narrative_regime_context: string | null;
+  limitations: string;
+}
+
+export interface PimBuildPortfolioBody {
+  candidates: PimPortfolioCandidate[];
+  constraints?: PimPositionConstraints | null;
+  current_regime?: string | null;
+  generate_narrative?: boolean;
+}
+
+export interface PimPortfolioRunsResponse {
+  items: PimPortfolioRun[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// --- PIM Backtest Types (PIM-4.7/4.8) ---
+
+export interface PimBacktestConfig {
+  lookback_days?: number;
+  rebalance_freq_days?: number;
+  top_n?: number;
+  max_weight_pct?: number;
+  max_sector_pct?: number;
+  benchmark_label?: string;
+  strategy_label?: string;
+}
+
+export interface PimHistoricalCISRecord {
+  date: string;
+  company_id: string;
+  cis_score: number;
+  sector?: string | null;
+  ticker?: string | null;
+  name?: string | null;
+  realised_return?: number | null;
+}
+
+export interface PimBacktestPeriod {
+  period_start: string;
+  period_end: string;
+  n_holdings: number;
+  period_return: number;
+  cumulative_return: number;
+  ic: number | null;
+}
+
+export interface PimBacktestResult {
+  backtest_id: string;
+  tenant_id: string;
+  config: PimBacktestConfig;
+  n_periods: number;
+  cumulative_return: number;
+  annualised_return: number;
+  volatility: number;
+  sharpe_ratio: number | null;
+  max_drawdown: number;
+  ic_mean: number | null;
+  ic_std: number | null;
+  icir: number | null;
+  periods: PimBacktestPeriod[];
+  limitations: string;
+}
+
+export interface PimRunBacktestBody {
+  historical_records: PimHistoricalCISRecord[];
+  config?: PimBacktestConfig | null;
+}
+
+export interface PimBacktestResultsResponse {
+  items: PimBacktestResult[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PimBacktestCommentary {
+  backtest_id: string;
+  commentary: string | null;
+  commentary_risks: string | null;
+  limitations: string;
+}
+
+export type PimCostType = "commission" | "spread" | "slippage";
+
+export interface PimTransactionCostInput {
+  cost_type: PimCostType;
+  estimated_bps: number;
+  n_rebalances: number;
+  actual_bps?: number | null;
+  description?: string | null;
+}
+
+export interface PimTransactionCost {
+  cost_id: string;
+  backtest_id: string;
+  cost_type: PimCostType;
+  estimated_bps: number;
+  actual_bps: number | null;
+  n_rebalances: number;
+  description: string | null;
+  created_at: string | null;
+}
+
+export interface PimTransactionCostsResponse {
+  backtest_id: string;
+  items: PimTransactionCost[];
+  total: number;
+}
+
+export interface PimBacktestSummaryItem {
+  strategy_label: string;
+  run_count: number;
+  latest_run_at: string | null;
+  avg_cumulative_return: number | null;
+  avg_annualised_return: number | null;
+  avg_sharpe_ratio: number | null;
+  avg_max_drawdown: number | null;
+  avg_ic_mean: number | null;
+  avg_ic_std: number | null;
+  avg_icir: number | null;
+  best_cumulative_return: number | null;
+  worst_cumulative_return: number | null;
+}
+
+export interface PimBacktestSummaryResponse {
+  items: PimBacktestSummaryItem[];
+  total: number;
+  note: string;
+}
+
+// --- PE Assessment Types (PIM-6.x) ---
+
+export type PeCashFlowType = "drawdown" | "distribution" | "recallable_distribution";
+
+export interface PeCashFlowItem {
+  date: string;
+  amount_usd: number;
+  cf_type: PeCashFlowType;
+}
+
+export interface PeJCurvePoint {
+  period_months: number;
+  cumulative_return: number;
+}
+
+export interface PeAssessment {
+  assessment_id: string;
+  tenant_id: string;
+  fund_name: string;
+  vintage_year: number;
+  currency: string;
+  commitment_usd: number;
+  cash_flows: PeCashFlowItem[];
+  nav_usd: number | null;
+  nav_date: string | null;
+  paid_in_capital: number | null;
+  distributed: number | null;
+  dpi: number | null;
+  tvpi: number | null;
+  moic: number | null;
+  irr: number | null;
+  irr_computed_at: string | null;
+  j_curve_json: PeJCurvePoint[] | null;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PeAssessmentsResponse {
+  items: PeAssessment[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface CreatePeAssessmentBody {
+  fund_name: string;
+  vintage_year: number;
+  currency?: string;
+  commitment_usd: number;
+  cash_flows?: PeCashFlowItem[];
+  nav_usd?: number | null;
+  nav_date?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdatePeAssessmentBody {
+  fund_name?: string;
+  vintage_year?: number;
+  currency?: string;
+  commitment_usd?: number;
+  cash_flows?: PeCashFlowItem[];
+  nav_usd?: number | null;
+  nav_date?: string | null;
+  notes?: string | null;
+}
+
+export interface PeComputeResult {
+  assessment_id: string;
+  paid_in_capital: number;
+  distributed: number;
+  dpi: number | null;
+  tvpi: number | null;
+  moic: number | null;
+  irr: number | null;
+  irr_converged: boolean;
+  j_curve: PeJCurvePoint[];
+  limitations: string;
+}
+
+// --- Admin LLM Policy Types (REM-19) ---
+
+export interface LlmPolicyRule {
+  task_label: string;
+  priority: number;
+  provider: string;
+  model: string;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+export interface LlmPolicyFallback {
+  provider: string;
+  model: string;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+export interface LlmPolicy {
+  rules: LlmPolicyRule[];
+  fallback?: LlmPolicyFallback;
+}
+
+export interface LlmPolicyResponse {
+  source: "default" | "override";
+  policy: LlmPolicy;
+  hint: string;
+}
+
+export interface UpdateLlmPolicyBody {
+  rules: LlmPolicyRule[];
+  fallback?: LlmPolicyFallback | null;
 }

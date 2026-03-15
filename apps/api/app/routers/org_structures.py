@@ -891,7 +891,7 @@ async def trigger_consolidated_run(
                 try:
                     config_dict = store.load(x_tenant_id, "model_config_v1", f"{baseline_id}{suffix}")
                     break
-                except Exception:
+                except (KeyError, ValueError, TypeError):
                     continue
             if config_dict is None:
                 logger.error("baseline_not_found", entity_id=entity_id, baseline_id=baseline_id)

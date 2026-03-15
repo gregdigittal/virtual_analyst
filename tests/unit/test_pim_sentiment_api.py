@@ -3,8 +3,11 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from fastapi import Header, HTTPException
 from fastapi.testclient import TestClient
 
+from apps.api.app.deps import require_pim_access
 from apps.api.app.main import app
 
 client = TestClient(app)
@@ -67,6 +70,18 @@ def _simple_conn(fetchrow_return=None, fetch_return=None, fetchval_return=None):
     return conn
 
 
+@pytest.fixture(autouse=True)
+def _bypass_pim_gate():
+    """Bypass the DB subscription check but keep the tenant-ID validation."""
+    async def _tenant_only(x_tenant_id: str = Header("", alias="X-Tenant-ID")):  # noqa: B008
+        if not x_tenant_id:
+            raise HTTPException(status_code=400, detail="X-Tenant-ID required")
+
+    app.dependency_overrides[require_pim_access] = _tenant_only
+    yield
+    app.dependency_overrides.pop(require_pim_access, None)
+
+
 # --- /scores ---
 
 
@@ -80,10 +95,7 @@ def test_scores_happy_path() -> None:
     conn = _simple_conn(fetchrow_return=count_row, fetch_return=[_SIGNAL_ROW])
     cm = _make_cm(conn)
 
-    with (
-        patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm),
-        patch("apps.api.app.routers.pim_sentiment.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
         r = client.get("/api/v1/pim/sentiment/scores", headers={"X-Tenant-ID": TENANT})
 
     assert r.status_code == 200
@@ -102,9 +114,9 @@ def test_aggregates_requires_tenant() -> None:
 
 
 def test_aggregates_invalid_period_type() -> None:
-    with (
-        patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: _make_cm(_simple_conn())),
-        patch("apps.api.app.routers.pim_sentiment.check_pim_access", new_callable=AsyncMock),
+    with patch(
+        "apps.api.app.routers.pim_sentiment.tenant_conn",
+        side_effect=lambda _t: _make_cm(_simple_conn()),
     ):
         r = client.get(
             "/api/v1/pim/sentiment/aggregates?period_type=bad",
@@ -118,10 +130,7 @@ def test_aggregates_happy_path() -> None:
     conn = _simple_conn(fetchrow_return=count_row, fetch_return=[_AGG_ROW])
     cm = _make_cm(conn)
 
-    with (
-        patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm),
-        patch("apps.api.app.routers.pim_sentiment.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
         r = client.get("/api/v1/pim/sentiment/aggregates", headers={"X-Tenant-ID": TENANT})
 
     assert r.status_code == 200
@@ -137,10 +146,7 @@ def test_dashboard_no_companies() -> None:
     conn = _simple_conn(fetch_return=[])
     cm = _make_cm(conn)
 
-    with (
-        patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm),
-        patch("apps.api.app.routers.pim_sentiment.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
         r = client.get("/api/v1/pim/sentiment/dashboard", headers={"X-Tenant-ID": TENANT})
 
     assert r.status_code == 200
@@ -166,10 +172,7 @@ def test_dashboard_with_companies() -> None:
     conn.execute = AsyncMock()
     cm = _make_cm(conn)
 
-    with (
-        patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm),
-        patch("apps.api.app.routers.pim_sentiment.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
         r = client.get("/api/v1/pim/sentiment/dashboard", headers={"X-Tenant-ID": TENANT})
 
     assert r.status_code == 200
@@ -190,10 +193,7 @@ def test_company_detail_not_found() -> None:
     conn = _simple_conn(fetchrow_return=None, fetch_return=[])
     cm = _make_cm(conn)
 
-    with (
-        patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm),
-        patch("apps.api.app.routers.pim_sentiment.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
         r = client.get(
             "/api/v1/pim/sentiment/company/pco_notexist",
             headers={"X-Tenant-ID": TENANT},
@@ -212,10 +212,7 @@ def test_company_detail_happy_path() -> None:
     conn.execute = AsyncMock()
     cm = _make_cm(conn)
 
-    with (
-        patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm),
-        patch("apps.api.app.routers.pim_sentiment.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
         r = client.get(
             "/api/v1/pim/sentiment/company/pco_1",
             headers={"X-Tenant-ID": TENANT},

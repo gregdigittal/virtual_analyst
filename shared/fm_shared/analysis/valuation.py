@@ -45,9 +45,12 @@ def dcf_valuation(
     net_debt: float = 0.0,
     cash: float = 0.0,
 ) -> DCFResult:
-    """
-    DCF: PV of explicit FCFs + PV of terminal value.
-    Terminal value: perpetuity growth (FCF_last * (1+g)/(wacc-g)) or exit multiple (not used here without EBITDA).
+    """DCF: PV of explicit FCFs + PV of terminal value.  # CFA Level II — DCF mid-year convention
+
+    Terminal value via perpetuity growth (Gordon Growth Model, CFA L2) or exit multiple.
+    Mid-year discounting applied to explicit FCFs: discount factor = (t+0.5)/12 months.
+    Terminal value discounted at end-of-period n/12 months (conventional for TV).
+    Breakdown stores rounded display values; accumulation uses full precision.
     When wacc <= 0, returns DCFResult with enterprise_value=0 (invalid WACC).
     """
     if not fcf_series or wacc <= 0.0:

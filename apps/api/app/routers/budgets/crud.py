@@ -290,19 +290,16 @@ async def clone_budget(
                 x_tenant_id,
                 budget_id,
             )
-            for pr in period_rows:
-                await conn.execute(
-                    """INSERT INTO budget_periods (tenant_id, budget_id, period_id, period_ordinal, period_start, period_end, label)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7)
-                       ON CONFLICT (tenant_id, budget_id, period_ordinal) DO NOTHING""",
-                    x_tenant_id,
-                    new_budget_id,
-                    _period_id(),
-                    pr["period_ordinal"],
-                    pr["period_start"],
-                    pr["period_end"],
-                    pr["label"],
-                )
+            # Batch insert periods — eliminates N+1
+            await conn.executemany(
+                """INSERT INTO budget_periods (tenant_id, budget_id, period_id, period_ordinal, period_start, period_end, label)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)
+                   ON CONFLICT (tenant_id, budget_id, period_ordinal) DO NOTHING""",
+                [
+                    (x_tenant_id, new_budget_id, _period_id(), pr["period_ordinal"], pr["period_start"], pr["period_end"], pr["label"])
+                    for pr in period_rows
+                ],
+            )
             rows = await conn.fetch(
                 """SELECT line_item_id, account_ref, notes, is_revenue FROM budget_line_items
                    WHERE tenant_id = $1 AND budget_id = $2 AND version_id = $3""",
@@ -324,28 +321,25 @@ async def clone_budget(
                 amounts_by_item.setdefault(ar["line_item_id"], []).append(
                     (ar["period_ordinal"], float(ar["amount"]))
                 )
-            for r in rows:
-                new_li_id = _line_item_id()
-                await conn.execute(
-                    """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, is_revenue)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-                    x_tenant_id,
-                    new_li_id,
-                    new_budget_id,
-                    new_version_id,
-                    r["account_ref"],
-                    r["notes"],
-                    r["is_revenue"],
+            # Build new line item records with pre-generated IDs for batch insert
+            new_line_items = [(x_tenant_id, _line_item_id(), new_budget_id, new_version_id, r["account_ref"], r["notes"], r["is_revenue"]) for r in rows]
+            await conn.executemany(
+                """INSERT INTO budget_line_items (tenant_id, line_item_id, budget_id, version_id, account_ref, notes, is_revenue)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                new_line_items,
+            )
+            # Build amounts for all new line items — correlate by position
+            new_amounts = []
+            for old_row, new_item in zip(rows, new_line_items):
+                new_li_id = new_item[1]
+                for period_ordinal, amount in amounts_by_item.get(old_row["line_item_id"], []):
+                    new_amounts.append((x_tenant_id, new_li_id, period_ordinal, amount))
+            if new_amounts:
+                await conn.executemany(
+                    """INSERT INTO budget_line_item_amounts (tenant_id, line_item_id, period_ordinal, amount)
+                       VALUES ($1, $2, $3, $4)""",
+                    new_amounts,
                 )
-                for period_ordinal, amount in amounts_by_item.get(r["line_item_id"], []):
-                    await conn.execute(
-                        """INSERT INTO budget_line_item_amounts (tenant_id, line_item_id, period_ordinal, amount)
-                           VALUES ($1, $2, $3, $4)""",
-                        x_tenant_id,
-                        new_li_id,
-                        period_ordinal,
-                        amount,
-                    )
             alloc_rows = await conn.fetch(
                 """SELECT department_ref, amount_limit FROM budget_department_allocations
                    WHERE tenant_id = $1 AND budget_id = $2 AND version_id = $3""",
@@ -353,17 +347,15 @@ async def clone_budget(
                 budget_id,
                 version_id,
             )
-            for ar in alloc_rows:
-                await conn.execute(
-                    """INSERT INTO budget_department_allocations (tenant_id, allocation_id, budget_id, version_id, department_ref, amount_limit)
-                       VALUES ($1, $2, $3, $4, $5, $6)""",
-                    x_tenant_id,
-                    _allocation_id(),
-                    new_budget_id,
-                    new_version_id,
-                    ar["department_ref"],
-                    ar["amount_limit"],
-                )
+            # Batch insert allocations — eliminates N+1
+            await conn.executemany(
+                """INSERT INTO budget_department_allocations (tenant_id, allocation_id, budget_id, version_id, department_ref, amount_limit)
+                   VALUES ($1, $2, $3, $4, $5, $6)""",
+                [
+                    (x_tenant_id, _allocation_id(), new_budget_id, new_version_id, ar["department_ref"], ar["amount_limit"])
+                    for ar in alloc_rows
+                ],
+            )
     return {
         "budget_id": new_budget_id,
         "label": body.label,

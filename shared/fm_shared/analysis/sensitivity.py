@@ -40,14 +40,31 @@ class HeatMapResult:
     matrix: list[list[float]]  # matrix[i][j] = metric at (values_a[i], values_b[j])
 
 
+_MAX_PATH_DEPTH = 5  # max dot-path segments (real model paths are 2–3 levels deep)
+# Non-underscore names that must not be traversed (class introspection, REM-18 / CR-Q9)
+_PATH_DENYLIST: frozenset[str] = frozenset({"mro", "bases", "subclasses", "dict", "class"})
+
+
 def _validate_path(path: str) -> None:
-    """Reject paths that could access private/dunder attributes."""
+    """Reject paths that could access private/dunder attributes or class internals.
+
+    Guards (REM-18 / CR-Q9):
+    - Empty or blank segments rejected
+    - Underscore-prefixed segments rejected (blocks __proto__, __class__, _private)
+    - Segments in _PATH_DENYLIST rejected (blocks mro, bases, subclasses, dict, class)
+    - Non-identifier segments rejected (blocks bracket notation, spaces, injection)
+    - Max depth of _MAX_PATH_DEPTH segments enforced
+    """
     segments = path.split(".")
     if not segments or not all(segments):
         raise ValueError(f"Invalid parameter path: '{path}'")
+    if len(segments) > _MAX_PATH_DEPTH:
+        raise ValueError(f"Parameter path too deep (max {_MAX_PATH_DEPTH} segments): '{path}'")
     for segment in segments:
         if segment.startswith("_"):
             raise ValueError(f"Invalid path segment: '{segment}'")
+        if segment in _PATH_DENYLIST:
+            raise ValueError(f"Denied path segment: '{segment}'")
         if not segment.isidentifier():
             raise ValueError(f"Invalid path segment: '{segment}'")
 

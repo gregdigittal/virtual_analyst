@@ -32,14 +32,14 @@ def _decode_oauth(raw: bytes | None) -> dict[str, Any]:
     key = get_settings().oauth_encryption_key
     if key:
         try:
-            from cryptography.fernet import Fernet
+            from cryptography.fernet import Fernet, InvalidToken
             decrypted = Fernet(key.encode()).decrypt(raw)
             return json.loads(decrypted.decode("utf-8"))
-        except Exception:
+        except (InvalidToken, ValueError, json.JSONDecodeError):
             _logger.error("oauth_decrypt_failed", msg="Fernet decryption failed; falling back to base64. Possible key rotation or data corruption.")
     try:
         return json.loads(base64.b64decode(raw).decode("utf-8"))
-    except Exception:
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
         _logger.error("oauth_decode_failed", msg="Both Fernet and base64 decoding failed for OAuth data.")
         return {}
 

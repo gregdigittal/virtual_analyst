@@ -40,6 +40,25 @@ export default async function PimIndexPage() {
           </VACard>
         </Link>
 
+        <Link href="/pim/economic">
+          <VACard className="cursor-pointer p-6 transition-colors hover:border-va-blue/50">
+            <div className="flex items-start gap-4">
+              <span className="text-3xl" aria-hidden="true">
+                🌐
+              </span>
+              <div>
+                <h2 className="text-base font-medium text-va-text">
+                  Economic Context
+                </h2>
+                <p className="mt-1 text-sm text-va-text2">
+                  Macroeconomic regime classification and FRED indicator
+                  dashboard. Monthly refresh.
+                </p>
+              </div>
+            </div>
+          </VACard>
+        </Link>
+
         <Link href="/pim/sentiment">
           <VACard className="cursor-pointer p-6 transition-colors hover:border-va-blue/50">
             <div className="flex items-start gap-4">
@@ -53,6 +72,44 @@ export default async function PimIndexPage() {
                 <p className="mt-1 text-sm text-va-text2">
                   Track news sentiment across your portfolio. Powered by
                   Polygon.io news and Claude AI.
+                </p>
+              </div>
+            </div>
+          </VACard>
+        </Link>
+
+        <Link href="/pim/backtest">
+          <VACard className="cursor-pointer p-6 transition-colors hover:border-va-blue/50">
+            <div className="flex items-start gap-4">
+              <span className="text-3xl" aria-hidden="true">
+                🔬
+              </span>
+              <div>
+                <h2 className="text-base font-medium text-va-text">
+                  Backtest Studio
+                </h2>
+                <p className="mt-1 text-sm text-va-text2">
+                  Walk-forward backtest results with IC/ICIR signal quality
+                  metrics and AI-generated performance commentary.
+                </p>
+              </div>
+            </div>
+          </VACard>
+        </Link>
+
+        <Link href="/pim/markov">
+          <VACard className="cursor-pointer p-6 transition-colors hover:border-va-blue/50">
+            <div className="flex items-start gap-4">
+              <span className="text-3xl" aria-hidden="true">
+                🔗
+              </span>
+              <div>
+                <h2 className="text-base font-medium text-va-text">
+                  Markov State Diagram
+                </h2>
+                <p className="mt-1 text-sm text-va-text2">
+                  81-state Markov chain over GDP, sentiment, quality, and
+                  momentum. Interactive steady-state visualisation.
                 </p>
               </div>
             </div>

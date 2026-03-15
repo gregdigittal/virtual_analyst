@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import structlog
+
 from apps.api.app.services.agent import tools as agent_tools
 from apps.api.app.services.agent.service import AgentService
+
+_logger = structlog.get_logger(__name__)
 
 BUDGET_REFORECAST_SCHEMA = {
     "type": "object",
@@ -61,7 +65,8 @@ async def run_reforecast_agent(
     """Agent-powered reforecast: analyze trends and propose revisions."""
     try:
         variance_data = await agent_tools.calculate_variance(tenant_id, budget_id)
-    except Exception:
+    except Exception as e:
+        _logger.warning("variance_calculation_failed", error=str(e))
         variance_data = {"variances": []}
 
     prompt = (

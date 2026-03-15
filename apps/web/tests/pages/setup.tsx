@@ -186,6 +186,24 @@ export const mockApi = {
     setOptIn: vi.fn(async () => ({ ok: true })),
     deleteOptIn: vi.fn(async () => ({ ok: true })),
   },
+  pim: {
+    universe: {
+      list: vi.fn(async () => ({ items: [], total: 0, limit: 50, offset: 0 })),
+      add: vi.fn(async () => ({ company_id: "co-1", company_name: "Test Co", ticker: "TEST" })),
+      remove: vi.fn(async () => ({ deleted: true })),
+      get: vi.fn(async () => ({ company_id: "co-1", company_name: "Test Co", ticker: "TEST" })),
+    },
+    sentiment: {
+      dashboard: vi.fn(async (): Promise<{ items: unknown[]; total: number }> => ({ items: [], total: 0 })),
+      companyDetail: vi.fn(async () => ({
+        company: { company_id: "co-1", company_name: "Test Co", ticker: "TEST" },
+        aggregates: [],
+        recent_signals: [],
+      })),
+      scores: vi.fn(async () => ({ items: [], total: 0, limit: 50, offset: 0 })),
+      aggregates: vi.fn(async () => ({ items: [] })),
+    },
+  },
   ventures: {
     templates: vi.fn(async () => []),
     create: vi.fn(async () => ({ venture_id: "v-1", question_plan: [] })),

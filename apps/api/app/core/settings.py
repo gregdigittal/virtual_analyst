@@ -101,9 +101,23 @@ class Settings(BaseSettings):
     polygon_api_key: str | None = Field(default=None, alias="POLYGON_API_KEY")
     """Polygon.io API key for PIM sentiment news ingestion."""
 
+    fred_api_key: str | None = Field(default=None, alias="FRED_API_KEY")
+    """St. Louis Fed FRED API key for PIM economic context (GDP, CPI, unemployment, yield curve, PMI)."""
+
     llm_tokens_monthly_limit: int = Field(default=1_000_000, ge=0, alias="LLM_TOKENS_MONTHLY_LIMIT")
     circuit_breaker_failure_threshold: int = Field(default=5, ge=1, alias="CIRCUIT_BREAKER_FAILURE_THRESHOLD")
     circuit_breaker_recovery_seconds: int = Field(default=60, ge=1, alias="CIRCUIT_BREAKER_RECOVERY_SECONDS")
+    llm_policy_override_json: str | None = Field(
+        default=None,
+        alias="LLM_POLICY_OVERRIDE_JSON",
+        description=(
+            "Optional JSON string overriding the hardcoded DEFAULT_POLICY in router.py. "
+            "Must be a valid JSON object with 'rules' (list) and optional 'fallback' keys. "
+            "Applied at startup when LLMRouter is first constructed. "
+            "To change at runtime, use PUT /api/v1/admin/llm-policy (owner role required). "
+            "Example: {\"rules\":[{\"task_label\":\"memo_generation\",\"priority\":1,\"provider\":\"openai\",\"model\":\"gpt-4o\",\"max_tokens\":4096,\"temperature\":0.2}],\"fallback\":{\"provider\":\"openai\",\"model\":\"gpt-4o-mini\",\"max_tokens\":4096,\"temperature\":0.2}}"
+        ),
+    )
 
     agent_sdk_enabled: bool = Field(default=True, alias="AGENT_SDK_ENABLED")
     agent_sdk_default_model: str = Field(default="sonnet", alias="AGENT_SDK_DEFAULT_MODEL")

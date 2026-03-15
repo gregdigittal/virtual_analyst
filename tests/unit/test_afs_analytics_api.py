@@ -56,7 +56,7 @@ def test_compute_analytics_requires_tenant() -> None:
 
 
 def test_compute_analytics_engagement_not_found() -> None:
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_mock_tenant_conn):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_mock_tenant_conn):
         r = client.post(
             "/api/v1/afs/engagements/eng-999/analytics/compute",
             json={"industry_segment": "general"},
@@ -91,7 +91,7 @@ def test_compute_analytics_no_trial_balance() -> None:
 
     _setup_di()
     try:
-        with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_conn_eng_but_no_tb):
+        with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_conn_eng_but_no_tb):
             r = client.post(
                 "/api/v1/afs/engagements/eng-1/analytics/compute",
                 json={"industry_segment": "general"},
@@ -161,11 +161,11 @@ def test_compute_analytics_success() -> None:
     _setup_di()
     try:
         with (
-            patch("apps.api.app.routers.afs.tenant_conn", side_effect=_conn_full),
-            patch("apps.api.app.routers.afs.detect_anomalies", new_callable=AsyncMock, return_value=mock_anomaly_resp),
-            patch("apps.api.app.routers.afs.generate_commentary", new_callable=AsyncMock, return_value=mock_commentary_resp),
-            patch("apps.api.app.routers.afs.assess_going_concern", new_callable=AsyncMock, return_value=mock_gc_resp),
-            patch("apps.api.app.routers.afs._load_benchmarks", return_value={
+            patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_conn_full),
+            patch("apps.api.app.routers.afs.analytics.detect_anomalies", new_callable=AsyncMock, return_value=mock_anomaly_resp),
+            patch("apps.api.app.routers.afs.analytics.generate_commentary", new_callable=AsyncMock, return_value=mock_commentary_resp),
+            patch("apps.api.app.routers.afs.analytics.assess_going_concern", new_callable=AsyncMock, return_value=mock_gc_resp),
+            patch("apps.api.app.routers.afs.analytics._load_benchmarks", return_value={
                 "segments": {"general": {"current_ratio": {"p25": 1.0, "median": 1.5, "p75": 2.5}}}
             }),
         ):
@@ -228,11 +228,11 @@ def test_compute_analytics_ai_failure_graceful() -> None:
     _setup_di()
     try:
         with (
-            patch("apps.api.app.routers.afs.tenant_conn", side_effect=_conn_full),
-            patch("apps.api.app.routers.afs.detect_anomalies", new_callable=AsyncMock, side_effect=RuntimeError("LLM timeout")),
-            patch("apps.api.app.routers.afs.generate_commentary", new_callable=AsyncMock, side_effect=RuntimeError("LLM timeout")),
-            patch("apps.api.app.routers.afs.assess_going_concern", new_callable=AsyncMock, side_effect=RuntimeError("LLM timeout")),
-            patch("apps.api.app.routers.afs._load_benchmarks", return_value={"segments": {"general": {}}}),
+            patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_conn_full),
+            patch("apps.api.app.routers.afs.analytics.detect_anomalies", new_callable=AsyncMock, side_effect=RuntimeError("LLM timeout")),
+            patch("apps.api.app.routers.afs.analytics.generate_commentary", new_callable=AsyncMock, side_effect=RuntimeError("LLM timeout")),
+            patch("apps.api.app.routers.afs.analytics.assess_going_concern", new_callable=AsyncMock, side_effect=RuntimeError("LLM timeout")),
+            patch("apps.api.app.routers.afs.analytics._load_benchmarks", return_value={"segments": {"general": {}}}),
         ):
             r = client.post(
                 "/api/v1/afs/engagements/eng-1/analytics/compute",
@@ -252,7 +252,7 @@ def test_compute_analytics_ai_failure_graceful() -> None:
 
 
 def test_get_analytics_not_found() -> None:
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_mock_tenant_conn):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_mock_tenant_conn):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics",
             headers=HEADERS,
@@ -282,7 +282,7 @@ def test_get_analytics_success() -> None:
         cm.__aexit__ = AsyncMock(return_value=None)
         return cm
 
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_conn_with_analytics):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_conn_with_analytics):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics",
             headers=HEADERS,
@@ -297,7 +297,7 @@ def test_get_analytics_success() -> None:
 
 
 def test_get_analytics_ratios_not_found() -> None:
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_mock_tenant_conn):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_mock_tenant_conn):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics/ratios",
             headers=HEADERS,
@@ -321,7 +321,7 @@ def test_get_analytics_ratios_success() -> None:
         cm.__aexit__ = AsyncMock(return_value=None)
         return cm
 
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_conn_with_ratios):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_conn_with_ratios):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics/ratios",
             headers=HEADERS,
@@ -338,7 +338,7 @@ def test_get_analytics_ratios_success() -> None:
 
 
 def test_get_analytics_anomalies_not_found() -> None:
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_mock_tenant_conn):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_mock_tenant_conn):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics/anomalies",
             headers=HEADERS,
@@ -363,7 +363,7 @@ def test_get_analytics_anomalies_success() -> None:
         cm.__aexit__ = AsyncMock(return_value=None)
         return cm
 
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_conn_with_anomalies):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_conn_with_anomalies):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics/anomalies",
             headers=HEADERS,
@@ -380,7 +380,7 @@ def test_get_analytics_anomalies_success() -> None:
 
 
 def test_get_going_concern_not_found() -> None:
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_mock_tenant_conn):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_mock_tenant_conn):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics/going-concern",
             headers=HEADERS,
@@ -410,7 +410,7 @@ def test_get_going_concern_success() -> None:
         cm.__aexit__ = AsyncMock(return_value=None)
         return cm
 
-    with patch("apps.api.app.routers.afs.tenant_conn", side_effect=_conn_with_gc):
+    with patch("apps.api.app.routers.afs.analytics.tenant_conn", side_effect=_conn_with_gc):
         r = client.get(
             "/api/v1/afs/engagements/eng-1/analytics/going-concern",
             headers=HEADERS,

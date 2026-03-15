@@ -86,7 +86,7 @@ class XeroAdapter(ERPAdapter):
                         first = connections[0]
                         org_name = first.get("tenantName")
                         tenant_id = first.get("tenantId", "")
-            except Exception:
+            except (KeyError, ValueError, AttributeError):
                 pass  # Proceed without tenant info; sync will fail later if needed
 
         return ConnectionResult(

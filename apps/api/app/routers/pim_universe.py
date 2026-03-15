@@ -6,16 +6,19 @@ import uuid
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import ROLES_CAN_WRITE, require_role
-from apps.api.app.services.pim.access import check_pim_access
+from apps.api.app.deps import ROLES_CAN_WRITE, require_pim_access, require_role
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/pim/universe", tags=["pim"], dependencies=[require_role(*ROLES_CAN_WRITE)])
+router = APIRouter(
+    prefix="/pim/universe",
+    tags=["pim"],
+    dependencies=[require_role(*ROLES_CAN_WRITE), Depends(require_pim_access)],
+)
 
 
 def _company_id() -> str:
@@ -88,12 +91,9 @@ async def add_company(
     x_user_id: str = Header("", alias="X-User-ID"),
 ) -> dict[str, Any]:
     """Add a company to the tenant's investable universe."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     company_id = _company_id()
     import json
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         await conn.execute(
             """INSERT INTO pim_universes
                (tenant_id, company_id, ticker, company_name, sector, sub_sector,
@@ -128,12 +128,9 @@ async def bulk_add_companies(
     x_user_id: str = Header("", alias="X-User-ID"),
 ) -> dict[str, Any]:
     """Bulk add companies to the universe (up to 500)."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     import json
     added: list[dict[str, Any]] = []
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         async with conn.transaction():
             for c in body.companies:
                 cid = _company_id()
@@ -171,8 +168,6 @@ async def list_companies(
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List companies in the tenant's universe with optional filters."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     conditions = ["tenant_id = $1"]
     args: list[Any] = [x_tenant_id]
     idx = 1
@@ -194,7 +189,6 @@ async def list_companies(
     offset_ph = idx
     args.extend([limit, offset])
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         rows = await conn.fetch(
             f"""SELECT * FROM pim_universes
                 WHERE {" AND ".join(conditions)}
@@ -221,10 +215,7 @@ async def get_company(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
 ) -> dict[str, Any]:
     """Get a single company by ID."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         row = await conn.fetchrow(
             "SELECT * FROM pim_universes WHERE tenant_id = $1 AND company_id = $2",
             x_tenant_id,
@@ -242,11 +233,8 @@ async def update_company(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
 ) -> dict[str, Any]:
     """Update a company in the universe."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     import json
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         row = await conn.fetchrow(
             "SELECT company_id FROM pim_universes WHERE tenant_id = $1 AND company_id = $2",
             x_tenant_id,
@@ -295,10 +283,7 @@ async def remove_company(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
 ) -> None:
     """Remove a company from the universe."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         res = await conn.execute(
             "DELETE FROM pim_universes WHERE tenant_id = $1 AND company_id = $2",
             x_tenant_id,
@@ -313,10 +298,7 @@ async def list_sectors(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
 ) -> dict[str, Any]:
     """List distinct sectors in the universe with counts."""
-    if not x_tenant_id:
-        raise HTTPException(400, "X-Tenant-ID required")
     async with tenant_conn(x_tenant_id) as conn:
-        await check_pim_access(x_tenant_id, conn)
         rows = await conn.fetch(
             """SELECT sector, count(*) AS count
                FROM pim_universes

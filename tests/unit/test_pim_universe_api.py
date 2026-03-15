@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi import HTTPException
+import pytest
+from fastapi import Header, HTTPException
 from fastapi.testclient import TestClient
 
+from apps.api.app.deps import require_pim_access
 from apps.api.app.main import app
 
 client = TestClient(app)
@@ -54,6 +56,18 @@ def _mock_tenant_conn_factory(fetchrow_return=None, fetch_return=None, fetchval_
     return _make
 
 
+@pytest.fixture(autouse=True)
+def _bypass_pim_gate():
+    """Bypass the DB subscription check but keep the tenant-ID validation."""
+    async def _tenant_only(x_tenant_id: str = Header("", alias="X-Tenant-ID")):  # noqa: B008
+        if not x_tenant_id:
+            raise HTTPException(status_code=400, detail="X-Tenant-ID required")
+
+    app.dependency_overrides[require_pim_access] = _tenant_only
+    yield
+    app.dependency_overrides.pop(require_pim_access, None)
+
+
 # --- Tests ---
 
 
@@ -67,10 +81,7 @@ def test_add_company_requires_tenant() -> None:
 
 def test_add_company_happy_path() -> None:
     make_conn = _mock_tenant_conn_factory(fetchrow_return=_COMPANY_DICT)
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.post(
             "/api/v1/pim/universe",
             json={"ticker": "AAPL", "company_name": "Apple Inc"},
@@ -84,20 +95,18 @@ def test_add_company_happy_path() -> None:
 
 
 def test_add_company_pim_access_denied() -> None:
+    async def _deny():
+        raise HTTPException(403, "PIM is not enabled for this tenant's subscription")
+
+    app.dependency_overrides[require_pim_access] = _deny
     make_conn = _mock_tenant_conn_factory(fetchrow_return=_COMPANY_DICT)
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch(
-            "apps.api.app.routers.pim_universe.check_pim_access",
-            new_callable=AsyncMock,
-            side_effect=HTTPException(403, "PIM is not enabled for this tenant's subscription"),
-        ),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.post(
             "/api/v1/pim/universe",
             json={"ticker": "AAPL", "company_name": "Apple Inc"},
             headers={"X-Tenant-ID": TENANT, "X-User-ID": USER},
         )
+    # autouse fixture restores _tenant_only override after test
     assert r.status_code == 403
 
 
@@ -114,10 +123,7 @@ def test_list_companies_happy_path() -> None:
     cm.__aenter__ = AsyncMock(return_value=conn)
     cm.__aexit__ = AsyncMock(return_value=None)
 
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=lambda _t: cm),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=lambda _t: cm):
         r = client.get("/api/v1/pim/universe", headers={"X-Tenant-ID": TENANT})
 
     assert r.status_code == 200
@@ -128,10 +134,7 @@ def test_list_companies_happy_path() -> None:
 
 def test_get_company_not_found() -> None:
     make_conn = _mock_tenant_conn_factory(fetchrow_return=None)
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.get(
             "/api/v1/pim/universe/pco_notexist",
             headers={"X-Tenant-ID": TENANT},
@@ -141,10 +144,7 @@ def test_get_company_not_found() -> None:
 
 def test_get_company_happy_path() -> None:
     make_conn = _mock_tenant_conn_factory(fetchrow_return=_COMPANY_DICT)
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.get(
             "/api/v1/pim/universe/pco_abc123",
             headers={"X-Tenant-ID": TENANT},
@@ -158,10 +158,7 @@ def test_get_company_happy_path() -> None:
 def test_update_company_not_found() -> None:
     # First fetchrow (existence check) returns None → 404
     make_conn = _mock_tenant_conn_factory(fetchrow_return=None)
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.patch(
             "/api/v1/pim/universe/pco_notexist",
             json={"company_name": "Updated Name"},
@@ -172,10 +169,7 @@ def test_update_company_not_found() -> None:
 
 def test_remove_company_not_found() -> None:
     make_conn = _mock_tenant_conn_factory(execute_return="DELETE 0")
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.delete(
             "/api/v1/pim/universe/pco_notexist",
             headers={"X-Tenant-ID": TENANT},
@@ -185,10 +179,7 @@ def test_remove_company_not_found() -> None:
 
 def test_remove_company_happy_path() -> None:
     make_conn = _mock_tenant_conn_factory(execute_return="DELETE 1")
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.delete(
             "/api/v1/pim/universe/pco_abc123",
             headers={"X-Tenant-ID": TENANT},
@@ -202,10 +193,7 @@ def test_list_sectors() -> None:
         {"sector": "Fintech", "count": 3},
     ]
     make_conn = _mock_tenant_conn_factory(fetch_return=sector_rows)
-    with (
-        patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn),
-        patch("apps.api.app.routers.pim_universe.check_pim_access", new_callable=AsyncMock),
-    ):
+    with patch("apps.api.app.routers.pim_universe.tenant_conn", side_effect=make_conn):
         r = client.get(
             "/api/v1/pim/universe/sectors/list",
             headers={"X-Tenant-ID": TENANT},

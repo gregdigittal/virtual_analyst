@@ -380,19 +380,16 @@ async def import_actuals(
         row = await get_budget(conn, x_tenant_id, budget_id)
         if not row:
             raise HTTPException(404, "Budget not found")
-        for a in body.actuals:
-            await conn.execute(
-                """INSERT INTO budget_actuals (tenant_id, budget_id, period_ordinal, account_ref, amount, department_ref, source)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7)
-                   ON CONFLICT (tenant_id, budget_id, period_ordinal, account_ref, department_ref) DO UPDATE SET amount = $5, source = $7""",
-                x_tenant_id,
-                budget_id,
-                a.period_ordinal,
-                a.account_ref,
-                a.amount,
-                a.department_ref or "",
-                body.source,
-            )
+        # Batch upsert — eliminates N+1 (one round-trip regardless of actuals count)
+        await conn.executemany(
+            """INSERT INTO budget_actuals (tenant_id, budget_id, period_ordinal, account_ref, amount, department_ref, source)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               ON CONFLICT (tenant_id, budget_id, period_ordinal, account_ref, department_ref) DO UPDATE SET amount = $5, source = $7""",
+            [
+                (x_tenant_id, budget_id, a.period_ordinal, a.account_ref, a.amount, a.department_ref or "", body.source)
+                for a in body.actuals
+            ],
+        )
     return {"imported": len(body.actuals), "source": body.source}
 
 

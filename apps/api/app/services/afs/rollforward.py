@@ -1,8 +1,11 @@
 """AFS Roll-Forward — copy sections and comparatives from a prior engagement."""
 
 from __future__ import annotations
+
 import json
 import uuid
+
+import asyncpg
 
 
 def _section_id() -> str:
@@ -45,8 +48,8 @@ async def rollforward_sections(
             await conn.execute(
                 """INSERT INTO afs_sections
                    (tenant_id, section_id, engagement_id, section_type, section_number,
-                    title, content_json, status, version, rolled_forward_from, created_by)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', 1, $8, $9)
+                    title, content_json, status, version, rolled_forward_from, needs_review, created_by)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', 1, $8, true, $9)
                    ON CONFLICT (tenant_id, engagement_id, section_number) DO NOTHING""",
                 tenant_id, new_id, target_engagement_id,
                 row["section_type"], row["section_number"],
@@ -60,8 +63,8 @@ async def rollforward_sections(
                 "section_type": row["section_type"],
                 "rolled_forward_from": row["section_id"],
             })
-        except Exception:
-            # ON CONFLICT path - section_number already exists in target
+        except asyncpg.exceptions.UniqueViolationError:
+            # ON CONFLICT: section_number already exists in target engagement
             pass
 
     return {"sections_copied": len(copied), "sections": copied}
@@ -92,7 +95,17 @@ async def rollforward_comparatives(
         return {"comparatives_copied": False, "trial_balance_id": None}
 
     new_tb_id = _tb_id()
-    comparative_meta = json.dumps({"_comparative_source": source_engagement_id})
+
+    # Preserve the source mapping and add the _comparative_source marker.
+    # This allows downstream consumers to render comparative columns using the
+    # prior year's account mapping while still identifying the source engagement.
+    raw_mapping = source_tb["mapped_accounts_json"]
+    if raw_mapping:
+        prior_mapping: dict = json.loads(raw_mapping) if isinstance(raw_mapping, str) else dict(raw_mapping)
+    else:
+        prior_mapping = {}
+    prior_mapping["_comparative_source"] = source_engagement_id
+    comparative_meta = json.dumps(prior_mapping)
 
     await conn.execute(
         """INSERT INTO afs_trial_balances
