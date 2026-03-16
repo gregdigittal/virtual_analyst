@@ -161,3 +161,56 @@ def test_generate_draft_creates_draft_from_questionnaire(mock_tenant_conn: Magic
     assert "draft_session_id" in data
     assert data["draft_session_id"].startswith("ds_")
     assert data["status"] == "active"
+
+
+# --- PIM-7.3: GET /ventures and GET /ventures/{id} ---
+
+
+def test_list_ventures_requires_tenant() -> None:
+    r = client.get("/api/v1/ventures")
+    assert r.status_code == 400
+
+
+def test_list_ventures_empty() -> None:
+    r = client.get("/api/v1/ventures", headers={"X-Tenant-ID": TENANT})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["items"] == []
+    assert data["total"] == 0
+
+
+def test_list_ventures_returns_created() -> None:
+    r_create = client.post(
+        "/api/v1/ventures",
+        json={"template_id": "manufacturing_discrete", "entity_name": "TestCo"},
+        headers={"X-Tenant-ID": TENANT},
+    )
+    assert r_create.status_code == 201
+    venture_id = r_create.json()["venture_id"]
+
+    r_list = client.get("/api/v1/ventures", headers={"X-Tenant-ID": TENANT})
+    assert r_list.status_code == 200
+    ids = [item["venture_id"] for item in r_list.json()["items"]]
+    assert venture_id in ids
+
+
+def test_get_venture_not_found() -> None:
+    r = client.get("/api/v1/ventures/vc_doesnotexist", headers={"X-Tenant-ID": TENANT})
+    assert r.status_code == 404
+
+
+def test_get_venture_happy_path() -> None:
+    r_create = client.post(
+        "/api/v1/ventures",
+        json={"template_id": "manufacturing_discrete", "entity_name": "StartupX"},
+        headers={"X-Tenant-ID": TENANT},
+    )
+    venture_id = r_create.json()["venture_id"]
+
+    r = client.get(f"/api/v1/ventures/{venture_id}", headers={"X-Tenant-ID": TENANT})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["venture_id"] == venture_id
+    assert data["entity_name"] == "StartupX"
+    assert data["template_id"] == "manufacturing_discrete"
+    assert isinstance(data["answers"], dict)

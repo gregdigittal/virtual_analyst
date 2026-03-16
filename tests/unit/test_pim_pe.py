@@ -310,3 +310,55 @@ def test_compute_happy_path() -> None:
     assert isinstance(data["j_curve"], list)
     assert len(data["j_curve"]) == 2
     assert "limitations" in data
+
+
+# --- GET /pim/pe/summary ---
+
+
+def test_pe_summary_requires_tenant() -> None:
+    r = client.get("/api/v1/pim/pe/summary")
+    assert r.status_code == 400
+
+
+def test_pe_summary_empty_portfolio() -> None:
+    """No assessments → zero counts, null averages."""
+    conn = _simple_conn(
+        fetchrow_return={
+            "total": 0, "with_irr": 0,
+            "avg_dpi": None, "avg_tvpi": None, "avg_irr": None,
+        },
+    )
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_pe.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/pe/summary", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_assessments"] == 0
+    assert data["assessments_with_irr"] == 0
+    assert data["avg_dpi"] is None
+    assert data["avg_tvpi"] is None
+    assert data["avg_irr"] is None
+
+
+def test_pe_summary_with_computed_assessments() -> None:
+    """Returns correct aggregated metrics when assessments have been computed."""
+    conn = _simple_conn(
+        fetchrow_return={
+            "total": 3, "with_irr": 2,
+            "avg_dpi": 1.25, "avg_tvpi": 1.80, "avg_irr": 0.15,
+        },
+    )
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_pe.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/pe/summary", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_assessments"] == 3
+    assert data["assessments_with_irr"] == 2
+    assert data["avg_dpi"] == pytest.approx(1.25)
+    assert data["avg_tvpi"] == pytest.approx(1.80)
+    assert data["avg_irr"] == pytest.approx(0.15)

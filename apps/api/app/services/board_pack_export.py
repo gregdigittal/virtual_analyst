@@ -43,6 +43,27 @@ def _format_table(rows: list[dict], period_labels: list[str] | None = None) -> s
     return "".join(html)
 
 
+def _format_pe_summary(pe_data: dict[str, Any]) -> str:
+    """Render PE portfolio summary as a small HTML table. PIM-7.8."""
+    total = pe_data.get("total_assessments", 0)
+    if not total:
+        return "<p>No PE fund assessments on record.</p>"
+    rows = [
+        ("Total Funds", str(total)),
+        ("Funds with IRR", str(pe_data.get("assessments_with_irr", 0))),
+    ]
+    if pe_data.get("avg_dpi") is not None:
+        rows.append(("Avg DPI", f"{pe_data['avg_dpi']:.2f}x"))
+    if pe_data.get("avg_tvpi") is not None:
+        rows.append(("Avg TVPI", f"{pe_data['avg_tvpi']:.2f}x"))
+    if pe_data.get("avg_irr") is not None:
+        rows.append(("Avg IRR (annualised)", f"{pe_data['avg_irr'] * 100:.1f}%"))
+    tbody = "".join(
+        f"<tr><td>{_html.escape(k)}</td><td>{_html.escape(v)}</td></tr>" for k, v in rows
+    )
+    return f"<table class='pack-table'><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>{tbody}</tbody></table>"
+
+
 def build_board_pack_html(
     label: str,
     section_order: list[str],
@@ -54,8 +75,13 @@ def build_board_pack_html(
     run_id: str = "",
     display_currency: str | None = None,
     benchmark_metrics: list[dict[str, Any]] | None = None,
+    pe_summary: dict[str, Any] | None = None,
 ) -> str:
-    """Build full HTML document: cover, ToC, sections in order, branding. Optional display_currency (VA-P8-01), benchmark_metrics (VA-P8-09)."""
+    """Build full HTML document: cover, ToC, sections in order, branding.
+
+    Optional display_currency (VA-P8-01), benchmark_metrics (VA-P8-09),
+    pe_summary (PIM-7.8).
+    """
     _raw_color = (branding.get("primary_color") or "#2563eb").strip()
     primary_color = _raw_color if re.fullmatch(r"#[0-9a-fA-F]{3,8}", _raw_color) else "#2563eb"
     terms_footer = _html.escape(str(branding.get("terms_footer") or ""))
@@ -82,6 +108,8 @@ def build_board_pack_html(
             for m in benchmark_metrics
         )
         section_contents["benchmark"] = f"<h3>Industry Benchmark (Peer Median)</h3><table class='pack-table'><thead><tr><th>Metric</th><th>Peer Median</th><th>Sample</th></tr></thead><tbody>{bench_rows}</tbody></table>"
+    if pe_summary is not None:
+        section_contents["pe_portfolio"] = f"<h3>PE Portfolio Summary</h3>{_format_pe_summary(pe_summary)}"
 
     toc_items = []
     body_sections = []
@@ -150,8 +178,9 @@ def build_board_pack_pptx(
     run_id: str = "",
     display_currency: str | None = None,
     benchmark_metrics: list[dict[str, Any]] | None = None,
+    pe_summary: dict[str, Any] | None = None,
 ) -> bytes:
-    """Build PPTX: title slide + one slide per section (title + content summary). VA-P7-08; VA-P8-01 display_currency."""
+    """Build PPTX: title slide + one slide per section. VA-P7-08; VA-P8-01 display_currency; PIM-7.8 pe_summary."""
     if Presentation is None:
         raise RuntimeError("PPTX export requires python-pptx; pip install python-pptx")
     prs = Presentation()
@@ -182,6 +211,19 @@ def build_board_pack_pptx(
     if benchmark_metrics:
         bench_text = "; ".join(f"{m.get('metric_name', '')}: median {m.get('median', '')}" for m in benchmark_metrics[:10])
         section_contents["benchmark"] = ("Industry Benchmark", bench_text or "No benchmark data.")
+    if pe_summary is not None:
+        total = pe_summary.get("total_assessments", 0)
+        if total:
+            pe_lines = [f"Funds: {total}"]
+            if pe_summary.get("avg_dpi") is not None:
+                pe_lines.append(f"Avg DPI: {pe_summary['avg_dpi']:.2f}x")
+            if pe_summary.get("avg_tvpi") is not None:
+                pe_lines.append(f"Avg TVPI: {pe_summary['avg_tvpi']:.2f}x")
+            if pe_summary.get("avg_irr") is not None:
+                pe_lines.append(f"Avg IRR: {pe_summary['avg_irr'] * 100:.1f}%")
+            section_contents["pe_portfolio"] = ("PE Portfolio", "  |  ".join(pe_lines))
+        else:
+            section_contents["pe_portfolio"] = ("PE Portfolio", "No PE fund assessments on record.")
 
     for sec_key in section_order:
         if sec_key not in section_contents:

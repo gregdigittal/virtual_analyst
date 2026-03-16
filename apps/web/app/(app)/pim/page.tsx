@@ -1,4 +1,5 @@
 import { VACard } from "@/components/ui";
+import { api } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -6,6 +7,9 @@ import { redirect } from "next/navigation";
 export default async function PimIndexPage() {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
+
+  api.setAccessToken(ctx.accessToken);
+  const peSummary = await api.pim.pe.summary(ctx.tenantId).catch(() => null);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -122,7 +126,7 @@ export default async function PimIndexPage() {
               <span className="text-3xl" aria-hidden="true">
                 💼
               </span>
-              <div>
+              <div className="flex-1">
                 <h2 className="text-base font-medium text-va-text">
                   PE Fund Assessments
                 </h2>
@@ -130,6 +134,40 @@ export default async function PimIndexPage() {
                   DPI, TVPI, IRR, and J-curve analysis for private equity
                   funds. Peer comparison against vintage-year cohorts.
                 </p>
+                {peSummary && peSummary.total_assessments > 0 && (
+                  <div className="mt-3 flex gap-4 text-xs text-va-text2">
+                    <span>
+                      <span className="font-mono text-va-text">
+                        {peSummary.total_assessments}
+                      </span>{" "}
+                      fund{peSummary.total_assessments !== 1 ? "s" : ""}
+                    </span>
+                    {peSummary.avg_dpi !== null && (
+                      <span>
+                        Avg DPI{" "}
+                        <span className="font-mono text-va-text">
+                          {peSummary.avg_dpi.toFixed(2)}x
+                        </span>
+                      </span>
+                    )}
+                    {peSummary.avg_tvpi !== null && (
+                      <span>
+                        TVPI{" "}
+                        <span className="font-mono text-va-text">
+                          {peSummary.avg_tvpi.toFixed(2)}x
+                        </span>
+                      </span>
+                    )}
+                    {peSummary.avg_irr !== null && (
+                      <span>
+                        IRR{" "}
+                        <span className="font-mono text-va-text">
+                          {(peSummary.avg_irr * 100).toFixed(1)}%
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </VACard>

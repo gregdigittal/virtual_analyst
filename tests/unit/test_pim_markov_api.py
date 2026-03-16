@@ -188,3 +188,55 @@ def test_top_transitions_top_n_clamped() -> None:
     assert r.status_code == 200
     data = r.json()
     assert len(data["top_state_indices"]) <= 15
+
+
+def test_steady_state_metadata_fields() -> None:
+    """Steady-state response includes expected metadata fields."""
+    conn = MagicMock()
+    conn.fetchrow = AsyncMock(return_value=_MATRIX_ROW)
+    conn.fetch = AsyncMock(return_value=_uniform_transition_rows())
+    conn.execute = AsyncMock()
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_markov.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/markov/steady-state", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert "is_ergodic" in data
+    assert "n_observations" in data
+    assert "matrix_id" in data
+    assert data["matrix_id"] == "mat-001"
+
+
+def test_states_empty_when_no_rows() -> None:
+    """Returns empty items list when no state labels have been seeded."""
+    conn = MagicMock()
+    conn.fetch = AsyncMock(return_value=[])
+    conn.execute = AsyncMock()
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_markov.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/markov/states", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] == 0
+    assert data["items"] == []
+
+
+def test_top_transitions_default_top_n() -> None:
+    """Without explicit top_n the default should be applied without error."""
+    conn = MagicMock()
+    conn.fetchrow = AsyncMock(return_value=_MATRIX_ROW)
+    conn.fetch = AsyncMock(side_effect=[_uniform_transition_rows(), _STATE_ROWS])
+    conn.execute = AsyncMock()
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_markov.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/markov/top-transitions", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert "edges" in data
+    assert "top_state_indices" in data

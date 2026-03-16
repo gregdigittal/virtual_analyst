@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
-import { api, PeAssessment, PeComputeResult, MetricRank, PeerRankResponse } from "@/lib/api";
+import { api, PeAssessment, PeComputeResult, MetricRank, PeerRankResponse, VentureSummary } from "@/lib/api";
 import { getAuthContext } from "@/lib/auth";
 import { VAButton } from "@/components/ui/VAButton";
 import { VACard } from "@/components/ui/VACard";
@@ -131,6 +131,9 @@ export default function PimPeDetailPage({ params }: { params: Promise<{ id: stri
   const [computeError, setComputeError] = useState<string | null>(null);
   const [generatingMemo, setGeneratingMemo] = useState(false);
   const [memo, setMemo] = useState<{ title: string; recommendation: string } | null>(null);
+  const [ventures, setVentures] = useState<VentureSummary[]>([]);
+  const [linkedVentureId, setLinkedVentureId] = useState<string>("");
+  const [ventureDetail, setVentureDetail] = useState<{ entity_name: string; answers: Record<string, string> } | null>(null);
 
   useEffect(() => {
     getAuthContext().then((ctx) => {
@@ -139,6 +142,21 @@ export default function PimPeDetailPage({ params }: { params: Promise<{ id: stri
       setTenantId(ctx.tenantId);
     });
   }, [router]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    // Fetch available ventures for overlay selector
+    api.ventures.list(tenantId)
+      .then((res) => setVentures(res.items))
+      .catch(() => {});
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (!tenantId || !linkedVentureId) { setVentureDetail(null); return; }
+    api.ventures.get(tenantId, linkedVentureId)
+      .then((v) => setVentureDetail({ entity_name: v.entity_name, answers: v.answers }))
+      .catch(() => setVentureDetail(null));
+  }, [tenantId, linkedVentureId]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -260,6 +278,50 @@ export default function PimPeDetailPage({ params }: { params: Promise<{ id: stri
           )}
         </VACard>
       )}
+
+      {/* PIM-7.3: Venture overlay */}
+      <VACard className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-va-text/70 uppercase tracking-wider">Venture Overlay</h2>
+          {ventures.length > 0 && (
+            <select
+              className="text-xs bg-va-midnight border border-va-border rounded px-2 py-1 text-va-text"
+              value={linkedVentureId}
+              onChange={(e) => setLinkedVentureId(e.target.value)}
+            >
+              <option value="">— link a venture —</option>
+              {ventures.map((v) => (
+                <option key={v.venture_id} value={v.venture_id}>
+                  {v.entity_name || v.venture_id}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        {ventures.length === 0 && (
+          <p className="text-xs text-va-text/40">No venture models found. Create one in Ventures to overlay here.</p>
+        )}
+        {ventures.length > 0 && !linkedVentureId && (
+          <p className="text-xs text-va-text/40">Select a venture model to view its assumptions alongside this PE assessment.</p>
+        )}
+        {ventureDetail && (
+          <div className="mt-2 space-y-2">
+            <p className="text-sm font-medium text-va-text">{ventureDetail.entity_name}</p>
+            {Object.entries(ventureDetail.answers).length > 0 ? (
+              <div className="divide-y divide-va-border">
+                {Object.entries(ventureDetail.answers).slice(0, 8).map(([k, v]) => (
+                  <div key={k} className="flex justify-between items-start py-1.5 gap-4">
+                    <span className="text-xs text-va-text/50 capitalize">{k.replace(/_/g, " ")}</span>
+                    <span className="text-xs font-mono text-va-text text-right max-w-[60%] break-words">{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-va-text/40">No questionnaire answers recorded for this venture.</p>
+            )}
+          </div>
+        )}
+      </VACard>
 
       {assessment.notes && (
         <VACard className="p-5">

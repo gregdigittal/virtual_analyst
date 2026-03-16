@@ -589,6 +589,32 @@ async def export_board_pack(
     if benchmark_metrics and "benchmark" not in so_with_bench:
         so_with_bench.append("benchmark")
 
+    # PIM-7.8: fetch PE portfolio summary when the section is requested
+    pe_summary_data: dict[str, Any] | None = None
+    if "pe_portfolio" in so_with_bench:
+        async with tenant_conn(x_tenant_id) as conn_pe:
+            pe_row = await conn_pe.fetchrow(
+                """
+                SELECT
+                    count(*)                                 AS total,
+                    count(*) FILTER (WHERE irr IS NOT NULL)  AS with_irr,
+                    avg(dpi)                                 AS avg_dpi,
+                    avg(tvpi)                                AS avg_tvpi,
+                    avg(irr)                                 AS avg_irr
+                FROM pim_pe_assessments
+                WHERE tenant_id = $1
+                """,
+                x_tenant_id,
+            )
+        if pe_row:
+            pe_summary_data = {
+                "total_assessments": int(pe_row["total"]),
+                "assessments_with_irr": int(pe_row["with_irr"]),
+                "avg_dpi": float(pe_row["avg_dpi"]) if pe_row["avg_dpi"] is not None else None,
+                "avg_tvpi": float(pe_row["avg_tvpi"]) if pe_row["avg_tvpi"] is not None else None,
+                "avg_irr": float(pe_row["avg_irr"]) if pe_row["avg_irr"] is not None else None,
+            }
+
     if export_format == "html":
         html = build_board_pack_html(
             label=row["label"],
@@ -601,6 +627,7 @@ async def export_board_pack(
             run_id=run_id,
             display_currency=display_currency,
             benchmark_metrics=benchmark_metrics if benchmark_metrics else None,
+            pe_summary=pe_summary_data,
         )
         if len(html.encode("utf-8")) > MAX_EXPORT_BYTES:
             raise HTTPException(413, "Export exceeds 10MB limit")
@@ -617,6 +644,7 @@ async def export_board_pack(
             run_id=run_id,
             display_currency=display_currency,
             benchmark_metrics=benchmark_metrics if benchmark_metrics else None,
+            pe_summary=pe_summary_data,
         )
         try:
             pdf_bytes = html_to_pdf(html)
@@ -641,6 +669,7 @@ async def export_board_pack(
             run_id=run_id,
             display_currency=display_currency,
             benchmark_metrics=benchmark_metrics if benchmark_metrics else None,
+            pe_summary=pe_summary_data,
         )
     except RuntimeError as e:
         raise HTTPException(501, str(e)) from e

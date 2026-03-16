@@ -225,3 +225,64 @@ def test_company_detail_happy_path() -> None:
     assert len(data["aggregates"]) == 1
     assert len(data["recent_signals"]) == 1
     assert data["recent_signals"][0]["signal_id"] == "sig_1"
+
+
+def test_company_detail_aggregates_empty() -> None:
+    """Company exists but has no aggregates or signals yet."""
+    conn = MagicMock()
+    conn.fetchrow = AsyncMock(return_value=_COMPANY_ROW)
+    conn.fetch = AsyncMock(side_effect=[[], []])
+    conn.fetchval = AsyncMock(return_value=None)
+    conn.execute = AsyncMock()
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get(
+            "/api/v1/pim/sentiment/company/pco_1",
+            headers={"X-Tenant-ID": TENANT},
+        )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["company"]["company_id"] == "pco_1"
+    assert data["aggregates"] == []
+    assert data["recent_signals"] == []
+
+
+def test_scores_company_filter_accepted() -> None:
+    """company_id filter query param is accepted without error."""
+    count_row = {"cnt": 0}
+    conn = _simple_conn(fetchrow_return=count_row, fetch_return=[])
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get(
+            "/api/v1/pim/sentiment/scores?company_id=pco_1",
+            headers={"X-Tenant-ID": TENANT},
+        )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["items"] == []
+
+
+def test_aggregates_valid_period_type() -> None:
+    """period_type=weekly is accepted."""
+    count_row = {"cnt": 1}
+    conn = _simple_conn(fetchrow_return=count_row, fetch_return=[_AGG_ROW])
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_sentiment.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get(
+            "/api/v1/pim/sentiment/aggregates?period_type=weekly",
+            headers={"X-Tenant-ID": TENANT},
+        )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] == 1
+
+
+def test_dashboard_requires_tenant() -> None:
+    r = client.get("/api/v1/pim/sentiment/dashboard")
+    assert r.status_code == 400

@@ -589,3 +589,55 @@ async def generate_pe_memo(
         disclaimer=parsed.get("disclaimer", ""),
         model_used=model_used,
     )
+
+
+# ---------------------------------------------------------------------------
+# PIM-7.9: PE portfolio summary
+# ---------------------------------------------------------------------------
+
+
+class PePortfolioSummary(BaseModel):
+    total_assessments: int
+    assessments_with_irr: int
+    avg_dpi: float | None
+    avg_tvpi: float | None
+    avg_irr: float | None
+
+
+@router.get("/pe/summary", response_model=PePortfolioSummary)
+async def get_pe_portfolio_summary(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    _: None = Depends(require_pim_access),  # noqa: B008
+) -> PePortfolioSummary:
+    """Aggregate PE portfolio metrics for the hub dashboard.  PIM-7.9.
+
+    Returns count, IRR coverage, and avg DPI/TVPI/IRR across all
+    assessments for the tenant.  Computed metrics (dpi/tvpi/irr) are
+    populated by the /compute endpoint; assessments without a compute
+    run are excluded from the averages.
+    """
+    if not x_tenant_id:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT
+                count(*)                                    AS total,
+                count(*) FILTER (WHERE irr IS NOT NULL)    AS with_irr,
+                avg(dpi)                                    AS avg_dpi,
+                avg(tvpi)                                   AS avg_tvpi,
+                avg(irr)                                    AS avg_irr
+            FROM pim_pe_assessments
+            WHERE tenant_id = $1
+            """,
+            x_tenant_id,
+        )
+
+    return PePortfolioSummary(
+        total_assessments=int(row["total"]) if row else 0,
+        assessments_with_irr=int(row["with_irr"]) if row else 0,
+        avg_dpi=float(row["avg_dpi"]) if row and row["avg_dpi"] is not None else None,
+        avg_tvpi=float(row["avg_tvpi"]) if row and row["avg_tvpi"] is not None else None,
+        avg_irr=float(row["avg_irr"]) if row and row["avg_irr"] is not None else None,
+    )

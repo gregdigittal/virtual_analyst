@@ -1405,6 +1405,16 @@ export const api = {
         `/api/v1/ventures/${encodeURIComponent(ventureId)}/generate-draft`,
         { tenantId, userId, method: "POST" }
       ),
+    list: (tenantId: string) =>
+      request<{ items: VentureSummary[]; total: number }>(
+        "/api/v1/ventures",
+        { tenantId }
+      ),
+    get: (tenantId: string, ventureId: string) =>
+      request<VentureDetail>(
+        `/api/v1/ventures/${encodeURIComponent(ventureId)}`,
+        { tenantId }
+      ),
   },
   changesets: {
     list: (tenantId: string, opts?: { baseline_id?: string; status?: string; limit?: number; offset?: number }) =>
@@ -1752,6 +1762,8 @@ export const api = {
         request<PeComputeResult>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}/compute`, { tenantId, method: "POST", body: {} }),
       memo: (tenantId: string, assessmentId: string) =>
         request<PeMemoResult>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}/memo`, { tenantId, method: "POST", body: {} }),
+      summary: (tenantId: string) =>
+        request<PePortfolioSummary>("/api/v1/pim/pe/summary", { tenantId }),
     },
     peer: {
       createBenchmark: (tenantId: string, body: CreatePeerBenchmarkBody) =>
@@ -3024,6 +3036,16 @@ export interface PeMemoResult {
   model_used: string;
 }
 
+// --- PE Portfolio Summary Types (PIM-7.9) ---
+
+export interface PePortfolioSummary {
+  total_assessments: number;
+  assessments_with_irr: number;
+  avg_dpi: number | null;
+  avg_tvpi: number | null;
+  avg_irr: number | null;
+}
+
 // --- Peer Benchmark Types (PIM-7.1) ---
 
 export interface PeerBenchmark {
@@ -3128,4 +3150,20 @@ export interface LlmPolicyResponse {
 export interface UpdateLlmPolicyBody {
   rules: LlmPolicyRule[];
   fallback?: LlmPolicyFallback | null;
+}
+
+
+// --- Venture Types (PIM-7.3) ---
+
+export interface VentureSummary {
+  venture_id: string;
+  entity_name: string;
+  template_id: string;
+}
+
+export interface VentureDetail {
+  venture_id: string;
+  entity_name: string;
+  template_id: string;
+  answers: Record<string, string>;
 }

@@ -101,6 +101,29 @@ def _deep_merge_assumptions(base: dict[str, Any], override: dict[str, Any]) -> d
     return out
 
 
+@router.get("")
+async def list_ventures(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """List all ventures for the tenant.  PIM-7.3."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    ids = store.list_ids(x_tenant_id, VENTURE_STATE_TYPE)
+    items = []
+    for vid in ids:
+        try:
+            state = store.load(x_tenant_id, VENTURE_STATE_TYPE, vid)
+            items.append({
+                "venture_id": vid,
+                "entity_name": state.get("entity_name") or "",
+                "template_id": state.get("template_id") or "",
+            })
+        except StorageError:
+            continue
+    return {"items": items, "total": len(items)}
+
+
 @router.get("/templates")
 async def list_templates():
     """Return the list of available venture templates (id + label only)."""
@@ -110,6 +133,29 @@ async def list_templates():
         {"template_id": t["template_id"], "label": t.get("label", t["template_id"])}
         for t in catalog.get("templates", [])
     ]
+
+
+@router.get("/{venture_id}")
+async def get_venture(
+    venture_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    store: ArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """Fetch a single venture state.  PIM-7.3."""
+    if not x_tenant_id:
+        raise HTTPException(400, "X-Tenant-ID required")
+    try:
+        state = store.load(x_tenant_id, VENTURE_STATE_TYPE, venture_id)
+    except StorageError as e:
+        if e.code == "ERR_STOR_NOT_FOUND":
+            raise HTTPException(404, "Venture not found") from e
+        raise
+    return {
+        "venture_id": venture_id,
+        "entity_name": state.get("entity_name") or "",
+        "template_id": state.get("template_id") or "",
+        "answers": state.get("answers") or {},
+    }
 
 
 @router.post("", status_code=201)
