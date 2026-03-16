@@ -67,6 +67,9 @@ target-version = "py312"
 select = ["E", "F", "I", "N", "W", "UP", "B", "S"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # assert is valid in pytest tests
+
 [tool.black]
 line-length = 100
 target-version = ["py312"]

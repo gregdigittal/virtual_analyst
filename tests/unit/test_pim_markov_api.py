@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import numpy as np
 import pytest
 from fastapi import Header, HTTPException
 from fastapi.testclient import TestClient
@@ -240,3 +239,73 @@ def test_top_transitions_default_top_n() -> None:
     data = r.json()
     assert "edges" in data
     assert "top_state_indices" in data
+
+
+# ---------------------------------------------------------------------------
+# SP8-B2: Markov steady-state CI tests
+# ---------------------------------------------------------------------------
+
+
+def test_steady_state_includes_ci_arrays() -> None:
+    """Steady-state response includes ci_lower and ci_upper arrays."""
+    conn = MagicMock()
+    conn.fetchrow = AsyncMock(return_value=_MATRIX_ROW)
+    conn.fetch = AsyncMock(return_value=_uniform_transition_rows())
+    conn.execute = AsyncMock()
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_markov.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/markov/steady-state", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert "ci_lower" in data
+    assert "ci_upper" in data
+    assert data["ci_lower"] is not None
+    assert data["ci_upper"] is not None
+    assert len(data["ci_lower"]) == 81
+    assert len(data["ci_upper"]) == 81
+
+
+def test_steady_state_ci_bounds_clamped_to_01() -> None:
+    """All CI bounds are within [0, 1]."""
+    conn = MagicMock()
+    conn.fetchrow = AsyncMock(return_value=_MATRIX_ROW)
+    conn.fetch = AsyncMock(return_value=_uniform_transition_rows())
+    conn.execute = AsyncMock()
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_markov.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/markov/steady-state", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    for lb, ub in zip(data["ci_lower"], data["ci_upper"], strict=False):
+        assert 0.0 <= lb <= 1.0, f"ci_lower out of range: {lb}"
+        assert 0.0 <= ub <= 1.0, f"ci_upper out of range: {ub}"
+        assert lb <= ub, f"ci_lower ({lb}) > ci_upper ({ub})"
+
+
+def test_steady_state_ci_warning_when_low_observations() -> None:
+    """ci_warning is set and CIs are null when n_observations < 10."""
+    low_obs_row = {
+        "matrix_id": "mat-low",
+        "n_observations": 5,
+        "is_ergodic": True,
+    }
+    conn = MagicMock()
+    conn.fetchrow = AsyncMock(return_value=low_obs_row)
+    conn.fetch = AsyncMock(return_value=_uniform_transition_rows())
+    conn.execute = AsyncMock()
+    cm = _make_cm(conn)
+
+    with patch("apps.api.app.routers.pim_markov.tenant_conn", side_effect=lambda _t: cm):
+        r = client.get("/api/v1/pim/markov/steady-state", headers={"X-Tenant-ID": TENANT})
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["ci_lower"] is None
+    assert data["ci_upper"] is None
+    assert "ci_warning" in data
+    assert data["ci_warning"] is not None
+    assert "n<10" in data["ci_warning"]

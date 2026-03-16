@@ -11,6 +11,7 @@ All endpoints require PIM access gate (check_pim_access).
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import structlog
@@ -123,10 +124,55 @@ def _snapshot_to_dict(row: Any) -> dict[str, Any]:
     }
 
 
+def _compute_cis_ci(
+    result: CISResult,
+) -> tuple[float | None, float | None, str | None]:
+    """Compute 95% CI for the CIS composite score using analytical uncertainty propagation.
+
+    Returns (ci_lower, ci_upper, ci_warning).
+    If n_factors < 3, returns (None, None, warning_message).
+    ci_method is always "analytical_propagation" when CIs are computed.
+    """
+    n = result.factors_available
+    if n < 3:
+        return None, None, "Insufficient factors for CI (n<3)"
+
+    fs = result.factor_scores
+    w = result.weights_used
+    composite = result.cis_score
+
+    factor_weight_pairs: list[tuple[float, float]] = [
+        (score, weight)
+        for score, weight in [
+            (fs.fundamental_quality, w.fundamental_quality),
+            (fs.fundamental_momentum, w.fundamental_momentum),
+            (fs.idiosyncratic_sentiment, w.idiosyncratic_sentiment),
+            (fs.sentiment_momentum, w.sentiment_momentum),
+            (fs.sector_positioning, w.sector_positioning),
+        ]
+        if score is not None
+    ]
+
+    total_weight = sum(wt for _, wt in factor_weight_pairs)
+    # Weighted variance of factor scores around the composite
+    weighted_variance = sum(
+        (wt / total_weight) * (score - composite) ** 2
+        for score, wt in factor_weight_pairs
+    )
+    weighted_std = math.sqrt(weighted_variance)
+
+    margin = 1.96 * (weighted_std / math.sqrt(n))
+    ci_lower = round(max(0.0, composite - margin), 4)
+    ci_upper = round(min(100.0, composite + margin), 4)
+    return ci_lower, ci_upper, None
+
+
 def _cis_result_to_dict(result: CISResult) -> dict[str, Any]:
     fs = result.factor_scores
     w = result.weights_used
-    return {
+    ci_lower, ci_upper, ci_warning = _compute_cis_ci(result)
+
+    out: dict[str, Any] = {
         "company_id": result.company_id,
         "cis_score": result.cis_score,
         "factors_available": result.factors_available,
@@ -145,8 +191,14 @@ def _cis_result_to_dict(result: CISResult) -> dict[str, Any]:
             "sentiment_momentum": w.sentiment_momentum,
             "sector_positioning": w.sector_positioning,
         },
+        "ci_lower": ci_lower,
+        "ci_upper": ci_upper,
+        "ci_method": "analytical_propagation",
         "limitations": result.limitations,
     }
+    if ci_warning is not None:
+        out["ci_warning"] = ci_warning
+    return out
 
 
 # ---------------------------------------------------------------------------

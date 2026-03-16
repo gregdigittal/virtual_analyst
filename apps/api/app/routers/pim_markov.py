@@ -10,12 +10,13 @@ All endpoints require PIM access gate (require_pim_access).
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
 from apps.api.app.deps import require_pim_access
@@ -57,6 +58,9 @@ class MarkovSteadyStateResponse(BaseModel):
     n_observations: int
     matrix_id: str
     limitations: str
+    ci_lower: list[float] | None = Field(default=None)
+    ci_upper: list[float] | None = Field(default=None)
+    ci_warning: str | None = Field(default=None)
 
 
 class MarkovTransitionEdge(BaseModel):
@@ -117,6 +121,32 @@ async def _build_matrix(conn: Any, tenant_id: str, matrix_id: str) -> np.ndarray
     row_sums = matrix.sum(axis=1, keepdims=True)
     row_sums = np.where(row_sums == 0, 1.0, row_sums)
     return matrix / row_sums
+
+
+def _compute_markov_ci(
+    steady_state: list[float],
+    effective_n: int,
+) -> tuple[list[float] | None, list[float] | None, str | None]:
+    """Compute 95% CI for steady-state probabilities using Dirichlet analytical approximation.
+
+    For each state i with steady-state probability pi_i:
+      var(pi_i) ≈ pi_i * (1 - pi_i) / effective_n
+      ci: pi_i ± 1.96 * sqrt(var(pi_i)), clamped to [0, 1].
+
+    Returns (ci_lower, ci_upper, ci_warning).
+    If effective_n < 10, returns (None, None, warning_message).
+    """
+    if effective_n < 10:
+        return None, None, "Insufficient observations for CI (n<10)"
+
+    ci_lower: list[float] = []
+    ci_upper: list[float] = []
+    for pi_i in steady_state:
+        variance = pi_i * (1.0 - pi_i) / effective_n
+        margin = 1.96 * math.sqrt(variance)
+        ci_lower.append(round(max(0.0, pi_i - margin), 4))
+        ci_upper.append(round(min(1.0, pi_i + margin), 4))
+    return ci_lower, ci_upper, None
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +210,10 @@ async def get_steady_state(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    effective_n = meta["n_observations"]
+    full_distribution: list[float] = [float(p) for p in result.stationary_distribution]
+    ci_lower, ci_upper, ci_warning = _compute_markov_ci(full_distribution, effective_n)
+
     return MarkovSteadyStateResponse(
         top_states=[
             MarkovTopState(
@@ -191,9 +225,12 @@ async def get_steady_state(
         ],
         is_ergodic=result.is_ergodic,
         quantecon_available=result.quantecon_available,
-        n_observations=meta["n_observations"],
+        n_observations=effective_n,
         matrix_id=meta["matrix_id"],
         limitations=_LIMITATIONS,
+        ci_lower=ci_lower,
+        ci_upper=ci_upper,
+        ci_warning=ci_warning,
     )
 
 

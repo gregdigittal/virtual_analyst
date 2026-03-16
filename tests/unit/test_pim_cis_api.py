@@ -281,3 +281,94 @@ def test_factor_attribution_happy_path() -> None:
     assert data["cis_score"] == pytest.approx(72.5)
     assert "narrative" in data
     assert data["top_driver"] == "fundamental_quality"
+
+
+# ---------------------------------------------------------------------------
+# SP8-B1: CIS confidence interval tests
+# ---------------------------------------------------------------------------
+
+
+def test_cis_ci_fields_present_with_valid_bounds() -> None:
+    """CI fields present in response; ci_lower < cis_score < ci_upper when n_factors >= 3."""
+    conn = _simple_conn(fetchrow_return={"regime": "expansion"})
+    with patch("apps.api.app.routers.pim_cis.tenant_conn", side_effect=lambda _t: _make_cm(conn)):
+        r = client.post(
+            "/api/v1/pim/cis/compute",
+            json={
+                "companies": [
+                    {
+                        "company_id": "co-ci",
+                        "dcf_upside_pct": 30.0,
+                        "roe": 25.0,
+                        "avg_sentiment_score": 0.5,
+                        "trend_direction": "improving",
+                        "sector": "technology",
+                    }
+                ]
+            },
+            headers={"X-Tenant-ID": TENANT},
+        )
+    assert r.status_code == 200
+    data = r.json()
+    company = data["companies"][0]
+    assert "ci_lower" in company
+    assert "ci_upper" in company
+    assert "ci_method" in company
+    assert company["ci_method"] == "analytical_propagation"
+    assert company["ci_lower"] is not None
+    assert company["ci_upper"] is not None
+    assert company["ci_lower"] <= company["cis_score"]
+    assert company["cis_score"] <= company["ci_upper"]
+
+
+def test_cis_ci_width_positive_when_sufficient_factors() -> None:
+    """CI width > 0 when n_factors >= 3 and factor scores differ."""
+    conn = _simple_conn(fetchrow_return={"regime": "expansion"})
+    with patch("apps.api.app.routers.pim_cis.tenant_conn", side_effect=lambda _t: _make_cm(conn)):
+        r = client.post(
+            "/api/v1/pim/cis/compute",
+            json={
+                "companies": [
+                    {
+                        "company_id": "co-ci-width",
+                        "dcf_upside_pct": 40.0,
+                        "roe": 5.0,
+                        "avg_sentiment_score": 0.8,
+                        "trend_direction": "stable",
+                        "sector": "utilities",
+                    }
+                ]
+            },
+            headers={"X-Tenant-ID": TENANT},
+        )
+    assert r.status_code == 200
+    data = r.json()
+    company = data["companies"][0]
+    assert company["ci_lower"] is not None
+    assert company["ci_upper"] is not None
+    assert company["ci_upper"] - company["ci_lower"] > 0.0
+
+
+def test_cis_ci_null_when_insufficient_factors() -> None:
+    """ci_lower and ci_upper are None when n_factors < 3 (only 1 factor provided)."""
+    conn = _simple_conn(fetchrow_return=None)
+    with patch("apps.api.app.routers.pim_cis.tenant_conn", side_effect=lambda _t: _make_cm(conn)):
+        r = client.post(
+            "/api/v1/pim/cis/compute",
+            json={
+                "companies": [
+                    {
+                        "company_id": "co-ci-null",
+                        "roe": 20.0,  # only 1 factor — fundamental_quality sub-component only
+                    }
+                ]
+            },
+            headers={"X-Tenant-ID": TENANT},
+        )
+    assert r.status_code == 200
+    data = r.json()
+    company = data["companies"][0]
+    assert company["ci_lower"] is None
+    assert company["ci_upper"] is None
+    assert "ci_warning" in company
+    assert "n<3" in company["ci_warning"]

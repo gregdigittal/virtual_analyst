@@ -2638,6 +2638,10 @@ export interface PimCISResult {
   factors_total: number;
   factor_scores: PimCISScores;
   weights_used: Record<string, number>;
+  ci_lower: number | null;
+  ci_upper: number | null;
+  ci_method: string;
+  ci_warning?: string;
   limitations: string;
 }
 
@@ -2695,6 +2699,9 @@ export interface PimMarkovSteadyStateResponse {
   n_observations: number;
   matrix_id: string;
   limitations: string;
+  ci_lower: number[] | null;
+  ci_upper: number[] | null;
+  ci_warning?: string;
 }
 
 export interface PimMarkovTransitionEdge {
