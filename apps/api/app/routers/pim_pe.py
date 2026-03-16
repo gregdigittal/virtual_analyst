@@ -1,4 +1,4 @@
-"""PIM PE assessment CRUD + compute endpoints — PIM-6.2 / PIM-6.4.
+"""PIM PE assessment CRUD + compute + memo endpoints — PIM-6.2 / PIM-6.4 / PIM-7.2.
 
 Endpoints:
   POST   /pim/pe/assessments                           — create PE fund assessment
@@ -7,6 +7,7 @@ Endpoints:
   PUT    /pim/pe/assessments/{assessment_id}           — update assessment
   DELETE /pim/pe/assessments/{assessment_id}           — delete assessment
   POST   /pim/pe/assessments/{assessment_id}/compute   — run DPI/TVPI/IRR engine + store results
+  POST   /pim/pe/assessments/{assessment_id}/memo      — generate LLM investment memo (PIM-7.2)
 
 All endpoints require PIM access gate (require_pim_access).
 """
@@ -21,7 +22,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.api.app.db import tenant_conn
-from apps.api.app.deps import require_pim_access
+from apps.api.app.deps import get_llm_router, require_pim_access
+from apps.api.app.services.llm.router import LLMRouter
 from apps.api.app.services.pim.pe_benchmarks import compute_pe_metrics
 
 logger = structlog.get_logger()
@@ -437,4 +439,153 @@ async def compute_pe_assessment(
         irr_converged=metrics.irr_converged,
         j_curve=metrics.j_curve,
         limitations=metrics.limitations,
+    )
+
+
+# ---------------------------------------------------------------------------
+# PIM-7.2: LLM PE investment memo
+# ---------------------------------------------------------------------------
+
+_MEMO_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "executive_summary": {"type": "string"},
+        "performance_analysis": {"type": "string"},
+        "risk_factors": {"type": "string"},
+        "recommendation": {"type": "string"},
+        "disclaimer": {"type": "string"},
+    },
+    "required": ["title", "executive_summary", "performance_analysis", "risk_factors", "recommendation", "disclaimer"],
+}
+
+
+class PeMemoResult(BaseModel):
+    assessment_id: str
+    fund_name: str
+    title: str
+    executive_summary: str
+    performance_analysis: str
+    risk_factors: str
+    recommendation: str
+    disclaimer: str
+    model_used: str
+
+
+@router.post("/pe/assessments/{assessment_id}/memo", response_model=PeMemoResult)
+async def generate_pe_memo(
+    assessment_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    _: None = Depends(require_pim_access),
+    llm: LLMRouter = Depends(get_llm_router),  # noqa: B008
+) -> PeMemoResult:
+    """Generate a natural-language PE investment memo using the LLM.
+
+    Fetches the computed metrics from the assessment and passes them to the
+    LLM to produce a structured memo with executive summary, performance
+    analysis, risk factors, and recommendation.
+
+    Requires /compute to have been run first (dpi/tvpi/irr must be populated).
+
+    # PIM-7.2: LLM PE memo, task_label=pim_pe_memo, temperature=0.4 for richer prose.
+    # LLMs interpret — they do not calculate. The memo narrates pre-computed metrics.
+    """
+    if not x_tenant_id:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID required")
+
+    async with tenant_conn(x_tenant_id) as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT assessment_id, fund_name, vintage_year, currency, commitment_usd,
+                   paid_in_capital, distributed, dpi, tvpi, moic, irr, irr_computed_at,
+                   nav_usd, notes
+            FROM pim_pe_assessments
+            WHERE tenant_id = $1 AND assessment_id = $2
+            """,
+            x_tenant_id, assessment_id,
+        )
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="PE assessment not found")
+
+    if row["dpi"] is None and row["tvpi"] is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Metrics not yet computed. Run POST .../compute first.",
+        )
+
+    fund_name = row["fund_name"]
+    vintage_year = row["vintage_year"]
+    currency = row["currency"]
+    commitment = row["commitment_usd"]
+    dpi = float(row["dpi"]) if row["dpi"] is not None else None
+    tvpi = float(row["tvpi"]) if row["tvpi"] is not None else None
+    moic = float(row["moic"]) if row["moic"] is not None else None
+    irr = float(row["irr"]) if row["irr"] is not None else None
+    nav_usd = float(row["nav_usd"]) if row["nav_usd"] is not None else None
+    notes = row["notes"] or ""
+
+    irr_pct = f"{irr * 100:.1f}%" if irr is not None else "N/A"
+    nav_str = f"{currency} {nav_usd:,.0f}" if nav_usd else "Not reported"
+
+    prompt = (
+        f"You are a CFA-qualified private equity analyst. "
+        f"Generate a concise investment memo for the following fund.\n\n"
+        f"Fund: {fund_name}\n"
+        f"Vintage Year: {vintage_year}\n"
+        f"Currency: {currency}\n"
+        f"Commitment: {currency} {commitment:,.0f}\n"
+        f"DPI (Distributed to Paid-In): {dpi:.2f}x\n"
+        f"TVPI (Total Value to Paid-In): {tvpi:.2f}x\n"
+        f"MOIC (Multiple on Invested Capital): {moic:.2f}x\n"
+        f"IRR (annualised): {irr_pct}\n"
+        f"Current NAV: {nav_str}\n"
+        f"Manager Notes: {notes or 'None'}\n\n"
+        f"Produce a professional investment memo with:\n"
+        f"- title: memo title\n"
+        f"- executive_summary: 2–3 sentence overview\n"
+        f"- performance_analysis: detailed analysis of DPI/TVPI/IRR vs typical benchmarks\n"
+        f"- risk_factors: 3–5 key risks for this fund\n"
+        f"- recommendation: Hold / Increase / Reduce with justification\n"
+        f"- disclaimer: standard PE disclaimer noting limitations\n\n"
+        f"Return as structured JSON matching the provided schema."
+    )
+
+    try:
+        response = await llm.complete_with_routing(
+            tenant_id=x_tenant_id,
+            messages=[{"role": "user", "content": prompt}],
+            response_schema=_MEMO_SCHEMA,
+            task_label="pim_pe_memo",
+        )
+        model_used = response.model or "unknown"
+        content = response.content
+
+        if isinstance(content, str):
+            import json as _json
+            parsed: dict[str, Any] = _json.loads(content)
+        else:
+            parsed = content  # type: ignore[assignment]
+
+    except Exception as exc:
+        logger.error("pe_memo_generation_failed", assessment_id=assessment_id, error=str(exc))
+        raise HTTPException(status_code=502, detail=f"Memo generation failed: {exc}") from exc
+
+    logger.info(
+        "pe_memo_generated",
+        tenant_id=x_tenant_id,
+        assessment_id=assessment_id,
+        fund_name=fund_name,
+    )
+
+    return PeMemoResult(
+        assessment_id=assessment_id,
+        fund_name=fund_name,
+        title=parsed.get("title", f"{fund_name} — Investment Memo"),
+        executive_summary=parsed.get("executive_summary", ""),
+        performance_analysis=parsed.get("performance_analysis", ""),
+        risk_factors=parsed.get("risk_factors", ""),
+        recommendation=parsed.get("recommendation", ""),
+        disclaimer=parsed.get("disclaimer", ""),
+        model_used=model_used,
     )

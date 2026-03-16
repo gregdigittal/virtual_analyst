@@ -115,6 +115,25 @@ export default async function PimIndexPage() {
             </div>
           </VACard>
         </Link>
+
+        <Link href="/pim/pe">
+          <VACard className="cursor-pointer p-6 transition-colors hover:border-va-blue/50">
+            <div className="flex items-start gap-4">
+              <span className="text-3xl" aria-hidden="true">
+                💼
+              </span>
+              <div>
+                <h2 className="text-base font-medium text-va-text">
+                  PE Fund Assessments
+                </h2>
+                <p className="mt-1 text-sm text-va-text2">
+                  DPI, TVPI, IRR, and J-curve analysis for private equity
+                  funds. Peer comparison against vintage-year cohorts.
+                </p>
+              </div>
+            </div>
+          </VACard>
+        </Link>
       </div>
     </main>
   );

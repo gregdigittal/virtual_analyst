@@ -17,7 +17,7 @@ from apps.api.app.middleware.auth import auth_middleware
 from apps.api.app.middleware.logging import logging_middleware
 from apps.api.app.middleware.metrics import metrics_middleware
 from apps.api.app.middleware.security import init_rate_limiting, security_headers_middleware
-from apps.api.app.routers import activity, admin_llm, afs, assignments, audit, auth_saml, baselines, benchmark, billing, board_pack_schedules, board_packs, budgets, changesets, comments, compliance, connectors, covenants, currency, documents, drafts, excel, excel_ingestion, feedback, health, import_csv, integrations, jobs, marketplace, memos, metrics_summary, notifications, org_structures, pim_backtest, pim_cis, pim_markov, pim_pe, pim_portfolio, pim_sentiment, pim_universe, runs, scenarios, teams, ventures, workflows
+from apps.api.app.routers import activity, admin_llm, afs, assignments, audit, auth_saml, baselines, benchmark, billing, board_pack_schedules, board_packs, budgets, changesets, comments, compliance, connectors, covenants, currency, documents, drafts, excel, excel_ingestion, feedback, health, import_csv, integrations, jobs, marketplace, memos, metrics_summary, notifications, org_structures, pim_backtest, pim_cis, pim_markov, pim_pe, pim_peer, pim_portfolio, pim_sentiment, pim_universe, runs, scenarios, teams, ventures, workflows
 from shared.fm_shared.errors import FinModelError, get_http_status
 from shared.fm_shared.logging import configure_logging
 from shared.fm_shared.metrics import metrics_app
@@ -204,6 +204,7 @@ app.include_router(pim_portfolio.router, prefix="/api/v1")
 app.include_router(pim_backtest.router, prefix="/api/v1")
 app.include_router(pim_markov.router, prefix="/api/v1")
 app.include_router(pim_pe.router, prefix="/api/v1")
+app.include_router(pim_peer.router, prefix="/api/v1")
 app.include_router(admin_llm.router, prefix="/api/v1")
 @app.get("/metrics")
 async def metrics_endpoint(request: Request):

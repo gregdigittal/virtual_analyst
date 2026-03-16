@@ -1,8 +1,7 @@
 # Virtual Analyst — Updated Backlog
 
-> Updated: 2026-03-09
+> Updated: 2026-03-15
 > Branch: main
-> Latest commit: 7311f55 (PIM v2.0 build plan + backlog update)
 > Source: PIM Requirements BuildPlan v2.0 (2026-03-09) — supersedes VA_Tech_Stack_Review_PIM v1.0
 
 ---
@@ -11,14 +10,16 @@
 
 | Area | Metric |
 |------|--------|
-| Backend tests | 85 test files (**547+ tests**), 0 failed, 19 skipped (integration gated) |
-| Frontend unit tests | **159 passed** across 59 test files |
-| Frontend pages | **58 pages** in `(app)` route group |
+| Backend tests | 90+ test files (**570+ tests**), 0 failed, 19 skipped (integration gated) |
+| Frontend unit tests | **163 passed** across 63 test files (4 new PIM page tests) |
+| Frontend pages | **60 pages** in `(app)` route group (PE list + PE detail added) |
 | E2E tests (Playwright) | **68 spec files** — 32 pass, 2 skip, 3 fail (UI detail page links) |
 | TypeScript | 0 errors |
-| All 35 backend routers | Covered by tests |
-| AFS Module | P1–P5 complete, P6 remaining |
-| Hosted API (Render) | Healthy (free tier, cold-starts ~3–5 min) |
+| All 37 backend routers | Covered by tests (pim_pe + pim_peer added) |
+| AFS Module | P1–P6 complete |
+| PIM Sprint 6 | PIM-7.1 peer comparison, PIM-7.2 PE memo, PIM-7.4 dashboard UI, PIM-7.5 billing gate — complete |
+| Tier 5 N-items | N-02, N-04, N-07, N-08 complete (4 of 8 done) |
+| Hosted API (Render) | Healthy (free tier, cold-starts ~3–5 min, keepalive cron active) |
 | Hosted Web (Vercel) | Healthy at `www.virtual-analyst.ai` |
 
 ---
@@ -83,13 +84,13 @@ AI-powered Annual Financial Statement generation with multi-framework compliance
 | # | Item | Description | Effort |
 |---|------|-------------|--------|
 | **N-01** | Integration tests without real DB | The 18 skipped integration tests require `INTEGRATION_TESTS=1` + PostgreSQL. Consider a Docker Compose test target or Supabase local dev for CI | M |
-| **N-02** | Render cold-start mitigation | Free tier spins down → 3–5 min cold starts. Options: upgrade to paid tier, add a cron health ping, or move to Railway/Fly.io | S–M |
+| ~~**N-02**~~ | ~~Render cold-start mitigation~~ | Done (2026-03-15) — `keepalive.yml` pings `/api/v1/health/live` every 14 min via GitHub Actions cron | ~~S–M~~ |
 | **N-03** | Frontend E2E tests (Playwright/Cypress) | No browser-level E2E tests exist. Priority flows: login → dashboard → create run → view results | L |
-| **N-04** | API rate-limit testing | Security middleware has per-tenant rate limiting but no tests exercise it | S |
+| ~~**N-04**~~ | ~~API rate-limit testing~~ | Done (2026-03-15) — 7 tests in `tests/unit/test_rate_limiting.py` covering GET/POST, per-tenant isolation, 429 body, no-tenant fallback | ~~S~~ |
 | **N-05** | OpenAPI schema validation tests | Ensure all endpoints match documented schemas; auto-generate TypeScript types from OpenAPI | M |
 | **N-06** | Performance/load test expansion | `tests/load/test_engine_performance.py` exists but scope is limited to the engine. Add API-level load tests for key flows | M |
-| **N-07** | Monitoring & alerting | No Sentry, Datadog, or equivalent configured. Add error tracking and uptime monitoring | M |
-| **N-08** | CI pipeline enhancements | Current CI runs lint + pytest + integration. Add: frontend `vitest`, TypeScript check, hosted health check, Docker image scan | S |
+| ~~**N-07**~~ | ~~Monitoring & alerting~~ | Done (2026-03-15) — Sentry wired: backend via `sentry-sdk[fastapi]` in `main.py`, frontend via `@sentry/nextjs` (server/client/edge configs) | ~~M~~ |
+| ~~**N-08**~~ | ~~CI pipeline enhancements~~ | Done (2026-03-15) — `ci.yml` now includes ESLint, `npm run test` (vitest), `npm run type-check`, hosted health check job, Trivy Docker scan | ~~S~~ |
 
 ---
 
@@ -210,3 +211,4 @@ AI-powered portfolio analytics with 81-state Markov chain model, CIS scoring, mu
 | E2E Seed | d681334 | 68 E2E spec files, 13 backend fixes (CORS, JWT, Redis, pgbouncer, tenant provisioning) |
 | AFS P1–P5 | cf9bda7 | AFS module phases 1–5 complete (52 endpoints, 12 tables, 10 frontend pages) |
 | Instructions | a5bd4bb | InstructionsDrawer + drafts fixes + 27 manual chapters updated |
+| AFS-P6 + PIM Sprint 6 | (2026-03-15) | AFS custom frameworks + roll-forward; PIM-7.1 peer comparison API + 23 tests, PIM-7.2 PE memo endpoint (LLMRouter, 6 tests), PIM-7.4 PE dashboard UI (list + detail pages, J-curve, peer rankings), PIM-7.5 billing gate verified; N-04 rate-limit tests (7), N-08 CI enhancements (ESLint, vitest, type-check, health-check, Trivy), N-02 keepalive verified, N-07 Sentry verified |

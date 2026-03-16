@@ -82,3 +82,57 @@ def test_rate_limit_429_body() -> None:
     assert r.status_code == 429
     body = r.json()
     assert "error" in body or "detail" in body or "Rate limit exceeded" in r.text
+
+
+def test_rate_limit_on_post_endpoint() -> None:
+    """Rate limiting should apply to POST endpoints, not just GET."""
+    test_app = FastAPI()
+    init_rate_limiting(test_app, "2/minute")
+    test_app.add_middleware(_TenantMiddleware)
+
+    @test_app.post("/write")
+    async def write():
+        return {"status": "written"}
+
+    client = TestClient(test_app)
+    headers = {"X-Tenant-ID": "tenant-post"}
+    r1 = client.post("/write", headers=headers)
+    r2 = client.post("/write", headers=headers)
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    r3 = client.post("/write", headers=headers)
+    assert r3.status_code == 429
+
+
+def test_rate_limit_no_tenant_id_still_applies() -> None:
+    """Requests without X-Tenant-ID should still be rate-limited (fallback key)."""
+    app = _make_app("2/minute")
+    client = TestClient(app)
+    # No X-Tenant-ID header — rate limiter falls back to IP-based key
+    r1 = client.get("/ping")
+    r2 = client.get("/ping")
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    r3 = client.get("/ping")
+    assert r3.status_code == 429
+
+
+def test_rate_limit_different_tenants_independent_post() -> None:
+    """POST requests from different tenants should have independent limits."""
+    test_app = FastAPI()
+    init_rate_limiting(test_app, "1/minute")
+    test_app.add_middleware(_TenantMiddleware)
+
+    @test_app.post("/action")
+    async def action():
+        return {"done": True}
+
+    client = TestClient(test_app)
+    # Exhaust tenant-x on POST
+    client.post("/action", headers={"X-Tenant-ID": "tenant-x"})
+    r_x = client.post("/action", headers={"X-Tenant-ID": "tenant-x"})
+    assert r_x.status_code == 429
+
+    # tenant-y still has quota
+    r_y = client.post("/action", headers={"X-Tenant-ID": "tenant-y"})
+    assert r_y.status_code == 200

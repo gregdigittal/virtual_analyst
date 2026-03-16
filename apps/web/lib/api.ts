@@ -1750,6 +1750,30 @@ export const api = {
         request<{ deleted: boolean }>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}`, { tenantId, method: "DELETE" }),
       compute: (tenantId: string, assessmentId: string) =>
         request<PeComputeResult>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}/compute`, { tenantId, method: "POST", body: {} }),
+      memo: (tenantId: string, assessmentId: string) =>
+        request<PeMemoResult>(`/api/v1/pim/pe/assessments/${encodeURIComponent(assessmentId)}/memo`, { tenantId, method: "POST", body: {} }),
+    },
+    peer: {
+      createBenchmark: (tenantId: string, body: CreatePeerBenchmarkBody) =>
+        request<PeerBenchmark>("/api/v1/pim/peer/benchmarks", { tenantId, method: "POST", body }),
+      listBenchmarks: (tenantId: string, params?: { vintage_year?: number; strategy?: string }) =>
+        request<PeerBenchmarksResponse>(
+          `/api/v1/pim/peer/benchmarks?${new URLSearchParams({
+            ...(params?.vintage_year !== undefined && { vintage_year: String(params.vintage_year) }),
+            ...(params?.strategy !== undefined && { strategy: params.strategy }),
+          })}`,
+          { tenantId },
+        ),
+      deleteBenchmark: (tenantId: string, benchmarkId: string) =>
+        request<{ deleted: boolean }>(`/api/v1/pim/peer/benchmarks/${encodeURIComponent(benchmarkId)}`, { tenantId, method: "DELETE" }),
+      rankAssessment: (tenantId: string, assessmentId: string, params?: { strategy?: string; geography?: string }) =>
+        request<PeerRankResponse>(
+          `/api/v1/pim/peer/assessments/${encodeURIComponent(assessmentId)}/rank?${new URLSearchParams({
+            ...(params?.strategy !== undefined && { strategy: params.strategy }),
+            ...(params?.geography !== undefined && { geography: params.geography }),
+          })}`,
+          { tenantId },
+        ),
     },
   },
   admin: {
@@ -2984,6 +3008,92 @@ export interface PeComputeResult {
   irr_converged: boolean;
   j_curve: PeJCurvePoint[];
   limitations: string;
+}
+
+// --- PE Memo Types (PIM-7.2) ---
+
+export interface PeMemoResult {
+  assessment_id: string;
+  fund_name: string;
+  title: string;
+  executive_summary: string;
+  performance_analysis: string;
+  risk_factors: string;
+  recommendation: string;
+  disclaimer: string;
+  model_used: string;
+}
+
+// --- Peer Benchmark Types (PIM-7.1) ---
+
+export interface PeerBenchmark {
+  benchmark_id: string;
+  tenant_id: string;
+  vintage_year: number;
+  strategy: string;
+  geography: string;
+  dpi_p25: number | null;
+  dpi_p50: number | null;
+  dpi_p75: number | null;
+  tvpi_p25: number | null;
+  tvpi_p50: number | null;
+  tvpi_p75: number | null;
+  irr_p25: number | null;
+  irr_p50: number | null;
+  irr_p75: number | null;
+  fund_count: number | null;
+  data_source: string | null;
+  as_of_date: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PeerBenchmarksResponse {
+  items: PeerBenchmark[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface CreatePeerBenchmarkBody {
+  vintage_year: number;
+  strategy?: string;
+  geography?: string;
+  dpi_p25?: number | null;
+  dpi_p50?: number | null;
+  dpi_p75?: number | null;
+  tvpi_p25?: number | null;
+  tvpi_p50?: number | null;
+  tvpi_p75?: number | null;
+  irr_p25?: number | null;
+  irr_p50?: number | null;
+  irr_p75?: number | null;
+  fund_count?: number | null;
+  data_source?: string | null;
+  as_of_date?: string | null;
+}
+
+export interface MetricRank {
+  metric: string;
+  value: number | null;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  percentile_rank: number | null;
+  quartile: number | null;
+  quartile_label: string | null;
+}
+
+export interface PeerRankResponse {
+  assessment_id: string;
+  vintage_year: number;
+  strategy: string;
+  geography: string;
+  benchmark_id: string | null;
+  fund_count: number | null;
+  data_source: string | null;
+  rankings: MetricRank[];
+  warning: string | null;
 }
 
 // --- Admin LLM Policy Types (REM-19) ---

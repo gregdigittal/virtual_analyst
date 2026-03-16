@@ -61,6 +61,9 @@ DEFAULT_POLICY = {
         # PIM backtest commentary (PIM-5.2: interpret IC/ICIR/performance, temp=0.2)
         {"task_label": "pim_backtest_commentary", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 1024, "temperature": 0.2},
         {"task_label": "pim_backtest_commentary", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 1024, "temperature": 0.2},
+        # PIM PE investment memo (PIM-7.2: free-form narrative memo, temp=0.4 for richer prose)
+        {"task_label": "pim_pe_memo", "priority": 1, "provider": "anthropic", "model": "claude-sonnet-4-5-20250929", "max_tokens": 4096, "temperature": 0.4},
+        {"task_label": "pim_pe_memo", "priority": 2, "provider": "openai", "model": "gpt-4o", "max_tokens": 4096, "temperature": 0.4},
     ],
     "fallback": {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 4096, "temperature": 0.2},
 }
@@ -145,9 +148,7 @@ class LLMRouter:
         settings = get_settings()
         candidates = self.resolve(task_label)
         rule_max_tokens_first = candidates[0][2] if candidates else 4096
-        rule_temp_first = candidates[0][3] if candidates else 0.2
         effective_max_tokens = max_tokens if max_tokens is not None else rule_max_tokens_first
-        effective_temp = temperature if temperature is not None else rule_temp_first
         if self._billing:
             allowed, current, limit = await self._billing.check_llm_limit(tenant_id, estimated_tokens=effective_max_tokens)
             if not allowed:
