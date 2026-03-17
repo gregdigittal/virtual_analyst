@@ -27,12 +27,16 @@ if (!mockApi.assignments.update) {
 const originalGet = mockApi.assignments.get;
 mockApi.assignments.get = vi.fn(async () => ({
   assignment_id: "a-1",
+  workflow_instance_id: null,
   entity_type: "draft",
   entity_id: "draft-1",
   assignee_user_id: "user-test",
+  assigned_by_user_id: null,
   status: "pending",
+  deadline: null,
   instructions: "Review this draft",
   created_at: "2026-01-01T00:00:00Z",
+  updated_at: null,
 }));
 
 function renderPage() {

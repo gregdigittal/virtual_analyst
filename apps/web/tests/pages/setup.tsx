@@ -84,6 +84,17 @@ export const mockApi = {
     create: vi.fn(async () => ({ run_id: "new-run" })),
     getStatements: vi.fn(async () => null),
     getKpis: vi.fn(async () => []),
+    getMc: vi.fn(async () => ({ num_simulations: 0, seed: 42, percentiles: {}, summary: {} })),
+    getValuation: vi.fn(async () => ({ dcf: {}, multiples: {} })),
+    getSensitivity: vi.fn(async () => ({ base_fcf: 0, pct: 0.1, drivers: [] })),
+    postSensitivityHeatmap: vi.fn(async () => ({
+      param_a: "a",
+      param_b: "b",
+      values_a: [],
+      values_b: [],
+      matrix: [],
+      metric: "revenue",
+    })),
   },
   budgets: {
     list: vi.fn(async () => ({ budgets: [], total: 0 })),
@@ -104,6 +115,24 @@ export const mockApi = {
   workflows: {
     listTemplates: vi.fn(async () => ({ templates: [] })),
     listInstances: vi.fn(async () => ({ instances: [] })),
+    getTemplate: vi.fn(async () => ({
+      template_id: "tmpl-1",
+      name: "Test Template",
+      description: null,
+      stages: [],
+      created_at: null,
+    })),
+    getInstance: vi.fn(async () => ({
+      instance_id: "inst-1",
+      template_id: "tmpl-1",
+      entity_type: "baseline",
+      entity_id: "b-1",
+      current_stage_index: 0,
+      status: "active",
+      created_at: null,
+      created_by: null,
+      updated_at: null,
+    })),
   },
   metrics: {
     getSummary: vi.fn(async () => ({
@@ -119,7 +148,32 @@ export const mockApi = {
   },
   orgStructures: {
     list: vi.fn(async () => ({ items: [], total: 0 })),
-    get: vi.fn(async () => ({ org_id: "org-1", group_name: "Test", entities: [] })),
+    get: vi.fn(async () => ({
+      org_id: "org-1",
+      group_name: "Test",
+      reporting_currency: "USD",
+      status: "active",
+      consolidation_method: "full",
+      eliminate_intercompany: true,
+      minority_interest_treatment: "proportional",
+      created_at: null,
+      entities: [],
+      ownership: [],
+      intercompany: [],
+    })),
+    update: vi.fn(async () => ({ org_id: "org-1", updated: [] })),
+    validate: vi.fn(async () => ({ status: "valid", checks: [] })),
+    hierarchy: vi.fn(async () => ({ org_id: "org-1", roots: [] })),
+    runs: vi.fn(async () => ({ items: [] })),
+    run: vi.fn(async () => ({ consolidated_run_id: "crun-1", status: "pending" })),
+    getRun: vi.fn(async () => ({
+      consolidated_run_id: "crun-1",
+      status: "completed",
+      result: null,
+      created_at: null,
+      completed_at: null,
+      error_message: null,
+    })),
   },
   notifications: {
     list: vi.fn(async () => ({ items: [], total: 0, unread_count: 0 })),
@@ -127,6 +181,85 @@ export const mockApi = {
   },
   assignments: {
     list: vi.fn(async () => ({ assignments: [], total: 0 })),
+    listPool: vi.fn(async () => ({ assignments: [], total: 0 })),
+    get: vi.fn(async () => ({
+      assignment_id: "asgn-1",
+      workflow_instance_id: null as string | null,
+      entity_type: "baseline",
+      entity_id: "b-1",
+      assignee_user_id: null as string | null,
+      assigned_by_user_id: null as string | null,
+      status: "open",
+      deadline: null as string | null,
+      instructions: null as string | null,
+      created_at: null as string | null,
+      updated_at: null as string | null,
+    })),
+    create: vi.fn(async () => ({
+      assignment_id: "asgn-new",
+      workflow_instance_id: null,
+      entity_type: "baseline",
+      entity_id: "b-1",
+      assignee_user_id: null,
+      assigned_by_user_id: null,
+      status: "open",
+      deadline: null,
+      instructions: null,
+      created_at: null,
+      updated_at: null,
+    })),
+    claim: vi.fn(async () => ({
+      assignment_id: "asgn-1",
+      workflow_instance_id: null,
+      entity_type: "baseline",
+      entity_id: "b-1",
+      assignee_user_id: "user-1",
+      assigned_by_user_id: null,
+      status: "in_progress",
+      deadline: null,
+      instructions: null,
+      created_at: null,
+      updated_at: null,
+    })),
+    submit: vi.fn(async () => ({
+      assignment_id: "asgn-1",
+      workflow_instance_id: null,
+      entity_type: "baseline",
+      entity_id: "b-1",
+      assignee_user_id: "user-1",
+      assigned_by_user_id: null,
+      status: "submitted",
+      deadline: null,
+      instructions: null,
+      created_at: null,
+      updated_at: null,
+    })),
+    update: vi.fn(async () => ({
+      assignment_id: "asgn-1",
+      workflow_instance_id: null,
+      entity_type: "baseline",
+      entity_id: "b-1",
+      assignee_user_id: null,
+      assigned_by_user_id: null,
+      status: "open",
+      deadline: null,
+      instructions: null,
+      created_at: null,
+      updated_at: null,
+    })),
+    submitReview: vi.fn(async () => ({
+      review_id: "rev-1",
+      assignment_id: "asgn-1",
+      reviewer_user_id: "user-1",
+      decision: "approved" as const,
+      notes: null,
+      corrections: [],
+      created_at: null,
+    })),
+  },
+  feedback: {
+    list: vi.fn(async () => ({ items: [], total: 0, unread_count: 0 })),
+    acknowledge: vi.fn(async () => ({ summary_id: "s-1", acknowledged: true })),
   },
   activity: {
     list: vi.fn(async () => ({ items: [], total: 0 })),
@@ -136,6 +269,42 @@ export const mockApi = {
   },
   boardPacks: {
     list: vi.fn(emptyList),
+    get: vi.fn(async () => ({
+      pack_id: "pack-1",
+      label: "Q1 Board Pack",
+      run_id: "run-1",
+      budget_id: null,
+      section_order: [],
+      status: "draft",
+      branding_json: {},
+      created_at: null,
+      narrative_json: {},
+      error_message: null,
+    })),
+    update: vi.fn(async () => ({
+      pack_id: "pack-1",
+      label: "Q1 Board Pack",
+      run_id: "run-1",
+      budget_id: null,
+      section_order: [],
+      status: "draft",
+      branding_json: {},
+      created_at: null,
+    })),
+    generate: vi.fn(async () => ({ pack_id: "pack-1", status: "generated", narrative_json: {} })),
+  },
+  boardPackSchedules: {
+    list: vi.fn(async () => ({ items: [], total: 0, limit: 20, offset: 0 })),
+    history: vi.fn(async () => ({ items: [], total: 0, limit: 20, offset: 0 })),
+    create: vi.fn(async () => ({
+      schedule_id: "sched-1",
+      label: "Monthly",
+      run_id: "run-1",
+      cron_expr: "0 9 1 * *",
+      distribution_emails: [],
+    })),
+    runNow: vi.fn(async () => ({ pack_id: "pack-1", history_id: "h-1", status: "running" })),
+    delete: vi.fn(async () => undefined),
   },
   drafts: {
     list: vi.fn(async () => ({ items: [], total: 0, limit: 50, offset: 0 })),
@@ -204,7 +373,18 @@ export const mockApi = {
       aggregates: vi.fn(async () => ({ items: [] })),
     },
     pe: {
-      list: vi.fn(async () => ({ items: [], total: 0, limit: 20, offset: 0 })),
+      list: vi.fn(async () => ({
+        items: [] as {
+          assessment_id: string; tenant_id: string; fund_name: string; vintage_year: number;
+          currency: string; commitment_usd: number; cash_flows: unknown[];
+          nav_usd: number | null; nav_date: string | null; paid_in_capital: number | null;
+          distributed: number | null; dpi: number | null; tvpi: number | null;
+          moic: number | null; irr: number | null; irr_computed_at: string | null;
+          j_curve_json: unknown[] | null; notes: string | null;
+          created_at: string | null; updated_at: string | null;
+        }[],
+        total: 0, limit: 20, offset: 0,
+      })),
       get: vi.fn(async () => ({
         assessment_id: "a-1",
         tenant_id: "t-1",
@@ -288,7 +468,11 @@ export const mockApi = {
         yield_10y: 0.042,
         vix: 18.5,
         captured_at: "2026-01-01T00:00:00Z",
-      })),
+      } as {
+        snapshot_id: string; tenant_id: string; regime: string;
+        gdp_growth: number; inflation: number; unemployment: number;
+        yield_10y: number; vix: number; captured_at: string;
+      } | null)),
       snapshots: vi.fn(async () => ({ snapshots: [] })),
     },
     cis: {
@@ -349,12 +533,35 @@ export const mockApi = {
       })),
       addCost: vi.fn(async () => ({ cost_id: "c-1" })),
       listCosts: vi.fn(async () => ({ items: [], total: 0 })),
-      summary: vi.fn(async () => ({ items: [] })),
+      summary: vi.fn(async () => ({
+        items: [] as {
+          strategy_label: string; run_count: number; latest_run_at: string | null;
+          avg_cumulative_return: number | null; avg_annualised_return: number | null;
+          avg_sharpe_ratio: number | null; avg_max_drawdown: number | null;
+          avg_ic_mean: number | null; avg_ic_std: number | null; avg_icir: number | null;
+          best_cumulative_return: number | null; worst_cumulative_return: number | null;
+        }[],
+        total: 0,
+        note: "",
+      })),
     },
     markov: {
       states: vi.fn(async () => ({ items: [] })),
-      steadyState: vi.fn(async () => ({ top_states: [], entropy: 0 })),
-      topTransitions: vi.fn(async () => ({ transitions: [] })),
+      steadyState: vi.fn(async () => ({
+        top_states: [] as { state_index: number; label: string; probability: number }[],
+        is_ergodic: true,
+        quantecon_available: true,
+        n_observations: 0,
+        matrix_id: "m-1",
+        limitations: "Test mode.",
+        ci_lower: null as number[] | null,
+        ci_upper: null as number[] | null,
+      })),
+      topTransitions: vi.fn(async () => ({
+        edges: [] as { from_state: number; from_label: string; to_state: number; to_label: string; probability: number }[],
+        top_state_indices: [] as number[],
+        limitations: "Test mode.",
+      })),
     },
   },
   ventures: {

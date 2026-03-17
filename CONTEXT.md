@@ -1,9 +1,9 @@
 # Project Context — Virtual Analyst
 
-> Last updated: 2026-03-09
-> Commit: cf9bda7 — feat(afs): add Phase 5 analytics endpoints + tests
-> Branch: main (clean — 67 untracked files, mostly E2E specs + plan docs)
-> Total commits: 244
+> Last updated: 2026-03-17
+> Commit: 7b567e2 — feat(sprint8): platform hardening — PIM-7.7 CI bounds, E2E fixes, OpenAPI + load test coverage
+> Branch: main
+> Total commits: 254
 
 ---
 
@@ -35,10 +35,10 @@
 
 | Area | Metric |
 |------|--------|
-| Backend tests | 85 test files (547+ tests), 0 failed, 19 skipped (integration gated) |
+| Backend tests | 640+ tests, 0 failed |
 | Frontend unit tests | **159 passed** across 32 test files |
 | Frontend pages | **58 pages** in `(app)` route group |
-| E2E tests (Playwright) | **68 spec files** — 32 pass, 2 skip, 3 fail (UI detail page links) |
+| E2E tests (Playwright) | **71 spec files**, 0 failing |
 | TypeScript | 0 errors (pre-existing E2E type issues only) |
 | All 35 backend routers | Covered by tests |
 
@@ -55,7 +55,7 @@
 | AFS-P3 | Review Workflow + Tax Computation | ✅ Complete |
 | AFS-P4 | Multi-entity Consolidation + iXBRL Output | ✅ Complete |
 | AFS-P5 | Analytics & Industry Benchmarking | ✅ Complete |
-| AFS-P6 | Custom Frameworks + Roll-forward | **Next** |
+| AFS-P6 | Custom Frameworks + Roll-forward | ✅ Complete (2026-03-15) |
 
 - **Router**: `apps/api/app/routers/afs.py` (~52 endpoints)
 - **Services**: `apps/api/app/services/afs/` (disclosure_drafter, tax_note_drafter, output_generator, analytics_ai, ratio_calculator)
@@ -71,18 +71,17 @@
 > Requirements spec: `docs/specs/PIM_Requirements_BuildPlan_v2.docx`
 > Tech stack review: `docs/reviews/VA_Tech_Stack_Review_PIM.docx`
 
-**Status:** Pre-development — 7 gates (GATE-1–GATE-7) must be closed in Sprint 0 before PIM sprints begin.
-29 consolidated code review issues tracked. 71 backlog items across 7 sprints (Sprint 0–6).
+**Status:** 7 sprints complete. 71 backlog items across 7 sprints (Sprint 0–6).
 
 | Sprint | Focus | Status |
 |--------|-------|--------|
-| Sprint 0 (2w) | Remediation — 7 gates + 16 fixes (REM-01–REM-23) | **Next** |
-| Sprint 1 (3w) | Sentiment Ingestion (FR-1) — Polygon.io, NewsAPI, LLM scoring | Pending S0 |
-| Sprint 2 (3w) | Economic Context (FR-2) — FRED integration, regime classification | Pending |
-| Sprint 3 (3w) | CIS & Markov Engine (FR-3, FR-4) — 81-state chain, QuantEcon, Numba | Pending |
-| Sprint 4 (4w) | Portfolio Construction (FR-5) — greedy optimizer, constraints, rebalancing | Pending |
-| Sprint 5 (3w) | Backtesting (FR-6) — walk-forward, IC/ICIR/SPC, backtest studio | Pending |
-| Sprint 6 (4w) | PE Benchmarking + DTF (FR-7) — DPI/TVPI/IRR, DTF-B validation | Pending |
+| Sprint 0 (2w) | Remediation — 7 gates + 16 fixes (REM-01–REM-23) | ✅ Complete |
+| Sprint 1 (3w) | Sentiment Ingestion (FR-1) — Polygon.io, NewsAPI, LLM scoring | ✅ Complete — routers/pim_sentiment.py, services/pim/sentiment_ingestor.py |
+| Sprint 2 (3w) | Economic Context (FR-2) — FRED integration, regime classification | ✅ Complete — services/pim/fred.py, routers/pim_universe.py |
+| Sprint 3 (3w) | CIS & Markov Engine (FR-3, FR-4) — 81-state chain, QuantEcon, Numba | ✅ Complete — routers/pim_cis.py, routers/pim_markov.py |
+| Sprint 4 (4w) | Portfolio Construction (FR-5) — greedy optimizer, constraints, rebalancing | ✅ Complete — routers/pim_portfolio.py, services/pim/portfolio.py |
+| Sprint 5 (3w) | Backtesting (FR-6) — walk-forward, IC/ICIR/SPC, backtest studio | ✅ Complete — routers/pim_backtest.py, materialized view migrations |
+| Sprint 6 (4w) | PE Benchmarking + DTF (FR-7) — DPI/TVPI/IRR, DTF-B validation | ✅ Complete — routers/pim_pe.py, routers/pim_peer.py |
 
 **Key changes from v1.0:**
 - 4 infrastructure gates dropped (Celery, Structlog, Sentry backend, CI — already implemented)
@@ -94,6 +93,13 @@
 ---
 
 ## Recent Changes (since last CONTEXT update)
+
+### Sprint 8 — Platform Hardening (2026-03-16)
+- CI confidence intervals for CIS and Markov steady-state
+- 11 new E2E specs
+- Load tests
+- OpenAPI schema validation
+- ruff per-file-ignores
 
 ### PIM v2.0 Build Plan (2026-03-09)
 - Created comprehensive build plan at `docs/plans/2026-03-09-pim-v2-build-plan.md`
@@ -196,11 +202,13 @@ See `BACKLOG.md` for full details.
 | Tier 1 Ship Blockers | ✅ Done | — |
 | Tier 2 High Priority | ✅ H-02, H-03, H-04 done | — |
 | Tier 3 Medium | ✅ All resolved | Compare scoping, budget flag, nav auth, prompt cleanup — all verified complete |
-| Tier 4 AFS Module | **P6 remaining** | Custom frameworks & roll-forward |
+| Tier 4 AFS Module | ✅ Done | All phases complete |
 | Tier 5 Nice to Have | **7 open** | Integration tests, cold-start, E2E, rate-limit, perf, monitoring, CI |
-| Tier 6 PIM Gates | **7 open** | Statistical anomaly, JWKS race, async Redis, DCF mid-year/equity/exit, MC parallelism |
-| Tier 7 PIM Remediation | **23 items** | Sprint 0: 7 gates + 16 code review fixes (REM-01–REM-23) |
-| Tier 8 PIM Module | **7 sprints, 71 items** | Sentiment, Economic, CIS/Markov, Portfolio, Backtesting, PE/DTF |
+| Tier 6 PIM Gates | ✅ Done | All 7 gates closed |
+| Tier 7 PIM Remediation | ✅ Done | All 23 REM items closed |
+| Tier 8 PIM Module | ✅ Done | All 7 sprints complete (Sprint 0–6) |
+| DTF | **In progress** | DTF-A (manual calibration) + DTF-B (automated validation) |
+| Excel Add-in | **Pending** | Excel add-in integration |
 | Review Findings | **29 tracked** | Consolidated in PIM v2.0 build plan (CR-S1–CR-N9) |
 | Review Findings | **41 open** | 7 sprints: security, DCF, tax, stats, consolidation, forecasting, code quality |
 

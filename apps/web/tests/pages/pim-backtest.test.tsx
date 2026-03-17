@@ -13,7 +13,7 @@ beforeEach(() => {
     userId: "user-test",
     tenantIdIsFallback: false,
   });
-  mockApi.pim.backtest.summary.mockResolvedValue({ items: [] });
+  mockApi.pim.backtest.summary.mockResolvedValue({ items: [], total: 0, note: "" });
 });
 
 describe("Backtest Studio page", () => {
@@ -25,7 +25,7 @@ describe("Backtest Studio page", () => {
   });
 
   it("shows empty state when no strategies", async () => {
-    mockApi.pim.backtest.summary.mockResolvedValue({ items: [] });
+    mockApi.pim.backtest.summary.mockResolvedValue({ items: [], total: 0, note: "" });
     render(<BacktestStudioPage />);
     await waitFor(() => {
       expect(screen.getByText(/No backtest strategies found/i)).toBeTruthy();
@@ -38,14 +38,20 @@ describe("Backtest Studio page", () => {
         {
           strategy_label: "momentum-v1",
           run_count: 5,
+          latest_run_at: null,
           avg_cumulative_return: 0.32,
+          avg_annualised_return: null,
           avg_sharpe_ratio: 1.1,
+          avg_max_drawdown: null,
           avg_ic_mean: 0.07,
+          avg_ic_std: null,
           avg_icir: 1.4,
           best_cumulative_return: 0.55,
           worst_cumulative_return: 0.1,
         },
       ],
+      total: 1,
+      note: "",
     });
     render(<BacktestStudioPage />);
     await waitFor(() => {

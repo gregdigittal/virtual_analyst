@@ -14,8 +14,21 @@ beforeEach(() => {
     userId: "user-test",
     tenantIdIsFallback: false,
   });
-  mockApi.pim.markov.steadyState.mockResolvedValue({ top_states: [], entropy: 0 });
-  mockApi.pim.markov.topTransitions.mockResolvedValue({ transitions: [] });
+  mockApi.pim.markov.steadyState.mockResolvedValue({
+    top_states: [],
+    is_ergodic: true,
+    quantecon_available: true,
+    n_observations: 0,
+    matrix_id: "m-1",
+    limitations: "Test mode.",
+    ci_lower: null,
+    ci_upper: null,
+  });
+  mockApi.pim.markov.topTransitions.mockResolvedValue({
+    edges: [],
+    top_state_indices: [],
+    limitations: "Test mode.",
+  });
 });
 
 describe("Markov State Diagram page", () => {
