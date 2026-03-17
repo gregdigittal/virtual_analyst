@@ -24,8 +24,10 @@
       <input type="password" id="accessToken" placeholder="Bearer token for API auth" style="width:100%;margin:4px 0;"/>
     </div>
     <div>
-      <label>Connection ID:</label>
-      <input type="text" id="connectionId" placeholder="ex_xxxx" style="width:100%;margin:4px 0;"/>
+      <label>Connection<br/>
+        <select id="connectionSelect" style="width:calc(100% - 32px);margin:4px 0;"><option value="">-- select --</option></select>
+        <button id="btnRefreshConnections" type="button" style="width:28px;margin-left:4px;" title="Refresh connections">&#8635;</button>
+      </label>
     </div>
     <button id="btnPull" style="margin:8px 4px 0 0;">Pull</button>
     <button id="btnPush" style="margin:8px 4px 0 0;">Push</button>

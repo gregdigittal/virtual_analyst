@@ -1138,4 +1138,216 @@ const INSTRUCTIONS_MAP: Record<string, InstructionSection> = {
       { label: "Audit Log", href: "/settings/audit" },
     ],
   },
+
+  // ── PIM — PORTFOLIO INTELLIGENCE ───────────────────────────────────
+
+  "/pim": {
+    title: "Portfolio Intelligence",
+    chapter: "27",
+    overview:
+      "The PIM hub provides a unified entry point to all portfolio intelligence modules. Use it to navigate between sentiment analysis, Markov state modeling, backtesting, and PE benchmarking.",
+    steps: [
+      "Review the module status cards to see which data feeds are active.",
+      "Navigate to Sentiment for real-time news scoring.",
+      "Check the Markov state overview for current regime classification.",
+      "Access Backtest Studio to validate model performance.",
+      "Use PE Benchmarking to compare fund performance against cohort.",
+    ],
+    prerequisites: [
+      { label: "Engagement set up", href: "/afs" },
+    ],
+    relatedPages: [
+      { label: "Sentiment Analysis", href: "/pim/sentiment" },
+      { label: "Markov State Model", href: "/pim/markov" },
+      { label: "Backtest Studio", href: "/pim/backtest" },
+    ],
+    tips: [
+      "Bookmark this page as your daily starting point for portfolio intelligence work.",
+      "The module status cards show API key health — configure POLYGON_API_KEY and FRED_API_KEY in your environment to enable live data.",
+    ],
+  },
+
+  "/pim/sentiment": {
+    title: "Sentiment Analysis",
+    chapter: "28",
+    overview:
+      "The Sentiment Analysis dashboard displays real-time news sentiment scores for tracked securities, powered by Polygon.io. Use it to identify sentiment shifts that may precede price movements.",
+    steps: [
+      "Review the sentiment score distribution across the investment universe.",
+      "Filter by security or sector to focus on specific holdings.",
+      "Examine the trend chart to identify sentiment momentum changes.",
+      "Cross-reference high-sentiment-divergence securities with your Markov state classification.",
+      "Export sentiment data for inclusion in investment memos.",
+    ],
+    prerequisites: [
+      { label: "Investment Universe", href: "/pim/universe" },
+    ],
+    relatedPages: [
+      { label: "Investment Universe", href: "/pim/universe" },
+      { label: "Economic Indicators", href: "/pim/economic" },
+      { label: "Markov State Model", href: "/pim/markov" },
+    ],
+    tips: [
+      "Sentiment scores update with each ingestion run — check timestamps before drawing conclusions.",
+      "A divergence between sentiment and Markov state (e.g. positive sentiment in a bear-regime state) may signal a regime transition.",
+    ],
+  },
+
+  "/pim/universe": {
+    title: "Investment Universe",
+    chapter: "29",
+    overview:
+      "The Investment Universe page lets you manage the set of securities tracked by the PIM engine. Adding a security here activates sentiment ingestion, Markov state classification, and CIS scoring for that security.",
+    steps: [
+      "Review the current universe to confirm all target securities are included.",
+      "Add new securities using the search and add workflow.",
+      "Remove securities that are no longer tracked to keep scoring clean.",
+      "Check the CIS score column to see current composite intelligence scores.",
+      "Sort by CIS score to identify top-ranked opportunities.",
+    ],
+    prerequisites: [
+      { label: "PIM Overview", href: "/pim" },
+    ],
+    relatedPages: [
+      { label: "Sentiment Analysis", href: "/pim/sentiment" },
+      { label: "Economic Indicators", href: "/pim/economic" },
+      { label: "PE Benchmarking", href: "/pim/pe" },
+    ],
+    tips: [
+      "Keep the universe to securities you actively monitor — larger universes increase ingestion cost.",
+      "CIS scores are only computed for securities in the universe — add a security before expecting it to appear in rankings.",
+    ],
+  },
+
+  "/pim/economic": {
+    title: "Economic Indicators",
+    chapter: "30",
+    overview:
+      "The Economic Indicators page displays FRED macroeconomic data series used by the PIM engine for regime classification. These indicators feed directly into the Markov state model's four-factor state space.",
+    steps: [
+      "Review current values for key indicators (GDP growth, interest rates, inflation, credit spreads).",
+      "Examine the regime classification derived from current indicator levels.",
+      "Check the historical trend charts to understand the current macro context.",
+      "Note indicators approaching threshold levels that may trigger a regime change.",
+      "Cross-reference the current regime with your Markov steady-state probabilities.",
+    ],
+    prerequisites: [
+      { label: "PIM Overview", href: "/pim" },
+    ],
+    relatedPages: [
+      { label: "Markov State Model", href: "/pim/markov" },
+      { label: "Sentiment Analysis", href: "/pim/sentiment" },
+      { label: "Backtest Studio", href: "/pim/backtest" },
+    ],
+    tips: [
+      "FRED data updates on a lag — GDP figures may be 30–90 days old; check the source timestamp.",
+      "Configure FRED_API_KEY in your environment to enable live data; without it, cached/mock data is used.",
+    ],
+  },
+
+  "/pim/markov": {
+    title: "Markov State Model",
+    chapter: "31",
+    overview:
+      "The Markov State Model page visualises the 81-state transition matrix and steady-state distribution for the current portfolio. The model classifies each state by GDP, sentiment, quality, and momentum factors.",
+    steps: [
+      "Review the steady-state distribution to understand long-run regime probabilities.",
+      "Identify the current state and its top transition destinations.",
+      "Examine the transition matrix heatmap to see state-to-state flow probabilities.",
+      "Check confidence intervals — wide CIs indicate limited historical observations for this state.",
+      "Use the top transitions panel to anticipate likely regime changes.",
+    ],
+    prerequisites: [
+      { label: "Economic Indicators", href: "/pim/economic" },
+      { label: "Investment Universe", href: "/pim/universe" },
+    ],
+    relatedPages: [
+      { label: "Backtest Studio", href: "/pim/backtest" },
+      { label: "Economic Indicators", href: "/pim/economic" },
+      { label: "Sentiment Analysis", href: "/pim/sentiment" },
+    ],
+    tips: [
+      "The 81-state space is a 3×3×3×3 grid of GDP × sentiment × quality × momentum — hover any state to see its factor breakdown.",
+      "States with high steady-state probability but low current probability represent mean-reversion opportunities.",
+    ],
+  },
+
+  "/pim/backtest": {
+    title: "Backtest Studio",
+    chapter: "32",
+    overview:
+      "Backtest Studio runs walk-forward backtests of the CIS scoring model against historical portfolio returns. Use it to validate model predictive power before relying on CIS rankings for allocation decisions.",
+    steps: [
+      "Select the backtest period and rebalancing frequency.",
+      "Run the backtest to compute IC, ICIR, and SPC metrics over the validation period.",
+      "Review the IC distribution chart — consistent positive IC indicates model validity.",
+      "Check the SPC (Statistical Process Control) chart for regime-dependent performance.",
+      "Export results for use in investment committee presentations.",
+    ],
+    prerequisites: [
+      { label: "Investment Universe", href: "/pim/universe" },
+      { label: "Markov State Model", href: "/pim/markov" },
+    ],
+    relatedPages: [
+      { label: "Markov State Model", href: "/pim/markov" },
+      { label: "PE Benchmarking", href: "/pim/pe" },
+      { label: "Portfolio Intelligence", href: "/pim" },
+    ],
+    tips: [
+      "IC ≥ 0.05 is considered economically significant; IC ≥ 0.10 is strong for a factor model.",
+      "Run backtests across different market regimes to understand where the model has the most and least predictive power.",
+    ],
+  },
+
+  "/pim/pe": {
+    title: "PE Benchmarking",
+    chapter: "33",
+    overview:
+      "The PE Benchmarking page lists private equity fund assessments for the current tenant, showing DPI, TVPI, and IRR relative to benchmark cohorts. Use it to evaluate fund performance against comparable vintage-year peers.",
+    steps: [
+      "Review the fund list sorted by TVPI to identify outperformers and underperformers.",
+      "Filter by vintage year and strategy to ensure like-for-like comparison.",
+      "Click a fund to open the detailed PE Assessment view.",
+      "Check the benchmark percentile column to see where each fund ranks against its cohort.",
+      "Flag funds below the 25th percentile for further review.",
+    ],
+    prerequisites: [
+      { label: "Investment Universe", href: "/pim/universe" },
+    ],
+    relatedPages: [
+      { label: "Investment Universe", href: "/pim/universe" },
+      { label: "Portfolio Intelligence", href: "/pim" },
+      { label: "Backtest Studio", href: "/pim/backtest" },
+    ],
+    tips: [
+      "DPI (Distributed to Paid-In) is the most reliable performance indicator for mature funds — focus on it for funds past year 5.",
+      "Compare IRR against the PME (Public Market Equivalent) benchmark, not just absolute returns.",
+    ],
+  },
+
+  "/pim/pe/[id]": {
+    title: "PE Assessment Detail",
+    chapter: "34",
+    overview:
+      "The PE Assessment Detail page provides a full fund analysis including J-curve projection, peer comparison, and AI-generated assessment narrative. Use it to build conviction or flag concerns about a specific fund investment.",
+    steps: [
+      "Review the fund summary metrics (DPI, TVPI, IRR, MOIC) at the top of the page.",
+      "Examine the J-curve chart to compare actual NAV progression against the vintage cohort median.",
+      "Review the peer comparison table to see performance vs. benchmark percentiles.",
+      "Read the AI-generated assessment narrative for qualitative insights.",
+      "Export the assessment as a PDF for inclusion in investment committee materials.",
+    ],
+    prerequisites: [
+      { label: "PE Benchmarking list", href: "/pim/pe" },
+    ],
+    relatedPages: [
+      { label: "PE Benchmarking", href: "/pim/pe" },
+      { label: "Backtest Studio", href: "/pim/backtest" },
+      { label: "Portfolio Intelligence", href: "/pim" },
+    ],
+    tips: [
+      "The AI narrative is generated from the quantitative metrics — review the underlying data before sharing the narrative externally.",
+      "Use the PDF export for investment memos; the exported document includes a disclaimer about AI-generated content.",
+    ],
+  },
 };

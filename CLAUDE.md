@@ -170,6 +170,19 @@ Full backlog: `BACKLOG.md` · Full context: `CONTEXT.md` · PIM build plan: `doc
 
 ---
 
+## Environment Variables — Optional
+
+These are optional at startup; the relevant modules degrade gracefully when absent.
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `POLYGON_API_KEY` | Polygon.io news feed for PIM sentiment ingestion | (PIM sentiment module disabled) |
+| `FRED_API_KEY` | FRED macroeconomic data for PIM economic indicators | (FRED data unavailable; mock data used) |
+
+See `.env.example` for the full list of required and optional variables.
+
+---
+
 ## PIM Transition — To-Be Stack Delta
 
 When working on PIM Sprint 0+ items, be aware of these additions:

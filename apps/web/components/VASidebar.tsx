@@ -32,8 +32,15 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard", label: "Dashboard", icon: "grid" },
       { href: "/marketplace", label: "Marketplace", icon: "store" },
       { href: "/excel-import", label: "Import Excel", icon: "upload" },
-      { href: "/afs", label: "AFS Import", icon: "file-text" },
       { href: "/org-structures", label: "Groups", icon: "users" },
+    ],
+  },
+  {
+    key: "afs",
+    label: "AFS",
+    items: [
+      { href: "/afs",            label: "Engagements", icon: "file-text" },
+      { href: "/afs/frameworks", label: "Frameworks",  icon: "folder"    },
     ],
   },
   {
@@ -52,6 +59,19 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/runs", label: "Runs", icon: "play" },
       { href: "/budgets", label: "Budgets", icon: "dollar" },
       { href: "/covenants", label: "Covenants", icon: "shield" },
+    ],
+  },
+  {
+    key: "intelligence",
+    label: "INTELLIGENCE",
+    items: [
+      { href: "/pim",           label: "Overview",  icon: "layers"     },
+      { href: "/pim/sentiment", label: "Sentiment", icon: "play"       },
+      { href: "/pim/universe",  label: "Universe",  icon: "store"      },
+      { href: "/pim/economic",  label: "Economic",  icon: "workflow"   },
+      { href: "/pim/markov",    label: "Markov",    icon: "layers"     },
+      { href: "/pim/backtest",  label: "Backtest",  icon: "git-branch" },
+      { href: "/pim/pe",        label: "PE",        icon: "dollar"     },
     ],
   },
   {
