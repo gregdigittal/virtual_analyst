@@ -5,8 +5,6 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from apps.api.app.services.afs.pdf_extractor import (
     PDFExtractResult,
     PDFSection,
@@ -14,7 +12,6 @@ from apps.api.app.services.afs.pdf_extractor import (
     extract_pdf,
     sections_to_json,
 )
-
 
 # ---------------------------------------------------------------------------
 # sections_to_json

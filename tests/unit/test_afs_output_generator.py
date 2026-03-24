@@ -7,15 +7,11 @@ Bug coverage (RED):
 
 from __future__ import annotations
 
-import pytest
-
 from apps.api.app.services.afs.output_generator import (
-    _build_html,
     _md_table_to_html,
     generate_ixbrl,
     generate_pdf_html,
 )
-
 
 # ---------------------------------------------------------------------------
 # _md_table_to_html
