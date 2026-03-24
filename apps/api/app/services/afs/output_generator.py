@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import html
 import io
-import re
 from datetime import datetime
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Shared HTML builder
@@ -53,6 +52,11 @@ def _build_html(
     standard: str = "ifrs",
 ) -> str:
     """Build a full HTML document from section content_json structures."""
+    safe_entity = html.escape(entity_name)
+    safe_period_start = html.escape(period_start)
+    safe_period_end = html.escape(period_end)
+    safe_framework = html.escape(framework_name)
+
     xbrl_ns = ""
     xbrl_header = ""
     if include_xbrl:
@@ -65,8 +69,8 @@ def _build_html(
       </ix:references>
       <ix:resources>
         <xbrli:context id="ctx-current">
-          <xbrli:entity><xbrli:identifier scheme="http://www.example.com">{entity_name}</xbrli:identifier></xbrli:entity>
-          <xbrli:period><xbrli:startDate>{period_start}</xbrli:startDate><xbrli:endDate>{period_end}</xbrli:endDate></xbrli:period>
+          <xbrli:entity><xbrli:identifier scheme="http://www.example.com">{safe_entity}</xbrli:identifier></xbrli:entity>
+          <xbrli:period><xbrli:startDate>{safe_period_start}</xbrli:startDate><xbrli:endDate>{safe_period_end}</xbrli:endDate></xbrli:period>
         </xbrli:context>
       </ix:resources>
     </ix:header>"""
@@ -97,7 +101,7 @@ def _build_html(
 
     parts: list[str] = [
         f'<!DOCTYPE html>\n<html{xbrl_ns}>\n<head>',
-        f'<meta charset="utf-8"><title>{entity_name} — Annual Financial Statements</title>',
+        f'<meta charset="utf-8"><title>{safe_entity} — Annual Financial Statements</title>',
         f"<style>{css}</style></head>\n<body>",
     ]
 
@@ -108,23 +112,23 @@ def _build_html(
     parts.append(f"""
     <div class="cover">
       <h1>Annual Financial Statements</h1>
-      <div class="entity">{entity_name}</div>
-      <div class="period">For the period {period_start} to {period_end}</div>
-      <div class="framework">Prepared in accordance with {framework_name}</div>
+      <div class="entity">{safe_entity}</div>
+      <div class="period">For the period {safe_period_start} to {safe_period_end}</div>
+      <div class="framework">Prepared in accordance with {safe_framework}</div>
       <div class="framework">Generated {datetime.utcnow().strftime('%d %B %Y')}</div>
     </div>""")
 
     # Table of contents
     parts.append('<div class="toc"><h2>Table of Contents</h2><ul>')
     for i, sec in enumerate(sections, 1):
-        title = sec.get("title", f"Section {i}")
+        title = html.escape(sec.get("title", f"Section {i}"))
         parts.append(f"<li>{i}. {title}</li>")
     parts.append("</ul></div>")
 
     # Sections
     for i, sec in enumerate(sections, 1):
         content = sec.get("content_json") or {}
-        title = content.get("title", sec.get("title", f"Section {i}"))
+        title = html.escape(content.get("title", sec.get("title", f"Section {i}")))
         paragraphs = content.get("paragraphs", [])
         references = content.get("references", [])
         warnings = content.get("warnings", [])
@@ -135,20 +139,20 @@ def _build_html(
             ptype = para.get("type", "text")
             pcontent = para.get("content", "")
             if ptype == "heading":
-                parts.append(f"<h3>{pcontent}</h3>")
+                parts.append(f"<h3>{html.escape(pcontent)}</h3>")
             elif ptype == "table":
                 parts.append(_md_table_to_html(pcontent))
             else:
-                parts.append(f"<p>{pcontent}</p>")
+                parts.append(f"<p>{html.escape(pcontent)}</p>")
 
         if references:
-            refs_str = ", ".join(references)
+            refs_str = ", ".join(html.escape(r) for r in references)
             parts.append(f'<div class="references">References: {refs_str}</div>')
 
         if warnings:
             parts.append('<div class="warnings"><strong>Notes:</strong><ul>')
             for w in warnings:
-                parts.append(f"<li>{w}</li>")
+                parts.append(f"<li>{html.escape(w)}</li>")
             parts.append("</ul></div>")
 
         parts.append("</div>")
@@ -186,8 +190,8 @@ def generate_docx(
 ) -> bytes:
     """Generate DOCX from sections using python-docx."""
     from docx import Document
-    from docx.shared import Pt, Inches
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt
 
     doc = Document()
 

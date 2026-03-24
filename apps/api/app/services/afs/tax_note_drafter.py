@@ -77,7 +77,10 @@ def _build_tax_prompt(
     # Reconciliation
     recon = computation.get("reconciliation_json", [])
     if isinstance(recon, str):
-        recon = json.loads(recon)
+        try:
+            recon = json.loads(recon)
+        except json.JSONDecodeError:
+            recon = []
     if recon:
         parts.append("### Tax Rate Reconciliation Items")
         for item in recon:
@@ -90,7 +93,10 @@ def _build_tax_prompt(
     # Deferred tax summary
     dtj = computation.get("deferred_tax_json", {})
     if isinstance(dtj, str):
-        dtj = json.loads(dtj)
+        try:
+            dtj = json.loads(dtj)
+        except json.JSONDecodeError:
+            dtj = {}
     if dtj:
         parts.append("### Deferred Tax Summary")
         parts.append(f"- Total deferred tax asset: {dtj.get('total_deferred_tax_asset', 0):,.2f}")
