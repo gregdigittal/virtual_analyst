@@ -218,3 +218,83 @@ See `.claude/agents/` for detailed prompts. Quick reference:
 | `dtf-engineer` | DTF calibration/validation CLI |
 | `frontend-builder` | Next.js pages, Tailwind, VA design system |
 | `financial-reviewer` | Read-only financial/statistical validation |
+
+---
+
+## Safety Protocol
+
+This session may run with `--dangerously-skip-permissions` when launched from agent-hub.
+You MUST follow the Safety Protocol in `~/.claude/rules/agent-hub-safety.md` for all dangerous operations.
+
+**Quick reference:**
+- **Critical** (rm -rf, git reset --hard, force push, DROP TABLE, overwriting existing files):
+  Create rollback file → post ⚠️ warning to Slack → STOP and wait for "go" reply
+- **High** (sudo, kill -9, systemctl stop, editing .env, removing packages):
+  Create rollback file → post ⚠️ warning → sleep 30 → proceed unless "abort" received
+- **Medium** (git reset soft, mv, adding packages):
+  Create rollback file → post 📝 notice → proceed
+
+Rollback files go to: `/home/gregmorris/projects/virtual_analyst/.agent-hub/rollback/`
+
+---
+
+## Slack Output and Progress Rules
+
+Full rules: `~/.claude/rules/agent-hub-slack-output.md`
+
+**Output length — 3500 char limit:**
+- Keep ALL Slack messages under 3500 characters
+- Long output (reports, audits, code >50 lines): write to `.agent-hub/outputs/` and send summary + file path
+
+**Progress updates — for any task with 3+ steps or >30 seconds:**
+1. `🔄 Starting: [task]...`
+2. `⏳ [Step X/Y] [doing...]` before each step
+3. `✅ [Step X/Y] [result]` after each step
+4. `✅ Done. [outcome]. File: [path if applicable]`
+
+---
+
+## Post-Session Context Sync
+
+After every meaningful session — task completion, dispatch completion, or natural session end — write a brief summary to the shared context repo and push it.
+
+### When to write
+
+Trigger on:
+- Completing a task, feature, or backlog item
+- Session ending after substantive work
+
+Skip for: one-line questions, status checks, single clarifications.
+
+### File format
+
+Path: `/home/gregmorris/agent-hub-context/sessions/virtual-analyst/YYYY-MM-DD-brief-title.md`
+
+```markdown
+---
+date: YYYY-MM-DD
+project: virtual-analyst
+---
+
+## What was done
+- [concrete bullet points]
+
+## Current status
+[One paragraph — where the project stands right now]
+
+## Files modified
+- `path/to/file` — what changed
+
+## Next steps
+- [bullet points]
+```
+
+Keep under 200 lines. One file per meaningful session, not per message.
+
+### Push commands
+
+```bash
+mkdir -p /home/gregmorris/agent-hub-context/sessions/virtual-analyst
+# Write the summary file, then:
+cd /home/gregmorris/agent-hub-context && git add -A && git commit -m "virtual-analyst: brief summary" && git push
+```
