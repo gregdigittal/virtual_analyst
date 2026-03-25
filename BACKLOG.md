@@ -19,6 +19,7 @@
 | AFS Module | P1–P6 complete |
 | PIM Module | Sprints 0–6 complete — all 8 routers, full test coverage |
 | **Sprint 8** | ✅ Done (2026-03-16) — PIM-7.7 CI bounds, N-03 E2E, N-05 OpenAPI, N-06 load tests |
+| **Requirements** | Requirements document generated: docs/requirements/2026-03-25-requirements-document.md (v1.0, 2026-03-25) |
 | Tier 5 N-items | **All 8 complete** — N-01, N-02, N-03, N-04, N-05, N-06, N-07, N-08 |
 | Hosted API (Render) | Healthy (free tier, cold-starts ~3–5 min, keepalive cron active) |
 | Hosted Web (Vercel) | Healthy at `www.virtual-analyst.ai` |
